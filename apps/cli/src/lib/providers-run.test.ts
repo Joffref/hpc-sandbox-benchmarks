@@ -39,6 +39,7 @@ describe("forEachProviderWithCreds `only`", () => {
 			"modal-gvisor",
 			"modal-vm",
 			"novita",
+			"namespace",
 		]);
 	});
 

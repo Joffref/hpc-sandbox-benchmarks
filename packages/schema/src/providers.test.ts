@@ -28,6 +28,7 @@ describe("@sandbox-benchmarks/schema providers", () => {
 			"e2b",
 			"modal-gvisor",
 			"modal-vm",
+			"namespace",
 			"novita",
 		]);
 	});

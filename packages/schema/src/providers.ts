@@ -18,7 +18,8 @@ export type ProviderId =
 	| "modal-gvisor"
 	| "modal-vm"
 	| "blaxel"
-	| "novita";
+	| "novita"
+	| "namespace";
 
 /** Can the SDK request a pinned target spec (vCPU / memory) at create() time? */
 export type SpecPinning = "settable" | "fixed" | "unknown";
@@ -136,7 +137,8 @@ export interface ProviderMeta {
  * so it clears the gate anyway. Blaxel's sandbox root is a RAM-derived tmpfs with no independent disk
  * knob, so it mounts a 40 GiB volume at the PTS data dir where the heavy suites write (see
  * packages/providers/src/lib/blaxel-volume.ts) — clearing the gate like the others. Only e2b/novita
- * still CANNOT express disk (the `@e2b/cli` `template create` takes only `--cpu-count`/`--memory-mb`):
+ * (the `@e2b/cli` `template create` takes only `--cpu-count`/`--memory-mb`) and namespace
+ * (`NamespaceConfig` has no disk field at all) still CANNOT express disk:
  * they run with actuals recorded and the heavy suites skip there, surfaced as an explicit coverage gap
  * in the leaderboard, never silently dropped.
  */
@@ -397,6 +399,52 @@ const REGISTRY: Record<ProviderId, Omit<ProviderMeta, "id">> = {
 			streaming: false,
 			syncCapMs: 60_000,
 			detachedPoll: true,
+		},
+	},
+	namespace: {
+		displayName: "Namespace",
+		website: "https://namespace.so",
+		sdkPackage: "@computesdk/namespace",
+		// NSC_TOKEN_FILE, not NSC_TOKEN: CI federates via GitHub's OIDC identity (nscloud-setup +
+		// `nsc auth exchange-github-token`, no stored secret), which lands the token at the CLI's
+		// standard cache path, wired to NSC_TOKEN_FILE — never a bare bearer string in the environment.
+		// This gate is a strict AND (missingCreds has no OR-group concept), so a local run with a bare
+		// NSC_TOKEN alone still skips even though @computesdk/namespace's own fallback chain would
+		// accept it — for local dev, mint a file instead (`nsc token create --token_file <path>` after
+		// `nsc auth login`) and point NSC_TOKEN_FILE at it, mirroring what CI does.
+		requiredEnvVars: ["NSC_TOKEN_FILE"],
+		isolation: {
+			technology: "microVM (dedicated instance)",
+			notes:
+				"Namespace runs each instance on its own hardware/network (namespace.so/docs/architecture/compute). The @computesdk/namespace wrapper deploys one container workload per instance via the Compute API's `containers` shape, and defines no template/snapshot managers (unexposed, same clean skip as novita) — and, unlike every other provider here, no filesystem manager either.",
+		},
+		pricing: {
+			model: "unknown",
+			notes:
+				"Not yet vetted against a published per-second/hour rate for the Compute API this wrapper drives; namespace.so/pricing documents CI-runner minutes, a distinct product.",
+			sourceUrl: "https://namespace.so/pricing",
+		},
+		maturity: {
+			status: "beta",
+			notes:
+				"Local e2e validation wiring; not yet a committed run. The wrapper's `methods.sandbox` declares no `filesystem` table, so computesdk falls back to its UnsupportedFileSystem (every filesystem op throws) — realworld suites that read/write through `sandbox.filesystem` skip on this provider.",
+		},
+		// virtualCpu/memoryMegabytes are independent, uncoupled knobs on the factory config (unlike
+		// blaxel's memory-derived cpu/disk), so the 4 vCPU / 8 GiB target spec is exactly expressible.
+		specPinning: "settable",
+		transport: {
+			// `runCommand` POSTs to the CommandService's RunCommandSync RPC and awaits the full response
+			// with no client-side timeout — but there is no evidence (SDK default, docs, or a measured
+			// probe) of a server-side cap either, unlike e2b's documented 60s or Daytona's measured 408.
+			// Declaring a guessed cap here would trip the schema's own invariant (a finite syncCapMs
+			// requires detachedPoll: true), and there IS no detached alternative — see below — so the
+			// honest declaration is uncapped, and every step, however long, stays synchronous.
+			streaming: false,
+			syncCapMs: null,
+			// No `filesystem` table on the wrapper (see isolation notes) means no pollable done-file for
+			// the harness's background+poll pattern — the durable long-step path other providers get is
+			// simply unavailable here.
+			detachedPoll: false,
 		},
 	},
 };

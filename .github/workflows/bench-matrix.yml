@@ -75,7 +75,11 @@ on:
         type: boolean
         default: false
 
-# Least privilege: jobs only read the checked-out code and upload artifacts (publish elevates).
+# Least privilege, workflow default: jobs only read the checked-out code and upload artifacts (publish
+# elevates to contents: write). `id-token: write` is deliberately NOT granted here — only the `suite`
+# fan-out needs it (it must pass the scope down to bench-suite.yml's cells for Namespace's GitHub OIDC
+# federation), so it is scoped to that job; zizmor flags a workflow-level id-token: write as overly
+# broad since `plan` and `publish` never touch it.
 permissions:
   contents: read
 
@@ -145,6 +149,14 @@ jobs:
     if: >
       github.repository == 'starslingdev/hpc-sandbox-benchmarks' &&
       (github.ref == 'refs/heads/main' || inputs.allow_branch)
+    # A called workflow's token can never exceed its caller's, so the id-token: write that
+    # bench-suite.yml's cells need for Namespace's GitHub OIDC federation has to be granted here too.
+    # Scoped to this job, not the workflow level, per zizmor's excessive-permissions audit; `contents`
+    # is restated because a job-level `permissions:` replaces the workflow default rather than adding
+    # to it.
+    permissions:
+      contents: read
+      id-token: write
     strategy:
       fail-fast: false
       matrix:

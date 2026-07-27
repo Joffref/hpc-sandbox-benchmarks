@@ -21,9 +21,30 @@
 import type { Aggregates, HarnessMetricId, RawRun, ResultGap } from "@sandbox-benchmarks/schema";
 import { aggregate, HARNESS_METRIC_IDS } from "@sandbox-benchmarks/schema";
 import { now as defaultNow, time } from "./internal.ts";
+import { neverReadyReason, waitUntilReady } from "./readiness.ts";
 
-/** The trivial command whose first successful (exitCode 0) return marks the sandbox ready. */
-const READINESS_CMD = "echo ok";
+/**
+ * Per-probe ceiling for THIS driver's readiness loop, deliberately far tighter than the suite path's.
+ *
+ * The two callers want opposite things. The suite path must absorb a cold multi-GiB image pull, so it
+ * accepts a long per-probe wait. Here, how long readiness takes IS the measurement, over
+ * `readinessMaxAttempts` (40) × `readinessRetryDelayMs` (250ms) ≈ a 10s window — and this driver runs
+ * once per cold-start iteration (5 by default). Inheriting the readiness module's generous default
+ * would let an all-hanging probe run turn one iteration into ~13.5 minutes and a default benchmark into
+ * over an hour before producing any result. A healthy probe answers in tens of ms, so 2s is slack
+ * enough to be sure the sandbox isn't up while keeping the pathological case ~90s per iteration.
+ */
+const READINESS_PROBE_TIMEOUT_MS = 2_000;
+/**
+ * Reasons an operation produced no Sample by DECISION rather than by outage — the `skip` arm's wording.
+ * Named because two paths file them now (the live chain and the never-ready bail-out), and a probe
+ * filed under the wrong arm, or under drifted wording, is exactly the misreport the skip/fail split
+ * exists to prevent.
+ */
+const PAYLOAD_DISABLED = "64KiB payload exec disabled for this run";
+const NO_LIST_OP = "provider SDK exposes no sandbox list operation";
+const SNAPSHOT_DISABLED = "snapshot measurement disabled for this run";
+const NO_SNAPSHOT_OP = "provider SDK exposes no snapshot operation";
 /** Writes exactly 64KiB (65536 bytes) to stdout — exec overhead including output streaming. Uses `tr`
  *  rather than `base64` so the stream is exactly 64KiB, matching the metric's name (base64 expands the
  *  input ~33%, overstating the payload). */
@@ -166,28 +187,45 @@ export async function measureLifecycle(
 		// Readiness: retry a trivial exec until it returns exitCode 0 — the FIRST success marks a usable
 		// sandbox. cold_start (t0→ready) is the honest cold start spawn alone can't see; first_exec
 		// (create→ready) isolates the readiness wait. A probe that throws counts as not-ready and retries.
-		let readyAt: number | undefined;
-		for (let attempt = 1; attempt <= readinessMaxAttempts; attempt++) {
-			let ready = false;
-			try {
-				ready = (await sandbox.runCommand(READINESS_CMD)).exitCode === 0;
-			} catch {
-				ready = false;
-			}
-			if (ready) {
-				readyAt = clock();
-				break;
-			}
-			if (attempt < readinessMaxAttempts) await delay(readinessRetryDelayMs);
-		}
+		const readiness = await waitUntilReady(sandbox, {
+			maxAttempts: readinessMaxAttempts,
+			retryDelayMs: readinessRetryDelayMs,
+			probeTimeoutMs: READINESS_PROBE_TIMEOUT_MS,
+			delay,
+		});
+		const readyAt = readiness.ready ? clock() : undefined;
 		if (readyAt === undefined) {
 			// Never went ready: record both readiness Metrics as FAILURES rather than fabricate a timing.
 			// The sandbox was spawned and probed to exhaustion and never came up — that is the loudest
 			// reliability signal this harness can produce, and calling it a "skip" would file it as a
 			// deliberate omission.
-			const reason = `sandbox never ready: no successful "${READINESS_CMD}" in ${readinessMaxAttempts} attempts`;
+			const reason = neverReadyReason(readiness.attempts);
 			fail(HARNESS_METRIC_IDS.firstExec, reason);
 			fail(HARNESS_METRIC_IDS.coldStart, reason);
+			// Stop here. Every probe below execs against this sandbox, and those calls are UNBOUNDED — on a
+			// sandbox that never answered, the first of them can hang indefinitely and undo the bounded gate
+			// above. Bail out, but keep the accounting honest: a Metric this abandons gets a FAILED gap
+			// naming the readiness outage, because the alternative (no Sample, no gap) reads downstream as
+			// "never scheduled" rather than "the sandbox never came up". `finally` still tears down and
+			// still samples teardown — the returned arrays are the same references it appends to.
+			//
+			// Crucially, only for what this configuration WOULD have attempted. A disabled payload, an SDK
+			// with no list, an absent snapshot manager: those are the same decisions they always were, and
+			// the readiness outage doesn't turn them into provider failures. Blanket-failing them would
+			// publish a control-plane outage for calls that were never going to happen — the exact
+			// skip/fail inversion the two helpers above exist to prevent.
+			fail(HARNESS_METRIC_IDS.exec, reason);
+			// One gap, not `controlPlaneSamples` of them: the live path records a gap per failed probe, but
+			// no probe ran here and N copies of one fact is noise, not fidelity.
+			fail(HARNESS_METRIC_IDS.controlPlaneInfo, reason);
+			if (wantPayload) fail(HARNESS_METRIC_IDS.execPayload64k, reason);
+			else skip(HARNESS_METRIC_IDS.execPayload64k, PAYLOAD_DISABLED);
+			if (compute.sandbox.list) fail(HARNESS_METRIC_IDS.controlPlaneList, reason);
+			else skip(HARNESS_METRIC_IDS.controlPlaneList, NO_LIST_OP);
+			if (!wantSnapshot) skip(HARNESS_METRIC_IDS.snapshot, SNAPSHOT_DISABLED);
+			else if (!compute.snapshot) skip(HARNESS_METRIC_IDS.snapshot, NO_SNAPSHOT_OP);
+			else fail(HARNESS_METRIC_IDS.snapshot, reason);
+			return { samples, gaps };
 		} else {
 			sample(HARNESS_METRIC_IDS.firstExec, floor(readyAt - createdAt));
 			sample(HARNESS_METRIC_IDS.coldStart, floor(readyAt - t0));
@@ -200,7 +238,7 @@ export async function measureLifecycle(
 		if (wantPayload) {
 			await step(HARNESS_METRIC_IDS.execPayload64k, () => sandbox.runCommand(PAYLOAD_CMD));
 		} else {
-			skip(HARNESS_METRIC_IDS.execPayload64k, "64KiB payload exec disabled for this run");
+			skip(HARNESS_METRIC_IDS.execPayload64k, PAYLOAD_DISABLED);
 		}
 
 		// Control-plane read: getInfo, sampled within this one (cheap) sandbox to build a distribution
@@ -219,16 +257,16 @@ export async function measureLifecycle(
 				await step(HARNESS_METRIC_IDS.controlPlaneList, () => listSandboxes());
 			}
 		} else {
-			skip(HARNESS_METRIC_IDS.controlPlaneList, "provider SDK exposes no sandbox list operation");
+			skip(HARNESS_METRIC_IDS.controlPlaneList, NO_LIST_OP);
 		}
 
 		// Snapshot: when requested and the SDK exposes a snapshot manager. Best-effort delete afterwards
 		// so a measured snapshot never leaks into the account.
 		const snapshots = compute.snapshot;
 		if (!wantSnapshot) {
-			skip(HARNESS_METRIC_IDS.snapshot, "snapshot measurement disabled for this run");
+			skip(HARNESS_METRIC_IDS.snapshot, SNAPSHOT_DISABLED);
 		} else if (!snapshots) {
-			skip(HARNESS_METRIC_IDS.snapshot, "provider SDK exposes no snapshot operation");
+			skip(HARNESS_METRIC_IDS.snapshot, NO_SNAPSHOT_OP);
 		} else {
 			try {
 				const snap = await time(() => snapshots.create(sandbox.sandboxId));

@@ -114,6 +114,14 @@ jobs:
       # the mechanical formatting here is exactly what a developer's `bun run lint:fix` would do. Scope
       # the write to data/dataset (JSON only): this job never touches LEADERBOARD.md, and Biome leaves
       # any rendered Markdown untouched anyway.
+      #
+      # A Run document grows with every provider x suite x metric the matrix gains, and Biome SKIPS any
+      # file over `files.maxSize` — emitting a warning that `--error-on-warnings` below turns into a job
+      # failure (run 30322186937 died this way at 2.2 MiB against the 2 MiB project cap, and the autofix
+      # silently no-op'd on the very file it exists to format). `biome.json` therefore carries a
+      # `data/dataset/runs/*.json` override raising the cap to 16 MiB for these generated documents only;
+      # hand-written source keeps the strict project-wide cap. Note biome.json cannot hold comments —
+      # Biome silently discards a commented config and falls back to its defaults — hence this note here.
       - name: Autofix the promoted dataset formatting (Biome)
         run: bunx biome check data/dataset --write
 

@@ -133,6 +133,21 @@ export interface StepOptions {
 	silent?: boolean;
 }
 
+/**
+ * Does this error mean the sandbox has NO filesystem API, as opposed to one that briefly failed?
+ *
+ * computesdk gives an adapter that declares no `filesystem` table its `UnsupportedFileSystem` stub
+ * (@computesdk/provider), which is a truthy object whose every method throws
+ * "Filesystem operations are not supported by <provider>'s sandbox environment." So the only way to
+ * tell "never going to work" from "wedged for a moment" is the error itself — matched on the stable
+ * phrase rather than the provider-interpolated remainder. Getting this wrong is asymmetric, which is
+ * why it matches narrowly: a missed match costs the old dead-step failure, while a false match would
+ * silently abandon a working filesystem for the (fully supported, slightly chattier) exec poll.
+ */
+function isUnsupportedFilesystem(err: unknown): boolean {
+	return err instanceof Error && /not supported by .*sandbox environment/i.test(err.message);
+}
+
 /** Race a promise against a timeout, clearing the timer either way. */
 export async function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
 	let timer: ReturnType<typeof setTimeout> | undefined;
@@ -352,6 +367,17 @@ export class StepRunner {
 	readonly stepLog: StepLogEntry[] = [];
 	/** The in-sandbox preamble prepended to every step, carrying this run's PTS pass policy. */
 	private readonly preamble: string;
+	/**
+	 * The sandbox filesystem WHILE it is usable — cleared for good the first time it proves it isn't.
+	 *
+	 * "Exposes a filesystem" is not "has a working one": computesdk hands an adapter that declares no
+	 * `filesystem` table its UnsupportedFileSystem stub, a present and truthy object that throws on
+	 * every call, so a truthiness check picks the fs poll and then every poll throws (live on namespace:
+	 * 12 straight failures killed a step the loop could only read as a dead sandbox). Scoped to the
+	 * RUNNER, not to one step, because it is a fact about the sandbox — a per-step local would re-probe
+	 * and re-announce the same permanent absence on every detached step of the run.
+	 */
+	private pollFs?: SandboxFilesystem;
 
 	constructor(
 		private readonly sandbox: SandboxHandle,
@@ -366,6 +392,32 @@ export class StepRunner {
 		passPolicy: PtsPassPolicy = DEFAULT_PTS_PASS_POLICY,
 	) {
 		this.preamble = buildPreamble(passPolicy);
+		this.pollFs = sandbox.filesystem;
+	}
+
+	/**
+	 * Observe a detached step's completion once: the exit code, or `undefined` while it is still running.
+	 *
+	 * Prefers the filesystem done-file and degrades PERMANENTLY to the exec `cat` poll the first time the
+	 * filesystem proves unsupported — retrying in the same call rather than surfacing a failure, because
+	 * an absent capability is a discovery, not evidence the sandbox died. Every other error propagates
+	 * untouched to the caller's consecutive-failure policy: a transient fs blip must keep the fs path (a
+	 * real Blaxel incident, 2026-07-19), where permanent absence must abandon it, and only the stub's own
+	 * error distinguishes the two. A dead sandbox is still caught, because the cat poll will fail too.
+	 */
+	private async pollDoneOnce(donePath: string, label: string): Promise<number | undefined> {
+		if (!this.pollFs) return this.pollDoneViaCat(donePath);
+		try {
+			return await this.pollDoneViaFs(this.pollFs, donePath);
+		} catch (err) {
+			if (!isUnsupportedFilesystem(err)) throw err;
+			console.log(
+				`    [${label}] this sandbox exposes no working filesystem; ` +
+					`falling back to the exec done-file poll`,
+			);
+			this.pollFs = undefined;
+			return this.pollDoneViaCat(donePath);
+		}
 	}
 
 	/**
@@ -437,7 +489,6 @@ export class StepRunner {
 		opts: StepOptions = {},
 	): Promise<CommandResult> {
 		console.log(`\n=== [${label}] (detached) ===`);
-		const fs = this.sandbox.filesystem;
 		const started = performance.now();
 		const stopHeartbeat = startHeartbeat(label, started, timeoutMs);
 		const tag = `bench-${randomUUID()}`;
@@ -471,9 +522,7 @@ export class StepRunner {
 				// for the rest of the command budget (see MAX_CONSECUTIVE_POLL_FAILURES).
 				let exitCode: number | undefined;
 				try {
-					exitCode = fs
-						? await this.pollDoneViaFs(fs, donePath)
-						: await this.pollDoneViaCat(donePath);
+					exitCode = await this.pollDoneOnce(donePath, label);
 					consecutivePollFailures = 0;
 				} catch (err) {
 					consecutivePollFailures++;
@@ -487,7 +536,9 @@ export class StepRunner {
 				}
 				if (exitCode !== undefined) {
 					try {
-						const stdout = await this.readCompletedLog(fs, logPath, label);
+						// this.pollFs, not the raw capability: once the poll has degraded, the read-back must not
+						// re-try the same broken API and burn its whole retry budget rediscovering that.
+						const stdout = await this.readCompletedLog(this.pollFs, logPath, label);
 						return this.finishStep(label, started, { exitCode, stdout }, opts);
 					} finally {
 						// The read-back is done — its contents are in memory — so drop the log/done files
@@ -503,7 +554,7 @@ export class StepRunner {
 					// A timed-out step is otherwise a black box: the log lives only inside the sandbox, and
 					// a step that hangs is exactly the one whose output we need. Best-effort — a failed read
 					// must not mask the timeout.
-					const tail = await this.readLogTail(fs, logPath);
+					const tail = await this.readLogTail(this.pollFs, logPath);
 					// Best-effort stop the detached job; don't let a failing kill mask the timeout.
 					await this.sandbox
 						.runCommand(`pkill -f ${shellQuote(tag)} || true`)

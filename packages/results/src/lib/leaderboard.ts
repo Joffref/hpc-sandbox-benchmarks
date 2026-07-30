@@ -23,6 +23,7 @@
  */
 import type {
 	Dimension,
+	GapCause,
 	GapOutcome,
 	GapScope,
 	MedianInterval,
@@ -255,13 +256,34 @@ export interface Leaderboard {
 }
 
 /**
- * Whether a skip reason is a disk-capacity gap — i.e. the harness wrote its "Insufficient disk: …"
- * marker because the sandbox had less free disk than the suite's `minDiskGb`. Matched by prefix rather
- * than importing the harness so `results` stays SDK-free; kept in lockstep with `runSuiteOnSandbox`'s
- * reason string (the one place that phrasing is authored).
+ * Whether the Run's producer was able to classify gaps at all — true once ANY gap carries a structured
+ * cause. This is what decides whether an ABSENT cause is meaningful.
+ *
+ * Deliberately not `schemaVersion >= 4`. The version says which fields the document MAY carry, not
+ * whether its producer populated them, and the two come apart precisely where it matters: re-aggregating
+ * a historical run emits a v4 document whose gaps have no causes, because the shard markers it merges
+ * were written by a harness that predated the taxonomy. Gating on the version would strip the disk
+ * classification off every backfilled run in the committed series; gating on the evidence does not.
  */
-function isDiskGap(reason: string): boolean {
-	return /^insufficient disk/i.test(reason.trim());
+function producerClassifiesGaps(run: Run): boolean {
+	return run.providers.some((provider) => provider.gaps.some((gap) => gap.cause !== undefined));
+}
+
+/**
+ * Whether a gap is a disk-capacity skip — the sandbox had less free disk than the suite's `minDiskGb`.
+ *
+ * Reads the structured {@link ResultGap.cause} whenever the Run's producer classified anything. In that
+ * case an absent cause means "this gap is unclassified", and prose-matching it anyway would manufacture
+ * a confident diagnosis for an event the producer declined to diagnose — exactly what the taxonomy's
+ * no-catch-all rule forbids.
+ *
+ * The prose match survives only for Runs whose producer emitted no causes at all, where the English
+ * sentence is the sole record of the fact. A compatibility shim over a closed input set — not a parser
+ * to extend. A NEW fact belongs in the cause taxonomy.
+ */
+function isDiskGap(gap: { reason: string; cause?: GapCause }, classified: boolean): boolean {
+	if (gap.cause !== undefined) return gap.cause.kind === "disk-shortfall";
+	return !classified && /^insufficient disk/i.test(gap.reason.trim());
 }
 
 /** Rendering/sort precedence: the structural absences first, the merely-unreported last. */
@@ -311,6 +333,9 @@ function suitesExercised(run: Run): string[] {
  */
 function coverageGapsOf(run: Run): CoverageGap[] {
 	const exercised = suitesExercised(run);
+	// Computed once per Run, not per gap: whether an absent cause means "unclassified" or "this producer
+	// had no causes to give".
+	const classified = producerClassifiesGaps(run);
 
 	const gaps = run.providers.flatMap((provider): CoverageGap[] => {
 		// A zero-evidence registry row (never dispatched, or every cell lost before reporting) gets the
@@ -335,7 +360,7 @@ function coverageGapsOf(run: Run): CoverageGap[] {
 				// before the suite was attempted. A failure's reason is an error message, and one that merely
 				// happens to start with "insufficient disk" is the workload running out of space mid-flight —
 				// a different fact, and not the structural "cannot host this at all" the ❌ claims.
-				disk: gap.outcome === "skipped" && isDiskGap(gap.reason),
+				disk: gap.outcome === "skipped" && isDiskGap(gap, classified),
 			})),
 			...exercised
 				.filter((suite) => !accountedFor.has(suite))

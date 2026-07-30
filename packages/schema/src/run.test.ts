@@ -212,6 +212,38 @@ describe("Run schema", () => {
 		expect(parseRun(suiteDisabled).providers[0]?.gaps[0]?.cause?.kind).toBe("measurement-disabled");
 	});
 
+	it("keeps the derived marker out of a pre-v4 Run, and says nothing about the catalog", () => {
+		// The marker is version-gated, which is a property of the DOCUMENT. Whether it agrees with the
+		// Metric Catalog is deliberately NOT checked here: `parseRun` must not make an already-published
+		// Run's validity a function of the current catalog, or reclassifying one metric would retroactively
+		// invalidate the whole committed series. That agreement is a producer-side gate (see isDerivedMetric).
+		const withMarker = (schemaVersion: string) => {
+			const run = structuredClone(validRun);
+			run.schemaVersion = schemaVersion;
+			const metric = run.providers[0]?.metrics[0] as Record<string, unknown>;
+			metric.derived = true;
+			return run;
+		};
+		expect(() => parseRun(withMarker("3"))).toThrow(/v4-or-later Run/);
+		// At v4 the marker is legal on any metric — including one the catalog calls measured, because the
+		// catalog is not consulted. The value is the document's own claim about itself.
+		expect(parseRun(withMarker("4")).providers[0]?.metrics[0]?.derived).toBe(true);
+	});
+
+	it("rejects a replicate breakdown on a derived Metric", () => {
+		// A computed row is one value derived from the merged measured set, so per-sandbox clusters would
+		// claim a between-machine spread nobody measured. Document-internal, so it needs no catalog.
+		const run = structuredClone(validRun);
+		run.schemaVersion = "4";
+		const metric = run.providers[0]?.metrics[0] as Record<string, unknown>;
+		metric.derived = true;
+		metric.replicates = [
+			{ index: 0, samples: [16.19, 16.3] },
+			{ index: 1, samples: [16.08] },
+		];
+		expect(() => parseRun(run)).toThrow(/derived MetricResult without a replicate breakdown/);
+	});
+
 	it("rejects an unknown schemaVersion", () => {
 		expect(() => parseRun({ ...validRun, schemaVersion: "1" })).toThrow();
 		expect(() => parseRun({ ...validRun, schemaVersion: "5" })).toThrow();

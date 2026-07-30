@@ -332,3 +332,37 @@ describe("aggregateRuns suite-shortfall gap folding", () => {
 		expect(daytona?.gaps).toEqual([shortfall(reason), shortfall(other)]);
 	});
 });
+
+describe("aggregateRuns derived-metric marking", () => {
+	it("marks the economics rows it re-derives, so the document says what is computed", () => {
+		// The guarantee the schema deliberately does NOT enforce (a published Run's validity must not track
+		// the live catalog) is pinned here instead, on the producer that owns catalog knowledge.
+		const merged = aggregateRuns([
+			shard([provider("daytona-vm", [metric(HARNESS_METRIC_IDS.spawn, [1000])])]),
+		]);
+		const metrics = merged.providers.find((p) => p.providerId === "daytona-vm")?.metrics ?? [];
+		const economics = metrics.filter((m) => m.metricId.startsWith("usd_"));
+		expect(economics.length).toBeGreaterThan(0);
+		for (const row of economics) expect(row.derived).toBe(true);
+		// And measurements stay unmarked — the marker means "computed", not "present".
+		expect(metrics.find((m) => m.metricId === HARNESS_METRIC_IDS.spawn)?.derived).toBeUndefined();
+	});
+
+	it("drops a shard's stale economics row even when the catalog no longer knows the id", () => {
+		// isDerivedMetric prefers the document's marker: a marked row is never re-admitted as a measurement
+		// and pooled into a ranking, which a catalog-only test would do for a renamed or retired id.
+		const stale = provider("daytona-vm", [metric("node_web_tooling_runs_per_s", [10])]);
+		stale.metrics.push({
+			metricId: "usd_per_retired_thing",
+			samples: [42],
+			aggregates: aggregate([42]),
+			derived: true,
+		});
+		const merged = aggregateRuns([shard([stale])]);
+		const ids =
+			merged.providers.find((p) => p.providerId === "daytona-vm")?.metrics.map((m) => m.metricId) ??
+			[];
+		expect(ids).not.toContain("usd_per_retired_thing");
+		expect(ids).toContain("node_web_tooling_runs_per_s");
+	});
+});

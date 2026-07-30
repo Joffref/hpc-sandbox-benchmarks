@@ -48,6 +48,20 @@ export const metricResultSchema = type({
 	// the clusters distinct so render-time inference can resample the between-sandbox level. Absent at
 	// R = 1, so a single-replicate Run is byte-identical to the pre-replicate schema.
 	"replicates?": metricReplicateSchema.array(),
+	/**
+	 * Marks a COMPUTED Metric (v4+): the economics rows, which are derived from other Metrics plus the
+	 * provider's published price rather than measured in any sandbox.
+	 *
+	 * Without it the document could not tell the two apart — `usd_per_hour` sat in `metrics` looking
+	 * exactly like a measurement, and only a Metric Catalog lookup (`getMetric(id)?.derived`) separated
+	 * them. That made a dataset non-self-describing: a consumer validating the JSON on its own would
+	 * rank a price alongside measured throughput, and a Run outlives the catalog version that produced
+	 * it. The narrow below keeps document and catalog in agreement rather than merely hoping.
+	 *
+	 * A literal `true`, not a boolean: the flag is a marker, so `derived: false` on a derived Metric is
+	 * unrepresentable rather than merely wrong. Absent means measured.
+	 */
+	"derived?": "true",
 }).narrow((metric, ctx) => {
 	// `aggregate()` already guarantees these at the producer; enforce them at the dataset boundary too,
 	// so a hand-edited/corrupt persisted Run can't carry NaN/Infinity samples or a sample count that
@@ -57,6 +71,12 @@ export const metricResultSchema = type({
 	}
 	if (metric.aggregates.n !== metric.samples.length) {
 		return ctx.mustBe("a MetricResult whose aggregates.n equals samples.length");
+	}
+	// A derived Metric is computed from the merged measured set as a single value, so it has no
+	// per-sandbox clusters to break out — a replicate breakdown on one would claim a between-machine
+	// spread that was never measured.
+	if (metric.derived === true && metric.replicates !== undefined) {
+		return ctx.mustBe("a derived MetricResult without a replicate breakdown");
 	}
 	if (metric.replicates !== undefined) {
 		// The replicate structure only exists to hold ≥2 clusters; a lone replicate is just `samples`.
@@ -437,9 +457,10 @@ export function providerStatusText(p: ProviderRun): string {
  * replicate sandboxes of one (provider, suite) into {@link MetricResult.replicates}.
  *
  * v4 makes the document SELF-DESCRIBING — every fact a reader needs is expressible from the file,
- * rather than recoverable only by knowing something the file does not say. The first of those facts:
+ * rather than recoverable only by knowing something the file does not say:
  *
  *  - {@link ResultGap.cause} classifies a failure as data rather than prose.
+ *  - {@link MetricResult.derived} separates a computed row from a measured one without a catalog lookup.
  *
  * Every version validates here — already-published Runs are read unchanged, and the parser never
  * migrates them in place.
@@ -477,14 +498,17 @@ export const runSchema = type({
 			return ctx.mustBe("a v3-or-later Run when a MetricResult carries replicates");
 		}
 	}
-	// The v4 self-description fields. A pre-v4 consumer handed one would fall back to the pre-v4 reading
-	// of the same fact — here, re-parsing `reason` prose for a classification the document already
-	// carries — which is a quietly wrong answer, never a loud one. Reported by FIELD rather than as one
-	// blanket message, so the error names what to fix.
+	// The v4 self-description fields, gated together because they arrived together. A pre-v4 consumer
+	// handed one would fall back to the pre-v4 reading of the same fact — re-parsed `reason` prose, a
+	// price treated as a measurement — each a quietly wrong answer, never a loud one. Reported by FIELD
+	// rather than as one blanket message, so the error names what to fix.
 	if (version < 4) {
 		for (const provider of run.providers) {
 			if (provider.gaps.some((gap) => gap.cause !== undefined)) {
 				return ctx.mustBe("a v4-or-later Run when a ResultGap carries a structured cause");
+			}
+			if (provider.metrics.some((metric) => metric.derived !== undefined)) {
+				return ctx.mustBe("a v4-or-later Run when a MetricResult carries the derived marker");
 			}
 		}
 	}

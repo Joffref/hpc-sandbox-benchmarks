@@ -29,8 +29,8 @@ import type {
 import {
 	aggregate,
 	deriveEconomics,
-	getMetric,
 	getProvider,
+	isDerivedMetric,
 	parseRun,
 } from "@sandbox-benchmarks/schema";
 
@@ -40,12 +40,6 @@ import {
  * rather than a literal control character in a template string (which makes git read the file as binary).
  */
 const NUL = "\u0000";
-
-/** A measured (non-derived) Metric: one a suite actually produced, vs. a derived economics Metric. */
-function isMeasured(metric: MetricResult): boolean {
-	// Derived metrics (economics) are recomputed post-merge; everything else is real measurement.
-	return getMetric(metric.metricId)?.derived !== true;
-}
 
 /** One provider's slice from one shard, tagged with the replicate sandbox the shard was measured under. */
 interface ReplicateSlice {
@@ -93,7 +87,7 @@ function mergeProvider(providerId: string, entries: readonly ReplicateSlice[]): 
 	const byMetric = new Map<string, Map<number, MetricResult>>();
 	for (const { slice, replicateIndex } of entries) {
 		for (const metric of slice.metrics) {
-			if (!isMeasured(metric)) continue;
+			if (isDerivedMetric(metric)) continue;
 			let byReplicate = byMetric.get(metric.metricId);
 			if (!byReplicate) {
 				byReplicate = new Map<number, MetricResult>();

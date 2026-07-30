@@ -25,7 +25,8 @@
 //   5. Both live-run jobs (smoke's job and the reusable fan-out) outlast the longest registered sandbox
 //      lifetime by a fixed margin, so a suite budget increase cannot leave an otherwise healthy job to
 //      be killed by Actions first.
-//   6. Nesting wiring (suite-matrix caller + reusable provider job name) — see workflow-nesting.ts.
+//   6. Nesting wiring (suite-matrix caller + reusable provider job name) and the replicate axis
+//      reaching the cell as BENCH_REPLICATES data rather than as a matrix axis — see workflow-nesting.ts.
 //
 // YAML navigation lives in workflow-yaml.ts; nesting checks in workflow-nesting.ts. This file owns
 // credential/timeout invariants plus runCheck orchestration, and re-exports the public surface the
@@ -57,9 +58,13 @@ export {
 	checkSuiteMatrixCaller,
 	checkSuiteWorkflowNesting,
 	EXPECTED_PROVIDER_NAME_EXPR,
+	EXPECTED_REPLICATES_ARG,
+	EXPECTED_REPLICATES_ENV_EXPR,
+	EXPECTED_REPLICATES_INPUT_EXPR,
 	EXPECTED_SUITE_MATRIX_EXPR,
 	EXPECTED_SUITE_NAME_EXPR,
 	matrixSuiteCaller,
+	REPLICATES_ENV_KEY,
 } from "./workflow-nesting.ts";
 export type { DispatchInput } from "./workflow-yaml.ts";
 export {
@@ -233,6 +238,42 @@ export function checkWorkflowTimeouts(timeoutByWorkflow: Record<string, number>)
 		);
 }
 
+/** The run-step env key carrying the cell's job budget down to `bench-suite`. */
+export const CELL_BUDGET_ENV_KEY = "BENCH_CELL_BUDGET_MINUTES";
+
+/**
+ * Invariant 5 (second half): the budget the cell's run step advertises equals the job's real
+ * `timeout-minutes`.
+ *
+ * `bench-suite` refuses a `--max-concurrency` cap whose serial waves cannot fit the cell's budget —
+ * the check that keeps a capped fan-out from being cancelled mid-flight with all R shards lost. It
+ * learns that budget from this env key, because `timeout-minutes` is not readable from an expression
+ * context, so the value is a hand-copied literal. Copied literals drift: raising the job timeout
+ * without raising the env would keep rejecting caps that now fit, and lowering it without lowering the
+ * env would wave through caps that no longer do — the exact failure the guard exists to prevent,
+ * re-entered through its own configuration. Assert them equal.
+ */
+export function checkCellBudgetEnv(
+	env: Record<string, string>,
+	timeoutMinutes: number,
+	workflow: string,
+): string[] {
+	const raw = env[CELL_BUDGET_ENV_KEY];
+	if (raw === undefined) {
+		return [
+			`${workflow}: run step must set ${CELL_BUDGET_ENV_KEY} so bench-suite can reject a ` +
+				`--max-concurrency cap that cannot fit the job's ${timeoutMinutes}-minute budget`,
+		];
+	}
+	if (Number(raw) !== timeoutMinutes) {
+		return [
+			`${workflow}: ${CELL_BUDGET_ENV_KEY} is "${raw}" but the job's timeout-minutes is ` +
+				`${timeoutMinutes} — the cell would size its fan-out against a budget it does not have`,
+		];
+	}
+	return [];
+}
+
 /**
  * The whole gate against the real workflow files under `root` — the single owner of which files feed
  * the gate, used by the real-file test in workflow-registry-sync.test.ts.
@@ -243,17 +284,22 @@ export function runCheck(root: string = findRepoRoot()): string[] {
 	// The matrix lane's credential block + run-job timeout live in the reusable bench-suite.yml that
 	// every suite job calls, so the "matrix side" of Invariants 3–5 reads that file.
 	const suiteWf = readWorkflow(SUITE_WORKFLOW, root);
+	// Read once and share: the suite run step's env feeds both the credential gate and the cell-budget
+	// gate, and its job timeout feeds both the margin gate and that same budget gate.
+	const suiteEnv = stepEnv(suiteWf, SUITE_JOB, RUN_STEP, SUITE_WORKFLOW);
+	const suiteTimeout = jobTimeoutMinutes(suiteWf, SUITE_JOB, SUITE_WORKFLOW);
 	return [
 		...checkProviderInput(dispatchInput(smoke, "provider", SMOKE_WORKFLOW)),
 		...checkSuiteInput(dispatchInput(smoke, "suite", SMOKE_WORKFLOW)),
 		...checkCredentialEnv({
 			[SMOKE_WORKFLOW]: stepEnv(smoke, SMOKE_JOB, RUN_STEP, SMOKE_WORKFLOW),
-			[SUITE_WORKFLOW]: stepEnv(suiteWf, SUITE_JOB, RUN_STEP, SUITE_WORKFLOW),
+			[SUITE_WORKFLOW]: suiteEnv,
 		}),
 		...checkWorkflowTimeouts({
 			[SMOKE_WORKFLOW]: jobTimeoutMinutes(smoke, SMOKE_JOB, SMOKE_WORKFLOW),
-			[SUITE_WORKFLOW]: jobTimeoutMinutes(suiteWf, SUITE_JOB, SUITE_WORKFLOW),
+			[SUITE_WORKFLOW]: suiteTimeout,
 		}),
+		...checkCellBudgetEnv(suiteEnv, suiteTimeout, SUITE_WORKFLOW),
 		...checkSuiteMatrixCaller(matrixSuiteCaller(matrix, MATRIX_WORKFLOW), MATRIX_WORKFLOW),
 		...checkSuiteWorkflowNesting(suiteWf, SUITE_WORKFLOW),
 	];

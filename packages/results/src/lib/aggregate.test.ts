@@ -172,41 +172,6 @@ describe("aggregateRuns", () => {
 		expect(merged.generatedAt).toBe("2026-06-02T00:00:00.000Z");
 	});
 
-	it("discloses the conflicting host CPUs when a provider's shards saw differing models", () => {
-		const a = shard([
-			{
-				...provider("daytona-vm", [metric("node_web_tooling_runs_per_s", [10])]),
-				observedSpecs: { cpuModel: "AMD EPYC 9R14", cpuMicroarch: "Zen 4 (Genoa)" },
-			},
-		]);
-		const b = shard([
-			{
-				...provider("daytona-vm", [metric("pybench_milliseconds", [900])]),
-				observedSpecs: { cpuModel: "AMD EPYC 9R45", cpuMicroarch: "Zen 5 (Turin)" },
-			},
-		]);
-		const merged = aggregateRuns([a, b]);
-		const daytona = merged.providers.find((p) => p.providerId === "daytona-vm");
-		// Sorted, distinct — names both machines rather than a bare "heterogeneous" flag.
-		expect(daytona?.observedSpecs.hostCpuModels).toEqual(["AMD EPYC 9R14", "AMD EPYC 9R45"]);
-	});
-
-	it("does not disclose host CPUs when every shard saw the same host CPU", () => {
-		const same = { cpuModel: "AMD EPYC 9R45", cpuMicroarch: "Zen 5 (Turin)" };
-		const a = shard([
-			{
-				...provider("daytona-vm", [metric("node_web_tooling_runs_per_s", [10])]),
-				observedSpecs: same,
-			},
-		]);
-		const b = shard([
-			{ ...provider("daytona-vm", [metric("pybench_milliseconds", [900])]), observedSpecs: same },
-		]);
-		const merged = aggregateRuns([a, b]);
-		const daytona = merged.providers.find((p) => p.providerId === "daytona-vm");
-		expect(daytona?.observedSpecs.hostCpuModels).toBeUndefined();
-	});
-
 	it("unions rich host metadata across shards and removes byte-identical duplicates", () => {
 		const record = {
 			source: "mise/system-provider" as const,

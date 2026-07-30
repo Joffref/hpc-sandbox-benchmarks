@@ -115,11 +115,6 @@ function mergeProvider(providerId: string, entries: readonly ReplicateSlice[]): 
 	// observed-specs: first non-undefined value per key wins (all shards of a provider ran the same spec).
 	const observedSpecs: ObservedSpecs = {};
 	let specMatched: boolean | undefined;
-	// Cross-shard hardware heterogeneity: shards of one provider are MEANT to be the same machine, so a
-	// divergent host cpuModel means the provider scheduled them onto different hardware — a confound the
-	// published Run must disclose. cpuModel is the key (cpuMicroarch is derived from it, so distinct
-	// microarchs can't arise without distinct models); collect the distinct disclosures, publish below.
-	const hostCpuModels = new Set<string>();
 	const hostMetadata: HostMetadataRecord[] = [];
 	const seenHostMetadata = new Set<string>();
 
@@ -147,7 +142,6 @@ function mergeProvider(providerId: string, entries: readonly ReplicateSlice[]): 
 				(observedSpecs as Record<string, unknown>)[key] = value;
 			}
 		}
-		if (slice.observedSpecs.cpuModel) hostCpuModels.add(slice.observedSpecs.cpuModel);
 		// specMatched folds ORDER-INDEPENDENTLY across shards (was first-shard-wins, which made ranking
 		// eligibility depend on shard arrival order). The merged provider row shares one aggregate, so a
 		// single shard that ran off the target spec (specMatched === false) contaminates it and
@@ -156,12 +150,6 @@ function mergeProvider(providerId: string, entries: readonly ReplicateSlice[]): 
 		// evidence", see computeSpecMatched).
 		if (slice.specMatched === false) specMatched = false;
 		else if (slice.specMatched === true && specMatched !== false) specMatched = true;
-	}
-
-	// Disclose the distinct host CPUs when the shards saw more than one — names the confound rather than
-	// hiding it behind the "first-wins" cpuModel merged above. Sorted for deterministic output.
-	if (hostCpuModels.size > 1) {
-		observedSpecs.hostCpuModels = [...hostCpuModels].sort((a, b) => a.localeCompare(b));
 	}
 
 	const metrics = [...measured.values()];

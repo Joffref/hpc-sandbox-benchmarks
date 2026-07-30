@@ -5,9 +5,12 @@
 // Logging and results go through @actions/core (groups, debug, annotations, job summary) so the
 // nested "<suite> / <provider>" cell is metadata-rich in the Actions UI.
 //
-// One invocation runs ONE replicate sandbox and reports it as a {@link ReplicateOutcome} rather than
-// exiting from inside the run: the concurrent fan-out that lands on top of this drives R of them from
-// one process, where a replicate that dies must not take its peers' sandboxes down with it.
+// `--replicates <indices>` drives the WHOLE between-machine fan-out for this (provider, suite) cell
+// from one process: R sandboxes concurrently, one shard Run each. That is what lets a single GitHub
+// Actions runner own a cell — a bench runner is ~100% idle waiting on its sandbox, so the old
+// runner-per-replicate matrix billed R idle runners to do one runner's work (see ../lib/replicates.ts).
+// Every replicate is run to completion regardless of its peers' outcomes and its shard is written
+// either way, so one flaky sandbox can't discard the rest of the fleet's results.
 
 import { join } from "node:path";
 import * as core from "@actions/core";
@@ -19,20 +22,34 @@ import {
 	unmetRequirements,
 } from "@sandbox-benchmarks/harness";
 import { writeNormalizedRun } from "@sandbox-benchmarks/results";
-import type { Run } from "@sandbox-benchmarks/schema";
+import type { Run, SuiteName } from "@sandbox-benchmarks/schema";
+import { SUITES } from "@sandbox-benchmarks/schema";
 import type { CellKind, SummaryRow } from "../lib/actions-log.ts";
 import {
+	escapeHtml,
 	fail,
 	inActions,
 	logInfo,
 	logProviderStatuses,
 	logWarning,
 	providerSummaryRows,
+	renderCell,
+	setGroupingEnabled,
 	withGroup,
 	writeJobSummary,
 } from "../lib/actions-log.ts";
 import { handleDiscovery } from "../lib/discovery.ts";
-import { lastFlagValue, parseReplicateIndex } from "../lib/replicates.ts";
+import { installLineTagging, withLineTag } from "../lib/log-prefix.ts";
+import {
+	fleetBudgetError,
+	lastFlagValue,
+	parseReplicateIndex,
+	parseReplicatesFlag,
+	replicatePaths,
+	resolveCellBudgetMinutes,
+	resolveMaxConcurrency,
+	runPooled,
+} from "../lib/replicates.ts";
 import { suiteMetricSummaryRows, suiteTaskSummaryRows } from "../lib/suite-summary.ts";
 import type { SuiteTaskPlan } from "../lib/suite-tasks.ts";
 import { describeSuiteTasks } from "../lib/suite-tasks.ts";
@@ -62,36 +79,48 @@ export const HELP = `bench-suite — run a benchmark suite on a provider sandbox
 usage: bench-suite [provider] [suite] [runId]
        bench-suite [--help] [--list-providers] [--list-suites] [--json]
 
-  provider           Provider to run on (default: daytona-vm). See --list-providers.
-  suite              Suite to run (default: cpu-node). See --list-suites.
-  runId              Run identifier for the data/ tree (default: local-<timestamp>).
-  --replicate <idx>  Replicate sandbox index this shard represents (a non-negative integer). Stamped
-                     onto the shard Run so the aggregate folds ≥2 replicates of one suite together.
-  --require <ids>    Comma-separated providers that MUST reach "validated"; exit 1 otherwise.
-                     Also read from REQUIRE_PROVIDERS. CI sets this so a missing secret fails loudly.
-  --list-providers   List the registered providers.
-  --list-suites      List the registered suites and their dimensions/metrics.
-  --json             Emit --list-* output as JSON instead of human-readable lines.
-  --help, -h         Show this help.
+  provider                Provider to run on (default: daytona-vm). See --list-providers.
+  suite                   Suite to run (default: cpu-node). See --list-suites.
+  runId                   Run identifier for the data/ tree (default: local-<timestamp>).
+  --replicates <indices>  Drive the whole replicate fan-out from THIS process: a JSON array
+                          ("[0,1,2]", what plan-replicates emits) or a comma-separated list ("0,1,2").
+                          Each index gets its own sandbox, raw tree (data/raw/<runId>/r<idx>/) and
+                          shard (data/runs/<runId>-r<idx>.json); they run concurrently and every one
+                          is run to completion even if a peer fails. This is the CI matrix's form.
+  --max-concurrency <n>   Cap the replicate sandboxes in flight (default: all at once). Also read from
+                          BENCH_MAX_CONCURRENCY. Lower it when a provider's quota makes a wide fan-out
+                          spend its create-retry budget queueing. A cap runs the fleet in ceil(R / n)
+                          serial waves; under CI (BENCH_CELL_BUDGET_MINUTES) a cap whose waves cannot
+                          fit the job budget is rejected up front rather than cancelled mid-fan-out.
+  --replicate <idx>       Run ONE replicate (a non-negative integer), stamped onto the shard Run so
+                          the aggregate folds ≥2 replicates of one suite together. Writes the
+                          un-suffixed data/runs/<runId>.json — the single-sandbox/local form.
+  --require <ids>         Comma-separated providers that MUST reach "validated"; exit 1 otherwise.
+                          Also read from REQUIRE_PROVIDERS. CI sets this so a missing secret fails loudly.
+  --list-providers        List the registered providers.
+  --list-suites           List the registered suites and their dimensions/metrics.
+  --json                  Emit --list-* output as JSON instead of human-readable lines.
+  --help, -h              Show this help.
 
 Missing provider credentials are recorded as a skip (the provider stays "pending"), so this is
-runnable without secrets. Writes data/runs/<runId>.json and updates data/runs/index.json.
+runnable without secrets. Writes the shard Run(s) under data/runs/ and updates data/runs/index.json.
 
 examples:
-  bench-suite daytona-vm cpu-node         # one suite locally, auto runId
-  bench-suite modal-vm memory ci-1234     # a specific cell + runId
-  bench-suite e2b memory --require e2b    # fail (don't skip) if E2B_API_KEY is absent
-  bench-suite --list-suites               # discover the suite names first
+  bench-suite daytona-vm cpu-node                 # one suite locally, auto runId
+  bench-suite modal-vm memory ci-1234             # a specific cell + runId
+  bench-suite e2b memory --require e2b            # fail (don't skip) if E2B_API_KEY is absent
+  bench-suite e2b memory ci-1 --replicates 0,1,2  # 3 replicate sandboxes from this one process
+  bench-suite --list-suites                       # discover the suite names first
 
 Next: render the Run with \`leaderboard data/runs/<runId>.json\`.`;
 
-/** What one replicate produced. Returned, never exited on: a replicate that dies must not take a
- *  concurrent peer's sandbox down with it, so the caller decides the process exit code once, at the end. */
+/** What one replicate produced. Returned, never exited on: a replicate that dies must not take its
+ *  peers' sandboxes down with it, so the fleet driver decides the process exit code once, at the end. */
 export interface ReplicateOutcome {
 	/** The replicate index, or undefined for the single un-indexed run (local/smoke). */
 	index?: number;
 	/** Where this replicate's shard Run belongs. Always set — including on a failure that never got as
-	 *  far as writing it — so a summary can name the missing shard rather than blanking the cell. */
+	 *  far as writing it — so the fleet table can name the missing shard rather than blanking the cell. */
 	outFile: string;
 	/** The normalized shard Run, absent when normalization itself failed. */
 	run?: Run;
@@ -127,8 +156,8 @@ function replicateLabel(index: number | undefined): string {
  * Parse `--replicate <idx>` / `--replicate=<idx>` into a non-negative integer, or `undefined` when the
  * flag is absent. A dangling or non-integer value fails loudly rather than silently defaulting the shard
  * to replicate 0 — a wrong index would collide two sandboxes into one replicate slot at aggregate time.
- * Exported so the parsing is unit-testable without spawning a process. (This is the single-sandbox
- * spelling, sharing its validation with the plural `--replicates` in ../lib/replicates.ts.)
+ * Exported so the parsing is unit-testable without spawning a process. (The CI fan-out uses the plural
+ * `--replicates`; this is the single-sandbox spelling, sharing its validation.)
  */
 export function parseReplicateFlag(argv: readonly string[]): number | undefined {
 	const raw = lastFlagValue(argv, "replicate");
@@ -136,7 +165,7 @@ export function parseReplicateFlag(argv: readonly string[]): number | undefined 
 	return parseReplicateIndex(raw);
 }
 
-/** Identity of the cell being reported. */
+/** Identity of the cell being reported, shared by both reporters below. */
 interface CellIdentity {
 	provider: string;
 	suite: string;
@@ -148,9 +177,10 @@ interface CellIdentity {
 
 /**
  * The half of a cell's job summary that does NOT depend on how many sandboxes ran: heading, cell
- * identity, the suite's task plan, and the annotation wiring. `fields`/`tables` are appended to it, so
- * a report covering several sandboxes can reuse the shared half instead of restating it — and a change
- * to that half cannot land in one reporter and miss the other.
+ * identity, the suite's task plan, and the annotation wiring. `fields`/`tables` are appended to it —
+ * that is the only place the single-sandbox and fleet reports legitimately differ, so a change to the
+ * shared half can no longer land in one reporter and miss the other. (They drifted exactly that way
+ * once, when the fleet report shipped without the per-sandbox CPU/spec columns.)
  */
 async function writeCellSummary(
 	opts: CellIdentity & {
@@ -192,10 +222,11 @@ async function writeCellSummary(
 }
 
 /**
- * The single-sandbox report: ONE cell, described in full. This is what a human reads after a manual
+ * The single-sandbox report: ONE cell, described in full. Deliberately richer per-provider than
+ * {@link reportFleet} rather than a special case of it — this is what a human reads after a manual
  * bench-smoke dispatch or a local run, so it keeps the whole-Run provider table (every registered
- * provider, with the skipped/failed gap split) and names the target provider's validation state in the
- * annotation itself.
+ * provider, with the skipped/failed gap split) that a fleet's one-row-per-replicate table has no room
+ * for, and names the target provider's validation state in the annotation itself.
  */
 async function reportCell(
 	opts: CellIdentity & {
@@ -233,6 +264,135 @@ async function reportCell(
 	});
 }
 
+/**
+ * How many failing replicates the ANNOTATION names before deferring to the job summary. GitHub
+ * truncates a long annotation message, and the fan-out axis reaches R=12 today with the dispatch
+ * `replicas` knob able to push it far higher — pasting 40+ multi-sentence failure reasons into one
+ * annotation produces an unreadable wall that the runner may cut mid-reason anyway. The job summary
+ * keeps EVERY failure verbatim (it has a far larger budget and is the right place to read them), so
+ * this cap costs no information; it only decides how much the annotations panel previews.
+ */
+const ANNOTATION_FAILURE_LIMIT = 3;
+
+/** The complete, one-line-per-failure detail for the job summary — never truncated. */
+export function fleetFailureDetail(failures: readonly ReplicateOutcome[]): string {
+	return failures.map((o) => `${replicateLabel(o.index)}: ${o.detail ?? "failed"}`).join("\n");
+}
+
+/**
+ * The annotation message for a fan-out cell: a count first (the fact a reader needs at a glance),
+ * then at most {@link ANNOTATION_FAILURE_LIMIT} failure reasons, then a pointer to the job summary
+ * for the rest. Bounded by design — see {@link ANNOTATION_FAILURE_LIMIT}.
+ */
+export function fleetAnnotationMessage(
+	failures: readonly ReplicateOutcome[],
+	total: number,
+	validated: number,
+): string {
+	if (failures.length === 0) return `${validated}/${total} replicate(s) validated`;
+	const shown = failures.slice(0, ANNOTATION_FAILURE_LIMIT);
+	const remaining = failures.length - shown.length;
+	return (
+		`${failures.length}/${total} replicate(s) failed — ${fleetFailureDetail(shown)}` +
+		(remaining > 0 ? `\n…and ${remaining} more (see the job summary)` : "")
+	);
+}
+
+/** One row per replicate: what each sandbox produced, so a 12-way fan-out is legible at a glance
+ *  without opening 12 job logs (which is what the per-replicate matrix cells used to be). Exported
+ *  so the table is testable at the fan-out widths the `replicas` dispatch knob allows. */
+export function replicateSummaryRows(
+	provider: string,
+	outcomes: readonly ReplicateOutcome[],
+): SummaryRow[] {
+	const header: SummaryRow = [
+		{ data: "Replicate", header: true },
+		{ data: "Status", header: true },
+		// The column the collapsed runner axis owes the reader: R replicates share ONE job duration
+		// now, so without this the report cannot say which sandbox was slow — and the slowest is what
+		// sets the cell's wall clock against a `timeout-minutes` that costs every shard when missed.
+		{ data: "Duration", header: true },
+		{ data: "Validation", header: true },
+		{ data: "Metrics", header: true },
+		{ data: "Suites", header: true },
+		{ data: "Gaps", header: true },
+		// Per-SANDBOX, not per-cell, and that is the point: R replicates exist to measure a provider's
+		// fleet variation, and a replicate that landed on different host hardware (or off the target
+		// spec) is the single most likely explanation for an outlier. reportCell surfaces these for a
+		// single sandbox; dropping them here would have left the CI path — the one that feeds the
+		// dataset — unable to see per-replicate heterogeneity without downloading the shard artifacts.
+		// `specMatched` is also what drives the leaderboard's Comparability warning.
+		{ data: "Observed CPU", header: true },
+		{ data: "Region", header: true },
+		{ data: "Spec", header: true },
+		{ data: "Shard", header: true },
+	];
+	const rows = outcomes.map((outcome) => {
+		const run = outcome.run?.providers.find((p) => p.providerId === provider);
+		return [
+			renderCell(replicateLabel(outcome.index), "code"),
+			escapeHtml(outcome.failed ? "failure" : "success"),
+			escapeHtml(formatDuration(outcome.durationMs)),
+			escapeHtml(run?.validationStatus ?? (outcome.run ? "absent" : "—")),
+			escapeHtml(run ? String(run.metrics.length) : "—"),
+			escapeHtml(run ? String(run.suitesCovered.length) : "—"),
+			escapeHtml(run ? String(run.gaps.length) : "—"),
+			renderCell(run?.observedSpecs.cpuModel || "—", "code"),
+			escapeHtml(run?.observedSpecs.region || "—"),
+			escapeHtml(run?.specMatched === undefined ? "—" : String(run.specMatched)),
+			renderCell(outcome.outFile, "code"),
+		];
+	});
+	return [header, ...rows];
+}
+
+/**
+ * The whole-fleet report for a `--replicates` run: ONE job summary + ONE annotation covering every
+ * replicate this runner drove. Deliberately not R separate reports — R annotations per cell would
+ * bury the run's annotation panel, and the failures a reader needs are the ones named in `detail`.
+ */
+async function reportFleet(
+	opts: CellIdentity & { outcomes: readonly ReplicateOutcome[] },
+): Promise<void> {
+	const failures = opts.outcomes.filter((o) => o.failed);
+	const byDuration = [...opts.outcomes].sort((a, b) => a.durationMs - b.durationMs);
+	const fastest = byDuration[0];
+	const slowest = byDuration[byDuration.length - 1];
+	// Complete for the summary; the annotation gets the bounded preview from fleetAnnotationMessage.
+	const detail = fleetFailureDetail(failures);
+	const validated = opts.outcomes.filter(
+		(o) =>
+			o.run?.providers.find((p) => p.providerId === opts.provider)?.validationStatus ===
+			"validated",
+	).length;
+	await writeCellSummary({
+		// Identity rides through as-is; `outcomes` is spent on the counts and the table below.
+		...opts,
+		failed: failures.length > 0,
+		fields: [
+			["Replicates", String(opts.outcomes.length), "plain"],
+			["Validated replicates", `${validated}/${opts.outcomes.length}`, "plain"],
+			["Failed replicates", String(failures.length), "plain"],
+			// The cell's wall clock IS its slowest replicate, so that number — not the mean — is what
+			// to compare against the job budget, and the spread next to it says whether one sandbox
+			// dragged the cell or the whole fleet was slow.
+			[
+				"Slowest replicate",
+				slowest ? `${replicateLabel(slowest.index)} ${formatDuration(slowest.durationMs)}` : "—",
+				"plain",
+			],
+			[
+				"Fastest replicate",
+				fastest ? `${replicateLabel(fastest.index)} ${formatDuration(fastest.durationMs)}` : "—",
+				"plain",
+			],
+		],
+		tables: [{ heading: "Replicates", rows: replicateSummaryRows(opts.provider, opts.outcomes) }],
+		...(detail ? { detail } : {}),
+		annotationMessage: fleetAnnotationMessage(failures, opts.outcomes.length, validated),
+	});
+}
+
 /** Everything one replicate needs; `replicateIndex` undefined is the single un-indexed run. */
 interface ReplicateContext {
 	provider: string;
@@ -249,15 +409,16 @@ interface ReplicateContext {
 
 /**
  * Run ONE replicate end to end — suite → normalize → gap verification → require gate — and report
- * what happened. Total by construction: it never throws and never exits, so a concurrent driver can
- * hold several in flight without one replicate's failure aborting its peers or skipping their shard
- * writes (the per-replicate matrix cells had `fail-fast: false` for the same reason).
+ * what happened. Total by construction: it never throws and never exits, because a `--replicates`
+ * fan-out has R of these in flight and one replicate's failure must not abort its peers or skip
+ * their shard writes (the per-replicate matrix cells had `fail-fast: false` for the same reason).
  */
 export async function runReplicate(ctx: ReplicateContext): Promise<ReplicateOutcome> {
 	const { provider, suite, runId, sha, rawRoot, outFile, indexFile, replicateIndex } = ctx;
-	// The replicate rides in the annotation TITLE: annotations are emitted as `::warning::` workflow
-	// commands, so once several replicates share a process there is nothing else in a warning saying
-	// which sandbox it came from.
+	// Annotations are emitted as `::warning::` workflow commands, which bypass the `[rN]` line tagging
+	// by necessity (a tagged command stops being an annotation). So the replicate has to ride in the
+	// TITLE instead — otherwise a 12-way fan-out puts up to 12 byte-identical warnings in the panel
+	// with nothing saying which sandbox each came from.
 	const cell =
 		cellTitle(suite, provider) +
 		(replicateIndex === undefined ? "" : ` ${replicateLabel(replicateIndex)}`);
@@ -400,7 +561,7 @@ if (import.meta.main) {
 	const argv = process.argv.slice(2);
 	// Flags that consume a separate operand — one source of truth so the discovery filter and the
 	// positional-skip loop below can never enumerate different sets.
-	const VALUE_FLAGS = ["--require", "--replicate"];
+	const VALUE_FLAGS = ["--require", "--replicate", "--replicates", "--max-concurrency"];
 	const discovery = handleDiscovery(argv, HELP, VALUE_FLAGS);
 	if (discovery !== null) {
 		if (discovery.ok) {
@@ -418,8 +579,8 @@ if (import.meta.main) {
 	for (let i = 0; i < argv.length; i++) {
 		const arg = argv[i];
 		if (arg === undefined) continue;
-		// Only the space-separated spelling needs the skip: `--require=<ids>`/`--replicate=<idx>` are
-		// single tokens already dropped by the leading-`-` guard below. Both flags take a separate operand.
+		// Only the space-separated spelling needs the skip: `--require=<ids>`/`--replicates=<idx>` are
+		// single tokens already dropped by the leading-`-` guard below.
 		if (VALUE_FLAGS.includes(arg)) {
 			i++;
 			continue;
@@ -433,29 +594,66 @@ if (import.meta.main) {
 	const sha = process.env.GITHUB_SHA ?? "local";
 	const cell = cellTitle(suite, provider);
 
-	// A malformed replicate index must fail the cell before a sandbox is created: a shard stamped with
-	// the wrong index would collide two sandboxes into one replicate slot at aggregate time.
-	let replicateIndex: number | undefined;
+	// A malformed replicate axis must fail the cell before a single sandbox is created: a fan-out that
+	// silently collapsed to one sandbox (or to none) would publish a shard set the aggregate reads as a
+	// smaller, quieter experiment than the one that was dispatched.
+	let replicateIndices: number[] | undefined;
+	let maxConcurrency = Number.POSITIVE_INFINITY;
+	let singleReplicate: number | undefined;
+	let cellBudgetMinutes: number | undefined;
 	try {
-		replicateIndex = parseReplicateFlag(argv);
+		replicateIndices = parseReplicatesFlag(argv);
+		maxConcurrency = resolveMaxConcurrency(argv);
+		singleReplicate = parseReplicateFlag(argv);
+		cellBudgetMinutes = resolveCellBudgetMinutes();
 	} catch (err) {
 		fail(err instanceof Error ? err.message : String(err), {
 			properties: { title: "bench-suite usage" },
 			exitCode: 2,
 		});
 	}
+	if (replicateIndices && singleReplicate !== undefined) {
+		fail("pass either --replicates or --replicate, not both", {
+			properties: { title: "bench-suite usage" },
+			exitCode: 2,
+		});
+	}
 
-	// The local newest-first Run index — a local convenience only (`leaderboard data/runs/<id>.json`
-	// discovery). Nothing downstream reads it: the aggregate is handed explicit shard paths.
+	// A concurrency cap trades wall clock for peak provider load, and the cell has a FIXED job budget to
+	// pay that clock out of — so a cap can be small enough that the fan-out is cancelled mid-flight,
+	// losing every shard of the cell rather than just slowing it down. Reject that combination here,
+	// alongside the other malformed-axis guards and before a single sandbox exists. An unregistered
+	// suite is left alone: `describeSuiteTasks` below owns that error, and guessing a budget for a suite
+	// with no declared one would report the wrong problem.
+	const suiteBudget = suite in SUITES ? SUITES[suite as SuiteName].timeoutMinutes : undefined;
+	if (replicateIndices && cellBudgetMinutes !== undefined && suiteBudget !== undefined) {
+		const budgetError = fleetBudgetError({
+			replicates: replicateIndices.length,
+			maxConcurrency,
+			suite,
+			suiteTimeoutMinutes: suiteBudget,
+			budgetMinutes: cellBudgetMinutes,
+		});
+		if (budgetError) {
+			fail(budgetError, { properties: { title: "bench-suite usage" }, exitCode: 2 });
+		}
+	}
+
+	// The local newest-first Run index, shared by every replicate of this cell. It is keyed by runId and
+	// all R shards carry the SAME runId, so the last replicate to normalize wins the entry — a local
+	// convenience only (`leaderboard data/runs/<id>.json` discovery). Nothing downstream reads it: the
+	// aggregate is handed explicit shard paths, and commit-dataset.yml globs the shard files directly.
+	// Writes are synchronous (writeNormalizedRun), so concurrent replicates cannot interleave a
+	// read-modify-write and corrupt it.
 	const indexFile = join("data", "runs", "index.json");
-	// Hoisted so the debug payload below can name them. They are the diagnostic an artifact-path
-	// failure is read with — "which tree did it pull into, which file did it normalize to" — and
-	// nothing else in the single-sandbox report carries rawRoot at all.
-	const rawRoot = join("data", "raw", runId);
-	const outFile = join("data", "runs", `${runId}.json`);
+	// The single-sandbox tree/shard, hoisted so the debug payload below can name them. They are the
+	// diagnostic an artifact-path failure is read with — which tree the results were pulled into,
+	// which file they normalized to — and on this path nothing else reports rawRoot at all.
+	const singleRawRoot = join("data", "raw", runId);
+	const singleOutFile = join("data", "runs", `${runId}.json`);
 	// Pass the sliced argv explicitly rather than letting it default to `process.argv` (which also
 	// carries the bun executable and script path), so the flag this bin parses is the flag the require
-	// gate inside the replicate reads.
+	// gate inside every replicate reads.
 	const required = requiredProviders(argv);
 
 	logInfo(`Benchmark cell ${cell}`);
@@ -466,17 +664,21 @@ if (import.meta.main) {
 				suite,
 				runId,
 				sha,
-				replicate: replicateIndex ?? null,
-				rawRoot,
-				outFile,
+				replicates: replicateIndices ?? [singleReplicate ?? null],
+				maxConcurrency: Number.isFinite(maxConcurrency) ? maxConcurrency : "unbounded",
+				// Per-mode, because a fan-out has no single pair to report: name every shard it will
+				// write, so a missing artifact can be traced to the path that was expected.
+				...(replicateIndices
+					? { shards: replicateIndices.map((index) => replicatePaths(runId, index).outFile) }
+					: { rawRoot: singleRawRoot, outFile: singleOutFile }),
 				require: required,
 			}),
 		);
 	}
 
-	// Resolve the precise mise tasks + PTS pins before any sandbox runs, so the job summary can
+	// Resolve the precise mise tasks + PTS pins ONCE before any sandbox runs, so the job summary can
 	// name what this cell planned to execute (schema commands → mise task info → run_task leaves). It
-	// is a property of the suite, not of a replicate, so it is resolved outside runReplicate.
+	// is a property of the suite, not of a replicate, so every replicate of this cell shares it.
 	let taskPlan: SuiteTaskPlan | undefined;
 	await withGroup(`Discover suite tasks (${suite})`, async () => {
 		try {
@@ -503,30 +705,121 @@ if (import.meta.main) {
 		}
 	});
 
-	// One shard at the un-suffixed `data/runs/<runId>.json`, which bench-smoke.yml and
-	// commit-dataset.yml both name directly — so the filename is a contract.
-	const outcome = await runReplicate({
+	if (replicateIndices === undefined) {
+		// Single-sandbox path (local dev, bench-smoke, and an explicit `--replicate <idx>`): one shard at
+		// the un-suffixed `data/runs/<runId>.json`, which bench-smoke.yml and commit-dataset.yml's legacy
+		// glob both name directly — so the filename is a contract, not the `-r<idx>` convention minus a
+		// suffix.
+		//
+		// Kept as its own path rather than "the fan-out with one replicate", deliberately. The audience
+		// differs, and so does the useful report: this is a human reading ONE cell, who wants the
+		// whole-Run provider table (every registered provider, skipped/failed gaps split out) and the
+		// foldable `::group::` sections — neither of which a fleet report can give, because its table is
+		// one row per replicate and its grouping is off so R interleaved transcripts stay readable. Fan
+		// out to R=1 and you would have to special-case all of that back in, trading two honest paths for
+		// one path full of `length === 1` branches. What the two DO share — heading, cell identity, task
+		// plan, annotation wiring — is shared for real, in writeCellSummary.
+		const outcome = await runReplicate({
+			provider,
+			suite,
+			runId,
+			sha,
+			rawRoot: singleRawRoot,
+			outFile: singleOutFile,
+			indexFile,
+			...(singleReplicate !== undefined ? { replicateIndex: singleReplicate } : {}),
+			required,
+		});
+		await reportCell({
+			provider,
+			suite,
+			runId,
+			sha,
+			outFile: outcome.outFile,
+			...(outcome.run ? { run: outcome.run } : {}),
+			failed: outcome.failed,
+			durationMs: outcome.durationMs,
+			...(outcome.detail !== undefined ? { detail: outcome.detail } : {}),
+			...(taskPlan ? { taskPlan } : {}),
+		});
+		if (outcome.failed) fail(outcome.detail ?? `Cell ${cell} failed`, { annotate: false });
+		process.exit(0);
+	}
+
+	// Fan-out path: R replicate sandboxes, all from this process. Foldable groups are turned off and
+	// every line is tagged with its replicate instead — Actions groups are a single ordered stream, so
+	// R concurrent replicates opening and closing them produces folds containing other replicates'
+	// output. The tag is what keeps an interleaved 12-way transcript attributable.
+	setGroupingEnabled(false);
+	installLineTagging();
+	logInfo(
+		`Driving ${replicateIndices.length} replicate sandbox(es) [${replicateIndices.join(", ")}] ` +
+			`for ${cell}` +
+			(Number.isFinite(maxConcurrency) ? ` (max ${maxConcurrency} in flight)` : ""),
+	);
+
+	// When each replicate started, so the pool's error backstop can still report a duration for one
+	// that threw before runReplicate could time itself. Written at dispatch, not at queue time: under
+	// a --max-concurrency cap a later wave's replicate waits, and charging it that queue time would
+	// misreport it as the straggler.
+	const startedAt = new Map<number, number>();
+	const outcomes = await runPooled(
+		replicateIndices,
+		maxConcurrency,
+		async (replicateIndex) => {
+			startedAt.set(replicateIndex, Bun.nanoseconds());
+			const paths = replicatePaths(runId, replicateIndex);
+			return withLineTag(`[${replicateLabel(replicateIndex)}] `, () =>
+				runReplicate({
+					provider,
+					suite,
+					runId,
+					sha,
+					rawRoot: paths.rawRoot,
+					outFile: paths.outFile,
+					indexFile,
+					replicateIndex,
+					required,
+				}),
+			);
+		},
+		// runReplicate is written to be total, but this is the backstop that makes that irrelevant: an
+		// unexpected throw becomes THIS replicate's failure instead of unwinding the pool and stranding
+		// its peers mid-suite with no report written. The peers keep running, every shard that can be
+		// written still is, and reportFleet names the thrower.
+		(error, replicateIndex) => ({
+			index: replicateIndex,
+			outFile: replicatePaths(runId, replicateIndex).outFile,
+			failed: true,
+			durationMs: Math.round(
+				(Bun.nanoseconds() - (startedAt.get(replicateIndex) ?? Bun.nanoseconds())) / 1e6,
+			),
+			detail: `replicate threw outside the reporting path: ${
+				error instanceof Error ? (error.stack ?? error.message) : String(error)
+			}`,
+		}),
+	);
+
+	await reportFleet({
 		provider,
 		suite,
 		runId,
 		sha,
-		rawRoot,
-		outFile,
-		indexFile,
-		...(replicateIndex !== undefined ? { replicateIndex } : {}),
-		required,
-	});
-	await reportCell({
-		provider,
-		suite,
-		runId,
-		sha,
-		outFile: outcome.outFile,
-		...(outcome.run ? { run: outcome.run } : {}),
-		failed: outcome.failed,
-		durationMs: outcome.durationMs,
-		...(outcome.detail !== undefined ? { detail: outcome.detail } : {}),
+		outcomes,
 		...(taskPlan ? { taskPlan } : {}),
 	});
-	if (outcome.failed) fail(outcome.detail ?? `Cell ${cell} failed`, { annotate: false });
+
+	const failures = outcomes.filter((o) => o.failed);
+	if (failures.length > 0) {
+		// reportFleet already annotated with every failure's detail; exit non-zero without a second one.
+		fail(`${failures.length}/${outcomes.length} replicate(s) of ${cell} failed`, {
+			annotate: false,
+		});
+	}
+	logInfo(`Cell ${cell}: ${outcomes.length}/${outcomes.length} replicate(s) succeeded`);
+	// Exit explicitly, matching the single-sandbox path above. `createSuiteSandbox` deliberately leaves
+	// a floating `createPromise.then(destroySandbox)` behind for a create that resolved after its
+	// timeout was lost, and a provider SDK may hold a keep-alive socket; falling off the end would make
+	// the cell wait on those instead of finishing, turning an all-green fleet into a job-timeout red.
+	process.exit(0);
 }

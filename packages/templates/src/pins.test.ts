@@ -19,6 +19,7 @@ const validSample = {
 	quartoVersion: "1.9.38",
 	ptsVersion: "10.8.4",
 	ptsDebSha256: "b".repeat(64),
+	ptsInstallGroups: ["node-web-tooling", "pyperformance"],
 	ptsInstallTests: "node-web-tooling pyperformance",
 };
 

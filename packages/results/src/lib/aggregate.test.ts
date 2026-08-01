@@ -524,7 +524,14 @@ describe("aggregateRuns", () => {
 		const record = {
 			source: "mise/system-provider" as const,
 			sourceFile: "system/system-provider.json",
-			fields: [{ path: "asn", value: "AS64500" }],
+			fields: [
+				{ path: "asn", value: "AS64500" },
+				{ path: "isolation_runtime", value: "firecracker" },
+				{ path: "machine_vmm", value: "firecracker" },
+				{ path: "machine_confidence", value: "confirmed" },
+				{ path: "container_runtime", value: "none" },
+				{ path: "isolation_why", value: "ACPI names Firecracker" },
+			],
 		};
 		const a = shard([
 			{
@@ -554,6 +561,8 @@ describe("aggregateRuns", () => {
 			"mise/system-provider",
 			"phoronix/result-file-to-json",
 		]);
+		const isolation = metadata?.find((m) => m.source === "mise/system-provider");
+		expect(isolation?.fields).toEqual(record.fields);
 	});
 
 	it("throws on a shard-identity mismatch and on empty input", () => {

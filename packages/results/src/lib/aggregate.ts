@@ -174,6 +174,9 @@ function mergeProvider(providerId: string, entries: readonly ReplicateSlice[]): 
 	for (const { slice, replicateIndex } of entries) {
 		const ids = observedMixtureIds(slice.observedSpecs);
 		if (!providerReportedNothing(slice)) sandboxSpecReadings.push(slice.observedSpecs);
+		// Preserve the complete provider probe record here: foldHostMetadata removes only volatile
+		// timestamps, so exact isolation fields (runtime, VMM, confidence, scores, and evidence)
+		// remain available to figure generation after shards are merged.
 		for (const record of slice.hostMetadata ?? []) hostMetadataInputs.push({ record, ids });
 		for (const suite of slice.suitesCovered) suitesCovered.add(suite);
 

@@ -40,6 +40,7 @@ export {
 export {
 	type BarSegment,
 	buildRealworldFigureModel,
+	type FigureIsolation,
 	type FigureModelInput,
 	type FigureProvider,
 	type PipelineBar,

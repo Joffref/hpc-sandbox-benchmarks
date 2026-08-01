@@ -67,6 +67,81 @@ function build(providers: ProviderRun[]) {
 }
 
 describe("buildRealworldFigureModel", () => {
+	it("uses concise provider titles and exact aggregated isolation runtimes", () => {
+		const withIsolation = (providerId: string, runtime: string): ProviderRun =>
+			provider(providerId, [metric(CLONE, [1, 2]), metric(INSTALL, [30, 32])], {
+				hostMetadata: [
+					{
+						source: "mise/system-provider",
+						sourceFile: "system/system-provider.json",
+						fields: [
+							{ path: "isolation_runtime", value: runtime },
+							{ path: "machine_vmm", value: runtime },
+						],
+					},
+				],
+			});
+		const model = buildRealworldFigureModel({
+			run: run([
+				withIsolation("namespace", "firecracker"),
+				withIsolation("daytona-vm", "firecracker"),
+				withIsolation("modal-gvisor", "gvisor"),
+				withIsolation("microsandbox-cloud", "libkrun"),
+			]),
+			metrics: METRICS,
+			providers: [
+				{
+					id: "namespace",
+					displayName: "Namespace",
+					isolationTechnology: "microVM (dedicated instance)",
+				},
+				{
+					id: "daytona-vm",
+					displayName: "Daytona (VM)",
+					isolationTechnology: "microVM (Linux VM)",
+				},
+				{
+					id: "modal-gvisor",
+					displayName: "Modal (gVisor)",
+					isolationTechnology: "gVisor container",
+				},
+				{
+					id: "microsandbox-cloud",
+					displayName: "Microsandbox Cloud",
+					isolationTechnology: "libkrun microVM (cloud)",
+				},
+			],
+			suites: SUITES,
+		});
+
+		expect(model.providers).toEqual([
+			{
+				id: "namespace",
+				name: "Namespace",
+				specMatched: true,
+				isolation: { kind: "microVM", technology: "Firecracker" },
+			},
+			{
+				id: "daytona-vm",
+				name: "Daytona",
+				specMatched: true,
+				isolation: { kind: "microVM", technology: "Firecracker" },
+			},
+			{
+				id: "modal-gvisor",
+				name: "Modal",
+				specMatched: true,
+				isolation: { kind: "Userspace", technology: "gVisor" },
+			},
+			{
+				id: "microsandbox-cloud",
+				name: "microsandbox",
+				specMatched: true,
+				isolation: { kind: "microVM", technology: "libkrun" },
+			},
+		]);
+	});
+
 	it("charts a suite two environments completed, named from its task labels", () => {
 		const model = build([
 			provider("alpha", [metric(CLONE, [1, 2]), metric(INSTALL, [30, 32])]),

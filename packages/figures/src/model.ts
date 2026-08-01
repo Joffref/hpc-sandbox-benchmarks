@@ -64,6 +64,14 @@ export interface FigureProvider {
 	readonly name: string;
 	/** False when the run disclosed an off-target allocation — the chart daggers the label. */
 	readonly specMatched: boolean;
+	/** The isolation subtitle rendered beneath the provider title, when declared or detected. */
+	readonly isolation?: FigureIsolation;
+}
+
+/** The two segments shown in a provider row's isolation chip. */
+export interface FigureIsolation {
+	readonly kind: string;
+	readonly technology: string;
 }
 
 export interface RealworldFigureModel {
@@ -81,12 +89,95 @@ export interface FigureModelInput {
 	readonly metrics: readonly Pick<MetricDef, "id" | "label">[];
 	/** Provider display names. String-keyed on purpose: the run side carries provider ids as
 	 *  strings, and the registry's narrower `ProviderId` union assigns into this cleanly. */
-	readonly providers: readonly { readonly id: string; readonly displayName: string }[];
+	readonly providers: readonly {
+		readonly id: string;
+		readonly displayName: string;
+		/** Registry declaration; host metadata may provide a more specific observed runtime. */
+		readonly isolationTechnology?: string;
+	}[];
 	/** The suite registry: which dimension a suite measures, canonical task order, disk floors. */
 	readonly suites: Readonly<Record<string, Pick<Suite, "dimensions" | "metrics" | "minDiskGb">>>;
 }
 
 const round = (v: number, dp: number) => Number(v.toFixed(dp));
+
+/** The chart uses concise vendor names while the full registry names remain in the Markdown tables. */
+function figureProviderName(providerId: string, displayName: string): string {
+	if (providerId.startsWith("daytona")) return "Daytona";
+	if (providerId.startsWith("modal")) return "Modal";
+	if (providerId.startsWith("microsandbox")) return "microsandbox";
+	return displayName;
+}
+
+/** Map the isolation probe's stable runtime ids to the short, reader-facing chip vocabulary. */
+function isolationFromRuntime(runtime: string | undefined): FigureIsolation | undefined {
+	if (!runtime) return undefined;
+	const normalized = runtime.trim().toLowerCase();
+	if (!normalized || ["unknown", "none", "not-observable"].includes(normalized)) return undefined;
+	if (normalized.includes("firecracker")) return { kind: "microVM", technology: "Firecracker" };
+	if (normalized.includes("libkrun") || normalized === "krunvm") {
+		return { kind: "microVM", technology: "libkrun" };
+	}
+	if (normalized.includes("gvisor")) return { kind: "Userspace", technology: "gVisor" };
+	if (normalized.includes("kata")) return { kind: "microVM", technology: "Kata" };
+	if (normalized.includes("cloud-hypervisor")) {
+		return { kind: "microVM", technology: "Cloud Hypervisor" };
+	}
+	if (normalized.includes("crosvm")) return { kind: "microVM", technology: "crosvm" };
+	if (normalized.includes("sysbox")) return { kind: "Container", technology: "Sysbox" };
+	if (normalized.includes("lxc")) return { kind: "Container", technology: "LXC" };
+	if (normalized.includes("oci") || normalized.includes("container")) {
+		return { kind: "Container", technology: "OCI" };
+	}
+	if (normalized.includes("microvm") || normalized === "vm") {
+		return { kind: "microVM", technology: normalized === "vm" ? "VM" : "microVM" };
+	}
+	return undefined;
+}
+
+/** Turn a registry declaration into the same compact chip when no exact probe result is available. */
+function isolationFromDeclaration(declared: string | undefined): FigureIsolation | undefined {
+	if (!declared) return undefined;
+	const normalized = declared.toLowerCase();
+	if (normalized.includes("firecracker")) return { kind: "microVM", technology: "Firecracker" };
+	if (normalized.includes("libkrun")) return { kind: "microVM", technology: "libkrun" };
+	if (normalized.includes("gvisor")) return { kind: "Userspace", technology: "gVisor" };
+	if (normalized.includes("kata")) return { kind: "microVM", technology: "Kata" };
+	if (normalized.includes("microvm") || normalized.includes("vm")) {
+		const detail = declared.match(/\(([^)]+)\)/)?.[1];
+		return { kind: "microVM", technology: detail ?? "VM" };
+	}
+	if (normalized.includes("container")) return { kind: "Container", technology: "OCI" };
+	return undefined;
+}
+
+/** Read the dominant exact runtime from the aggregated mise/system-provider records. */
+function observedIsolationRuntime(provider: ProviderRun): string | undefined {
+	const paths = ["isolation_runtime", "machine_vmm", "container_runtime"];
+	for (const path of paths) {
+		const counts = new Map<string, number>();
+		for (const record of provider.hostMetadata ?? []) {
+			if (record.source !== "mise/system-provider") continue;
+			const value = record.fields.find((field) => field.path === path)?.value?.trim();
+			if (!value || ["unknown", "none", "not-observable"].includes(value.toLowerCase())) continue;
+			counts.set(value, (counts.get(value) ?? 0) + (record.sandboxes ?? 1));
+		}
+		const winner = [...counts.entries()].sort(
+			([valueA, countA], [valueB, countB]) => countB - countA || valueA.localeCompare(valueB, "en"),
+		)[0]?.[0];
+		if (winner) return winner;
+	}
+	return undefined;
+}
+
+function isolationFor(
+	provider: ProviderRun,
+	declared: string | undefined,
+): FigureIsolation | undefined {
+	return (
+		isolationFromRuntime(observedIsolationRuntime(provider)) ?? isolationFromDeclaration(declared)
+	);
+}
 
 export function buildRealworldFigureModel(input: FigureModelInput): RealworldFigureModel {
 	const { run, metrics, providers, suites } = input;
@@ -188,10 +279,17 @@ export function buildRealworldFigureModel(input: FigureModelInput): RealworldFig
 
 	return {
 		suites: chartable,
-		providers: rendered.map((p) => ({
-			id: p.providerId,
-			name: displayName.get(p.providerId) ?? p.providerId,
-			specMatched: p.specMatched !== false,
-		})),
+		providers: rendered.map((p) => {
+			const isolation = isolationFor(
+				p,
+				providers.find((meta) => meta.id === p.providerId)?.isolationTechnology,
+			);
+			return {
+				id: p.providerId,
+				name: figureProviderName(p.providerId, displayName.get(p.providerId) ?? p.providerId),
+				specMatched: p.specMatched !== false,
+				...(isolation ? { isolation } : {}),
+			};
+		}),
 	};
 }

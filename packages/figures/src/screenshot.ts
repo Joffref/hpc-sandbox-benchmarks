@@ -29,8 +29,9 @@ export interface ScreenshotOptions {
 	 *  integer — the geometry check compares against the image's integer pixel dimensions, and
 	 *  a fractional density would fail it on a perfectly good capture. */
 	readonly deviceScaleFactor?: number;
-	/** WebP quality, 0–100. Defaults to 100 — for flat-colour chart raster the near-lossless
-	 *  top of the lossy range is visually transparent and still far smaller than PNG. */
+	/** WebP quality, 0–100. Defaults to 90: measured on the real charts, q90 is visually
+	 *  transparent for flat-colour raster at half the equivalent PNG's bytes, while q100
+	 *  INFLATES past PNG (near-lossless lossy spends bits on invisible precision). */
 	readonly quality?: number;
 	/**
 	 * Chrome executable. Left unset, `Bun.WebView` discovers one (`BUN_CHROME_PATH`, then
@@ -176,7 +177,7 @@ export async function screenshotHtml(
 		// A Buffer IS a Uint8Array — no copy; its mmap-backed pages release on GC.
 		const bytes: Uint8Array = await view.screenshot({
 			format: "webp",
-			quality: options.quality ?? 100,
+			quality: options.quality ?? 90,
 			encoding: "buffer",
 		});
 

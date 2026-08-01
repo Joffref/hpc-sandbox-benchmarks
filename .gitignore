@@ -145,3 +145,6 @@ packages/templates/images/e2b/e2b.toml
 # Generated per-bake by `bake` (apps/cli/src/lib/bake/e2b.ts): the committed e2b/Dockerfile with its
 # base pinned to the candidate/version registry ref, since e2b CLI 2.x can't inject a build-arg.
 packages/templates/images/e2b/Dockerfile.generated
+
+# macOS Finder litter - never content, and the artifact gate compares docs/figures exactly.
+.DS_Store

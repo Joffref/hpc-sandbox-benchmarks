@@ -22,6 +22,7 @@
         "plan-matrix": "./src/bin/plan-matrix.ts",
         "plan-providers": "./src/bin/plan-providers.ts",
         "plan-suites": "./src/bin/plan-suites.ts",
+        "plan-replicates": "./src/bin/plan-replicates.ts",
         "build-template": "./src/bin/build-template.ts",
         "normalize": "./src/bin/normalize.ts",
         "aggregate": "./src/bin/aggregate.ts",
@@ -33,6 +34,7 @@
         "@actions/core": "1.11.1",
         "@daytona/api-client": "catalog:computesdk",
         "@daytona/sdk": "catalog:computesdk",
+        "@sandbox-benchmarks/figures": "workspace:*",
         "@sandbox-benchmarks/harness": "workspace:*",
         "@sandbox-benchmarks/providers": "workspace:*",
         "@sandbox-benchmarks/results": "workspace:*",
@@ -105,6 +107,7 @@
       "dependencies": {
         "@nodable/compact-builder": "catalog:xml",
         "@nodable/flexible-xml-parser": "catalog:xml",
+        "@sandbox-benchmarks/figures": "workspace:*",
         "@sandbox-benchmarks/schema": "workspace:*",
         "arktype": "catalog:",
       },
@@ -148,6 +151,7 @@
       "version": "0.0.0",
       "devDependencies": {
         "@repo/tsconfig": "workspace:*",
+        "@sandbox-benchmarks/figures": "workspace:*",
         "@sandbox-benchmarks/results": "workspace:*",
         "@sandbox-benchmarks/schema": "workspace:*",
         "@types/bun": "catalog:",

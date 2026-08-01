@@ -14,6 +14,7 @@ import {
 	TOOLCHAIN_APT_GROUPS,
 	TOOLCHAIN_IMAGE_NAME,
 	TOOLCHAIN_VERSION,
+	VERCEL_VCR_REPOSITORY,
 } from "@sandbox-benchmarks/schema";
 import { type } from "arktype";
 import type { Pins } from "./lib/pins.ts";
@@ -21,7 +22,7 @@ import { pinsSchema, rawPins } from "./lib/pins.ts";
 
 export type { Pins };
 /** The raw toolchain pins (single source of truth). Validate with {@link validatedPins} before use. */
-export { rawPins as pins };
+export { rawPins as pins, VERCEL_VCR_REPOSITORY };
 
 /**
  * Validate the pins (content included — hex sha256s, non-empty versions) and return the typed object.

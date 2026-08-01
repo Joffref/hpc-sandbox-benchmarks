@@ -59,6 +59,7 @@
     "lefthook": "2.1.9",
     "playwright-core": "1.62.1",
     "typescript": "catalog:",
-    "@types/bun": "catalog:"
+    "@types/bun": "catalog:",
+    "vercel": "58.4.4"
   }
 }

@@ -133,7 +133,11 @@ h1 { margin: 0; font: 500 24px/32px ${HEADING}; color: ${pageColors.fg}; }
 .legend-note { font: 400 10px/15px ${MONO}; letter-spacing: 0.14em; text-transform: uppercase; color: ${pageColors.muted50}; }
 .row { display: flex; align-items: center; gap: ${COLUMN_GAP}px; min-height: ${BAR_HEIGHT}px; }
 .row + .row { margin-top: ${ROW_GAP}px; }
-.provider { flex: 0 0 ${LABEL_COLUMN}px; font: 400 12px/16px ${MONO}; color: ${pageColors.fg90}; }
+.provider { flex: 0 0 ${LABEL_COLUMN}px; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; font: 400 12px/16px ${MONO}; color: ${pageColors.fg90}; }
+.provider-title { white-space: nowrap; }
+.isolation-chip { display: inline-flex; align-items: stretch; overflow: hidden; border: 1px solid ${pageColors.muted40}; border-radius: 4px; font: 400 9px/13.5px ${MONO}; color: ${pageColors.muted70}; white-space: nowrap; }
+.isolation-chip span { padding: 1px 4px; }
+.isolation-chip span + span { border-left: 1px solid ${pageColors.muted40}; color: ${pageColors.teal}; }
 .bar { display: flex; align-items: center; gap: ${TOTAL_GAP}px; }
 .track { display: flex; gap: ${SEGMENT_GAP}px; height: ${BAR_HEIGHT}px; }
 .segment { flex-shrink: 1; flex-basis: 0; }
@@ -148,6 +152,15 @@ h1 { margin: 0; font: 500 24px/32px ${HEADING}; color: ${pageColors.fg}; }
 `;
 
 export function pipelineChartHtml(model: PipelineChartModel): string {
+	const providerMarkup = (
+		label: string,
+		isolation: PipelineChartModel["bars"][number]["isolation"],
+	): string => {
+		const chip = isolation
+			? `<span class="isolation-chip"><span>${escapeHtml(isolation.kind)}</span><span>${escapeHtml(isolation.technology)}</span></span>`
+			: "";
+		return `<span class="provider"><span class="provider-title">${escapeHtml(label)}</span>${chip}</span>`;
+	};
 	const legend = model.legend
 		.map(
 			(entry) =>
@@ -164,7 +177,7 @@ export function pipelineChartHtml(model: PipelineChartModel): string {
 			.join("");
 		const badge = bar.fastest ? `<span class="badge">fastest</span>` : "";
 		return (
-			`<div class="row"><span class="provider">${escapeHtml(bar.label)}</span>` +
+			`<div class="row">${providerMarkup(bar.label, bar.isolation)}` +
 			`<div class="bar"><div class="track" style="width: ${px(bar.scaleFraction * TRACK_WIDTH)};">${segments}</div>` +
 			`<span class="value"><span class="total">${escapeHtml(bar.total)}</span>${badge}</span></div></div>`
 		);
@@ -172,7 +185,7 @@ export function pipelineChartHtml(model: PipelineChartModel): string {
 
 	const incompleteRows = model.incomplete.map(
 		(row) =>
-			`<div class="row incomplete"><span class="provider">${escapeHtml(row.label)}</span>` +
+			`<div class="row incomplete">${providerMarkup(row.label, row.isolation)}` +
 			`<span class="gap">${escapeHtml(row.outcome)} · ${escapeHtml(row.reason)}</span></div>`,
 	);
 

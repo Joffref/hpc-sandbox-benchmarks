@@ -21,7 +21,12 @@
  *    outcome and reason. Dropping them would turn a chart that discloses its gaps into one
  *    that appears to have none.
  */
-import type { FigureProvider, PipelineSuite, RealworldFigureModel } from "../model.ts";
+import type {
+	FigureIsolation,
+	FigureProvider,
+	PipelineSuite,
+	RealworldFigureModel,
+} from "../model.ts";
 import type { PhaseId } from "../phases.ts";
 import { PHASE_RAMP, phaseOf } from "../phases.ts";
 import { formatSeconds } from "./format.ts";
@@ -40,6 +45,8 @@ export interface ChartSegment {
 export interface ChartBar {
 	/** Display label. Off-spec providers carry the report's dagger: `name †`. */
 	readonly label: string;
+	/** The provider's compact isolation chip, when metadata was available. */
+	readonly isolation?: FigureIsolation;
 	/** Formatted total, e.g. `61.9 s` — the sum of the segments' medians. */
 	readonly total: string;
 	/** This bar's length as a fraction of the SHARED scale (the run's slowest charted
@@ -53,6 +60,7 @@ export interface ChartBar {
 /** An environment disclosed as not having completed the suite: outcome and reason, no bar. */
 export interface ChartIncompleteRow {
 	readonly label: string;
+	readonly isolation?: FigureIsolation;
 	readonly outcome: string;
 	readonly reason: string;
 }
@@ -97,8 +105,14 @@ function requireProvider(
 /** The off-spec badge on the provider name is a bordered pill on the page; the report and
  *  these charts draw it as the plain dagger. The disclosure survives either way, which is
  *  the part that matters. */
-function providerLabel(provider: FigureProvider): string {
-	return provider.specMatched ? provider.name : `${provider.name} †`;
+function providerPresentation(provider: FigureProvider): {
+	label: string;
+	isolation?: FigureIsolation;
+} {
+	return {
+		label: provider.specMatched ? provider.name : `${provider.name} †`,
+		...(provider.isolation ? { isolation: provider.isolation } : {}),
+	};
 }
 
 /** Shared x-scale across the pipeline charts: the slowest charted total in the run — and 0,
@@ -151,7 +165,7 @@ export function buildPipelineChartModel(
 		// 0/0 NaN — which CSS reads as a broken flex/width, silently collapsing the bar. A
 		// zero-duration bar or segment draws at zero width instead.
 		bars: bars.map((bar) => ({
-			label: providerLabel(requireProvider(providerById, bar.provider)),
+			...providerPresentation(requireProvider(providerById, bar.provider)),
 			total: formatSeconds(bar.totalS),
 			scaleFraction: pipelineScaleMaxS > 0 ? bar.totalS / pipelineScaleMaxS : 0,
 			fastest: bar.totalS === bestTotal,
@@ -162,7 +176,7 @@ export function buildPipelineChartModel(
 			})),
 		})),
 		incomplete: suite.incomplete.map((row) => ({
-			label: providerLabel(requireProvider(providerById, row.provider)),
+			...providerPresentation(requireProvider(providerById, row.provider)),
 			outcome: row.outcome,
 			reason: row.reason,
 		})),

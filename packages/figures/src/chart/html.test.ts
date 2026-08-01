@@ -89,6 +89,30 @@ describe("pipelineChartHtml", () => {
 		expect(html).toContain("failed · install exceeded stop");
 	});
 
+	it("renders isolation as a segmented subtitle chip", () => {
+		const isolated = {
+			...FIXTURE,
+			providers: FIXTURE.providers.map((provider) =>
+				provider.id === "alpha"
+					? {
+							...provider,
+							name: "Namespace",
+							isolation: { kind: "microVM", technology: "Firecracker" },
+						}
+					: provider,
+			),
+		};
+		const rendered = pipelineChartHtml(
+			buildPipelineChartModel(
+				isolated.suites[0] as (typeof isolated.suites)[number],
+				isolated,
+				"n",
+			),
+		);
+		expect(rendered).toContain('class="isolation-chip"');
+		expect(rendered).toContain("<span>microVM</span><span>Firecracker</span>");
+	});
+
 	it("escapes interpolated text and renders the note's inline markdown", () => {
 		const spiky = pipelineChartHtml(
 			buildPipelineChartModel(suite, FIXTURE, "a **sum of medians** of `p50 <& friends>`"),

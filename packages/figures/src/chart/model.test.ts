@@ -23,6 +23,30 @@ describe("buildPipelineChartModel", () => {
 		]);
 	});
 
+	it("keeps the isolation chip separate from the concise provider title", () => {
+		const isolated = {
+			...FIXTURE,
+			providers: FIXTURE.providers.map((provider) =>
+				provider.id === "alpha"
+					? {
+							...provider,
+							name: "Daytona",
+							isolation: { kind: "microVM", technology: "Firecracker" },
+						}
+					: provider,
+			),
+		};
+		const chart = buildPipelineChartModel(
+			isolated.suites[0] as (typeof isolated.suites)[number],
+			isolated,
+			"n",
+		);
+		expect(chart.bars.find((bar) => bar.label === "Daytona")?.isolation).toEqual({
+			kind: "microVM",
+			technology: "Firecracker",
+		});
+	});
+
 	it("scales every bar against the run's slowest charted total", () => {
 		// Beta (400 s) is the run's slowest bar, so it IS the scale; Alpha (100 s) is a
 		// quarter of it. This ratio — not a per-chart maximum — is what makes a second the

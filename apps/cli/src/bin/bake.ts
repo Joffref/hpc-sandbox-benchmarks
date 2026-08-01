@@ -13,6 +13,7 @@ import { requiredProviders, unmetRequirements } from "@sandbox-benchmarks/harnes
 import type { ProviderConfig } from "@sandbox-benchmarks/providers";
 import { config } from "@sandbox-benchmarks/providers";
 import type { ProviderId } from "@sandbox-benchmarks/schema";
+import { PROVIDERS } from "@sandbox-benchmarks/schema";
 import { bakeDaytonaContainerSnapshot, bakeDaytonaVmSnapshot } from "../lib/bake/daytona.ts";
 import { bakeE2bTemplate } from "../lib/bake/e2b.ts";
 import { buildAndPushCandidate, resolveImageDigestRef } from "../lib/bake/image.ts";
@@ -20,8 +21,8 @@ import { bakeModalImage } from "../lib/bake/modal.ts";
 import { bakeNovitaTemplate } from "../lib/bake/novita.ts";
 import { promoteAll } from "../lib/bake/promote.ts";
 import type { BakeReport, Log } from "../lib/bake/types.ts";
-import { candidateCreateOptions } from "../lib/bake/validate.ts";
-import { selectProviders } from "../lib/matrix.ts";
+import { baseImageUse, candidateCreateOptions } from "../lib/bake/validate.ts";
+import { isPartialScope, selectProviders } from "../lib/matrix.ts";
 import { anyFailed, forEachProviderWithCreds } from "../lib/providers-run.ts";
 import { bootAndSmoke, logChecks, smokeFailureReason, smokeOk } from "../lib/smoke-run.ts";
 
@@ -79,7 +80,8 @@ function writeReport(report: unknown): void {
  * default). The argv scan mirrors `--require` (harness `requiredProviders`); the CSV is split and
  * validated against the registry by the shared {@link selectProviders} (which dedups, is
  * case-insensitive, returns registry order, and throws a registry-derived message on an unknown id).
- * The flag applies only to the candidate bake loop; `--promote` is always all-providers (a transaction).
+ * It restricts `--promote` too: a scoped promote publishes only those providers' version artifacts,
+ * onto an already-published version, and leaves the public base alone (see promote.ts, PromoteOptions).
  *
  * A PRESENT-but-valueless flag (`--provider`, `--provider=`, `--provider --force`) THROWS rather than
  * falling through to the all-providers default. `selectProviders` treats a blank list as "every
@@ -112,12 +114,40 @@ export function requestedProviders(argv: string[]): ProviderId[] | undefined {
 if (import.meta.main) {
 	const log: Log = (m) => console.error(m);
 
+	// Optional per-provider restriction. On the bake path it is the CI matrix fan-out (one cell per
+	// provider); on the promote path it scopes the transaction to a backfill. Parsed before any build
+	// or registry call so a typo'd id fails fast (clean message, no stack) before anything is touched.
+	let only: ProviderId[] | undefined;
+	try {
+		only = requestedProviders(process.argv);
+	} catch (err) {
+		log(`error: ${err instanceof Error ? err.message : String(err)}`);
+		process.exit(2);
+	}
+
 	// Promote is the release step: publish the already-validated candidate as the public version.
 	if (process.argv.includes("--promote")) {
 		// `--force` republishes over an existing (immutable) version — dev regeneration, set only by a
 		// manual toolchain-image.yml dispatch. Automated pushes never pass it, so :v1 stays immutable there.
-		const promoted = await promoteAll(log, process.argv.includes("--force"));
+		const force = process.argv.includes("--force");
+		// A scoped promote is a backfill onto an existing version, which is the opposite of what --force
+		// does (regenerate the whole version in place, destructively for daytona). Refuse the combination
+		// rather than pick a winner: whichever we picked would silently not be what the operator asked for.
+		if (isPartialScope(only) && force) {
+			log(
+				"error: --force cannot be combined with a scoped --provider promote — a scoped promote " +
+					"backfills providers onto an already-published version, while --force regenerates the " +
+					"whole version in place. Pick one.",
+			);
+			process.exit(2);
+		}
+		const promoted = await promoteAll(log, { force, only });
 		writeReport({
+			// The scope is recorded alongside the version names because those names are the FULL set the
+			// version owns — on a partial promote most of them were not touched, and the payload has to
+			// say which run this was rather than leave a reader to infer it from `reports`.
+			scope: only ?? PROVIDERS.map((p) => p.id),
+			partial: isPartialScope(only),
 			version: {
 				image: config.toolchainImageVersion,
 				e2bTemplate: config.e2bTemplateVersion,
@@ -136,21 +166,12 @@ if (import.meta.main) {
 		process.exit(promoted.some((r) => r.status === "failed") ? 1 : 0);
 	}
 
-	// Optional per-provider restriction for the CI matrix fan-out (one cell per provider). Parsed before
-	// any build so a typo'd id fails the cell fast (clean message, no stack), before the candidate is touched.
-	let only: ProviderId[] | undefined;
-	try {
-		only = requestedProviders(process.argv);
-	} catch (err) {
-		log(`error: ${err instanceof Error ? err.message : String(err)}`);
-		process.exit(2);
-	}
 	if (only) log(`>>> restricting bake+validate to: ${only.join(", ")}`);
 
 	if (process.argv.includes("--build-push")) {
 		log(">>> building + pushing candidate image…");
 		try {
-			await buildAndPushCandidate(log);
+			await buildAndPushCandidate(log, only);
 		} catch (err) {
 			log(`<<< build/push failed — ${err instanceof Error ? err.message : String(err)}`);
 			process.exit(1);
@@ -160,15 +181,25 @@ if (import.meta.main) {
 	// Modal's registry importer, like the remote E2B-compatible builders, may cache a mutable tag.
 	// Resolve once after the push and validate the exact candidate bytes by immutable digest. This also
 	// makes a tag change between provider bakes unable to redirect Modal's validation to different bytes.
-	let pinnedCandidateImage: string;
-	try {
-		pinnedCandidateImage = await resolveImageDigestRef(config.toolchainImageCandidate);
-		log(`>>> candidate image pinned for validation: ${pinnedCandidateImage}`);
-	} catch (err) {
-		log(
-			`<<< could not resolve candidate image digest — ${err instanceof Error ? err.message : String(err)}`,
-		);
-		process.exit(1);
+	//
+	// Only providers that actually reference the base need it: vercel boots its own VCR mirror and
+	// blaxel the vendor's stock image, so a cell restricted to those must not die on a base candidate it
+	// never reads — under `build: variants`/`skip` that ref may legitimately be stale or absent, and
+	// failing there would break the one flow the scoped release exists for.
+	const needsBase = (only ?? PROVIDERS.map((p) => p.id)).some((id) => baseImageUse(id) !== "none");
+	let pinnedCandidateImage: string = config.toolchainImageCandidate;
+	if (needsBase) {
+		try {
+			pinnedCandidateImage = await resolveImageDigestRef(config.toolchainImageCandidate);
+			log(`>>> candidate image pinned for validation: ${pinnedCandidateImage}`);
+		} catch (err) {
+			log(
+				`<<< could not resolve candidate image digest — ${err instanceof Error ? err.message : String(err)}`,
+			);
+			process.exit(1);
+		}
+	} else {
+		log(`>>> no provider in scope reads ${config.toolchainImageCandidate} — not resolving it`);
 	}
 	const candidateRefs = {
 		e2bTemplateCandidate: config.e2bTemplateCandidate,

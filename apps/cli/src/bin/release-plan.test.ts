@@ -1,7 +1,14 @@
 import { describe, expect, test } from "bun:test";
-import { buildReleasePlan, planOutputs, RELEASE_REQUIRED_PROVIDERS } from "./release-plan.ts";
+import { PROVIDERS } from "@sandbox-benchmarks/schema";
+import {
+	buildReleasePlan,
+	planOutputs,
+	RELEASE_REQUIRED_PROVIDERS,
+	RELEASE_UNSCOPABLE_PROVIDERS,
+} from "./release-plan.ts";
 
 const base = { sourceRef: "abc123", forceRepublish: false, alreadyPublished: false };
+const ALL_PROVIDERS = PROVIDERS.map((p) => p.id);
 
 describe("buildReleasePlan mode + skip", () => {
 	test("a fresh build of an unpublished version runs (mode build, skip false)", () => {
@@ -21,6 +28,29 @@ describe("buildReleasePlan mode + skip", () => {
 		expect(plan.mode).toBe("republish");
 		expect(plan.skip).toBe(false);
 		expect(plan.gates.forceRepublish).toBe(true);
+	});
+
+	// The reason the scoped path exists: v7 was published for every provider except the one being added,
+	// so the early skip would otherwise kill the run before it could backfill anything.
+	test("a scoped release runs against an already-published version (mode backfill, skip false)", () => {
+		const plan = buildReleasePlan({ ...base, alreadyPublished: true, providers: "vercel" });
+		expect(plan.mode).toBe("backfill");
+		expect(plan.partial).toBe(true);
+		expect(plan.skip).toBe(false);
+	});
+
+	// The early skip spares a release that would only re-publish a version already in the registry. A
+	// dispatch that is not publishing has nothing to spare — it asked to bake and verify against the
+	// current version — so skipping it would turn the whole run into a silent no-op.
+	test("promote: false still runs against an already-published version", () => {
+		const plan = buildReleasePlan({ ...base, alreadyPublished: true, promote: false });
+		expect(plan.partial).toBe(false);
+		expect(plan.promote).toBe(false);
+		expect(plan.skip).toBe(false);
+	});
+
+	test("...but a promoting full release of the same version still skips", () => {
+		expect(buildReleasePlan({ ...base, alreadyPublished: true, promote: true }).skip).toBe(true);
 	});
 });
 
@@ -48,6 +78,89 @@ describe("buildReleasePlan matrix", () => {
 		expect(required).toEqual([...RELEASE_REQUIRED_PROVIDERS]);
 		expect(plan.required).toEqual([...RELEASE_REQUIRED_PROVIDERS]);
 	});
+
+	test("a scoped dispatch emits only its own cells", () => {
+		const plan = buildReleasePlan({ ...base, providers: "vercel" });
+		expect(plan.matrix.include).toEqual([{ provider: "vercel", required: true }]);
+		expect(plan.providers.map((p) => p.provider)).toEqual(["vercel"]);
+	});
+
+	// A named provider that could still skip on a missing secret would report a green release that
+	// published nothing — the exact failure the scoped path is meant to make impossible.
+	test("every provider a partial dispatch names is required, even a normally best-effort one", () => {
+		const plan = buildReleasePlan({ ...base, providers: "daytona-container,novita" });
+		expect(plan.required).toEqual(["daytona-container", "novita"]);
+		expect(plan.matrix.include.every((c) => c.required)).toBe(true);
+	});
+
+	// The flip side of "everything you name is required": a provider the lane carries no credentials
+	// for would fail its cell deterministically, after a privileged approval and (on `build: full`) an
+	// hour of rebuild. The plan refuses instead, naming the reason.
+	test("refuses a scope naming a provider the release lane cannot ship", () => {
+		expect(() => buildReleasePlan({ ...base, providers: "blaxel" })).toThrow(/blaxel/);
+		expect(() => buildReleasePlan({ ...base, providers: "e2b,blaxel" })).toThrow(
+			/BL_API_KEY|cannot ship/,
+		);
+	});
+
+	// Unscoped, the same provider is simply skipped — it is not in the required set, so a missing
+	// credential is a skip and the release proceeds. Only a scope makes it a demand.
+	test("the same provider is fine in an unscoped release", () => {
+		const plan = buildReleasePlan(base);
+		expect(plan.matrix.include.map((c) => c.provider)).toContain("blaxel");
+		expect(plan.required).not.toContain("blaxel");
+		expect(Object.keys(RELEASE_UNSCOPABLE_PROVIDERS)).toEqual(["blaxel"]);
+	});
+
+	// Everything keys off `partial`, never "did the operator type a list" — otherwise spelling out the
+	// registry would quietly make every best-effort provider gating, and force_republish (rejected only
+	// for a partial release) would land on a release whose required set had silently grown.
+	test("naming the whole registry is an ordinary full release", () => {
+		const plan = buildReleasePlan({ ...base, providers: ALL_PROVIDERS.join(",") });
+		expect(plan.partial).toBe(false);
+		expect(plan.mode).toBe("build");
+		expect(plan.required).toEqual([...RELEASE_REQUIRED_PROVIDERS]);
+	});
+
+	test("an unknown provider id throws instead of silently shrinking the release", () => {
+		expect(() => buildReleasePlan({ ...base, providers: "vercelly" })).toThrow(/vercelly/);
+	});
+});
+
+describe("buildReleasePlan phases", () => {
+	test("defaults to a full build that promotes", () => {
+		const plan = buildReleasePlan(base);
+		expect(plan.build).toBe("full");
+		expect(plan.promote).toBe(true);
+	});
+
+	test("carries the build mode and promote toggle through to the plan", () => {
+		const plan = buildReleasePlan({ ...base, build: "variants", promote: false });
+		expect(plan.build).toBe("variants");
+		expect(plan.promote).toBe(false);
+	});
+});
+
+describe("buildReleasePlan packages", () => {
+	// The vercel bake cell pulls its staged variant from GHCR with no login, so the variant package has
+	// to be covered by the visibility guard too — the base alone is not enough.
+	test("lists the base package and every registry-served variant package", () => {
+		const plan = buildReleasePlan(base);
+		expect(plan.packages[0]).toBe(plan.image.name);
+		expect(plan.packages).toContain(`${plan.image.name}-vercel`);
+	});
+
+	// The guard FAILS the release on a package that isn't public yet, so listing a variant no in-scope
+	// provider pulls would block a release over an image it never reads.
+	test("omits a variant package no provider in scope pulls", () => {
+		const plan = buildReleasePlan({ ...base, providers: "e2b" });
+		expect(plan.packages).toEqual([plan.image.name]);
+	});
+
+	test("keeps the variant package when its own provider is in scope", () => {
+		const plan = buildReleasePlan({ ...base, providers: "vercel" });
+		expect(plan.packages).toEqual([plan.image.name, `${plan.image.name}-vercel`]);
+	});
 });
 
 describe("planOutputs", () => {
@@ -62,5 +175,30 @@ describe("planOutputs", () => {
 		const parsed = JSON.parse((matrixLine as string).slice("matrix=".length));
 		expect(parsed.include).toHaveLength(11);
 		expect((matrixLine as string).includes("\n")).toBe(false);
+	});
+
+	// The workflow's `if:` conditions compare against these literal strings, so the booleans have to
+	// render as `true`/`false` — not `True`, not empty.
+	test("emits the job-skipping gates as the strings the workflow compares against", () => {
+		const lines = planOutputs(buildReleasePlan({ ...base, build: "skip", promote: false })).split(
+			"\n",
+		);
+		expect(lines).toContain("build-mode=skip");
+		expect(lines).toContain("run-build=false");
+		expect(lines).toContain("run-publish=false");
+	});
+
+	test("emits the RESOLVED provider scope, so a blank input becomes the whole registry", () => {
+		expect(planOutputs(buildReleasePlan(base)).split("\n")).toContain(
+			`providers=${ALL_PROVIDERS.join(",")}`,
+		);
+		expect(planOutputs(buildReleasePlan({ ...base, providers: "vercel" })).split("\n")).toContain(
+			"providers=vercel",
+		);
+	});
+
+	test("emits every package the visibility guard must check, comma-separated", () => {
+		const plan = buildReleasePlan(base);
+		expect(planOutputs(plan).split("\n")).toContain(`packages=${plan.packages.join(",")}`);
 	});
 });

@@ -23,7 +23,11 @@ function metric(metricId: string, samples: number[]): MetricResult {
 	return { metricId, samples, aggregates: aggregate(samples) };
 }
 
-function provider(providerId: string, metrics: MetricResult[]): ProviderRun {
+function provider(
+	providerId: string,
+	metrics: MetricResult[],
+	over: Partial<ProviderRun> = {},
+): ProviderRun {
 	return {
 		providerId,
 		validationStatus: "validated",
@@ -32,6 +36,7 @@ function provider(providerId: string, metrics: MetricResult[]): ProviderRun {
 		suitesCovered: ["realworld-mastra"],
 		gaps: [],
 		uncatalogued: [],
+		...over,
 	};
 }
 
@@ -105,6 +110,53 @@ describe("leaderboardFigures", () => {
 });
 
 describe("renderLeaderboardFigureHtml", () => {
+	it("passes declared and aggregated detected isolation into figure labels", () => {
+		const withRuntime = (providerId: string, runtime: string) =>
+			provider(providerId, [metric(CLONE, [1, 2]), metric(INSTALL, [30, 32])], {
+				hostMetadata: [
+					{
+						source: "mise/system-provider",
+						sourceFile: "system/system-provider.json",
+						fields: [{ path: "isolation_runtime", value: runtime }],
+					},
+				],
+			});
+		const data = benchmarkDataOf(
+			run([
+				withRuntime("namespace", "firecracker"),
+				withRuntime("daytona-vm", "firecracker"),
+				withRuntime("modal-gvisor", "gvisor"),
+				withRuntime("microsandbox-cloud", "libkrun"),
+			]),
+		);
+		expect(data.providers).toEqual([
+			{
+				id: "namespace",
+				name: "Namespace",
+				specMatched: true,
+				isolation: { kind: "microVM", technology: "Firecracker" },
+			},
+			{
+				id: "daytona-vm",
+				name: "Daytona",
+				specMatched: true,
+				isolation: { kind: "microVM", technology: "Firecracker" },
+			},
+			{
+				id: "modal-gvisor",
+				name: "Modal",
+				specMatched: true,
+				isolation: { kind: "Userspace", technology: "gVisor" },
+			},
+			{
+				id: "microsandbox-cloud",
+				name: "microsandbox",
+				specMatched: true,
+				isolation: { kind: "microVM", technology: "libkrun" },
+			},
+		]);
+	});
+
 	it("returns one self-contained document per chartable suite, paired with its figure", () => {
 		const rendered = renderLeaderboardFigureHtml(chartableRun());
 		expect(rendered.map(({ figure }) => figure.suiteId)).toEqual(["realworld-mastra"]);

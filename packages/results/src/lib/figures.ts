@@ -93,7 +93,11 @@ export function benchmarkDataOf(run: Run): RealworldFigureModel {
 	return buildRealworldFigureModel({
 		run,
 		metrics: METRIC_CATALOG,
-		providers: PROVIDERS,
+		providers: PROVIDERS.map((provider) => ({
+			id: provider.id,
+			displayName: provider.displayName,
+			isolationTechnology: provider.isolation.technology,
+		})),
 		suites: SUITES,
 	});
 }

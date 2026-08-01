@@ -19,17 +19,22 @@ For local benches, copy [`.env.example`](./.env.example) to a gitignored `.env`.
 keys or paste them into issues/PRs — the repo-checks secret-hygiene gate fails CI if a credential
 file or secret token is tracked ([SECURITY.md](./SECURITY.md)).
 
-## Local checks (the gate)
+## Local checks (the browser-free gate)
 
-Green-on-your-machine means green-in-CI — the same command contract runs in both:
+The browser-free checks below are the shared local/CI baseline. CI runs the figures screenshot suite
+in a separate job that provisions pinned headless Chrome.
 
 ```sh
 bun install          # resolve the graph (frozen lockfile in CI)
 bun run typecheck    # tsc --noEmit per member
-bun run test         # bun test per member, incl. repo-checks invariants
+bun run test         # browser-free bun test per member, incl. repo-checks invariants
 bun run lint         # biome check; warnings fail
 bun run spell        # typos (via mise)
 ```
+
+The Chrome-backed figures screenshot suite is intentionally separate from the normal local gate:
+CI's `figures` job provisions its pinned headless Chrome on a hosted runner and runs
+`bun run test:figures` explicitly.
 
 PTS-catalog changes also have a drift gate:
 

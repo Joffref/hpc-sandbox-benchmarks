@@ -96,8 +96,9 @@ matters for what can be checked where: the HTML is byte-deterministic everywhere
 that set, that each committed WebP has the promised geometry, and that the chart HTML renders the same
 bytes twice — all without a browser. The pixels themselves are Chrome's, and Chrome's rasterisation is
 not byte-stable across machines, so they are authored in one place: the *Update leaderboard* workflow,
-which installs the browser build its lockfile pins (`playwright-core`'s `chromium-headless-shell`),
-rasterises every chart twice, and fails on a byte mismatch. A raster cannot be reviewed as a diff —
+which provisions the browser build its lockfile pins via `scripts/pin-chrome.sh` (the same script a
+maintainer can use for a pinned local render), rasterises every chart twice, and fails on a byte
+mismatch. A raster cannot be reviewed as a diff —
 which is exactly why the per-task tables stay one click below the charts as the auditable receipts.
 
 Metrics come from three sources:

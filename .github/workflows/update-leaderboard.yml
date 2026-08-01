@@ -80,6 +80,14 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile --ignore-scripts
 
+      # The chart screenshots need a Chrome, and this is what makes the browser a PINNED input
+      # rather than ambient runner state (the image's unpinned google-chrome-stable would
+      # otherwise rasterise the figures — and defeat the "nothing to commit" early-exit below
+      # with pure pixel churn on every image update). The composite installs the build the
+      # lockfile's playwright-core pins, cached on that version, and exports BUN_CHROME_PATH.
+      - name: Set up pinned headless Chrome
+        uses: ./.github/actions/setup-pinned-chrome
+
       # Resolve which committed run to render: the explicit input when given, else the newest entry in
       # the newest-first data/dataset/index.json. Fail loudly if the chosen run isn't in the committed
       # dataset — the leaderboard must be rendered from data/dataset/runs/ (what promote writes), never

@@ -18,3 +18,6 @@ uncatalogued = "uncatalogued"
 # The plural of the image format: typos tokenises "PNGs" as PN + Gs and would "correct" the PN
 # token to ON, so the token itself is the thing to allow.
 PN = "PN"
+# POSIX Basic Regular Expression, the grep dialect. Named in lib/probe/isolation/20-collect.sh to
+# explain why a match is done in the shell instead of with a `grep` alternation, a GNU extension to BRE.
+BRE = "BRE"

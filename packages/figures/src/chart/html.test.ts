@@ -2,6 +2,12 @@ import { describe, expect, it } from "bun:test";
 import { FIXTURE } from "./__fixtures__/data.ts";
 import { pipelineChartHtml } from "./html.ts";
 import { buildPipelineChartModel } from "./model.ts";
+import {
+	WORDMARK_ASPECT,
+	WORDMARK_BASELINE_RATIO,
+	WORDMARK_CAP_RATIO,
+	WORDMARK_SVG,
+} from "./wordmark.ts";
 
 const suite = FIXTURE.suites[0];
 if (!suite) throw new Error("fixture must carry a chartable suite");
@@ -75,10 +81,83 @@ describe("pipelineChartHtml", () => {
 	});
 
 	it("draws the shared scale as track widths against one constant", () => {
-		// Beta is the run's slowest bar (scaleFraction 1) → the full 680 px track; Alpha is
+		// Beta is the run's slowest bar (scaleFraction 1) → the full 648 px track; Alpha is
 		// a quarter of it. The constant is the same in every chart, which is the claim.
-		expect(html).toContain("width: 680.00px");
-		expect(html).toContain("width: 170.00px");
+		expect(html).toContain("width: 648.00px");
+		expect(html).toContain("width: 162.00px");
+	});
+
+	it("puts every track on one origin — a label column no chip can widen", () => {
+		// The bug this pins: the provider cell was 128 px of flex-basis with `min-width: auto`,
+		// so the widest isolation chip (`microVM` + `dedicated instance`, 154 px) became the
+		// cell's min-content width and pushed ITS row's bar ~26 px right of the others. The
+		// column is a constant AND cannot grow, so the second half is what makes it structural.
+		expect(html).toContain(`flex: 0 0 160px; min-width: 0;`);
+	});
+
+	it("reads top to bottom: title, subtitle, note, bars, then the legend", () => {
+		// The document ORDER is the reading order, and the figure's is deliberate: the eyebrow is
+		// a subtitle under the title rather than a right-aligned tail on its row, and the legend
+		// is a footer under the chart rather than a preamble above it. Asserted as offsets
+		// because CSS cannot reorder what is not there — this is the structure, not the styling.
+		const at = (needle: string) => {
+			const index = html.indexOf(needle);
+			expect(index, `${needle} missing`).toBeGreaterThan(-1);
+			return index;
+		};
+		expect(at("<h1>")).toBeLessThan(at(`<p class="summary">`));
+		expect(at(`<p class="summary">`)).toBeLessThan(at(`<p class="note">`));
+		expect(at(`<p class="note">`)).toBeLessThan(at("<section>"));
+		expect(at("<section>")).toBeLessThan(at(`<ul class="legend">`));
+		// The subtitle is a SIBLING of the header, not a child: inside it, it would sit on the
+		// title's row again, which is the arrangement this replaced.
+		expect(html).toContain(`</h1>${WORDMARK_SVG}</header>\n<p class="summary">`);
+	});
+
+	it("lets the note run the full content width", () => {
+		// It used to carry `max-width: 672px` — a prose measure that left it wrapping short of
+		// every other block in the figure and reading as a column that had lost its column.
+		expect(html).not.toContain("max-width: 672px");
+		expect(html).toMatch(/\.note \{ margin: [^;]+; font:/);
+	});
+
+	it("keeps the legend note on the far end of its row", () => {
+		expect(html).toContain(".legend-note { margin-left: auto;");
+	});
+
+	it("carries the wordmark inline, with the artwork's own geometry", () => {
+		// Inline SVG, not a fetch: the whole point of the document is that it is self-contained.
+		expect(html).toContain(`<svg class="wordmark" viewBox="0 0 508 125"`);
+		expect(html).not.toContain("<image");
+		// Every path paints from `currentColor`, so the figure's palette is the only thing that
+		// decides the mark's colour — a hard-coded `black` would survive a theme change.
+		expect(WORDMARK_SVG).not.toContain("black");
+		expect(WORDMARK_SVG.match(/fill="currentColor"/g)?.length).toBe(17);
+	});
+
+	it("sizes the wordmark to the title's cap band, from the pinned face's real metrics", () => {
+		// Matching the artwork's BOX to the 24 px title would set `STARSLING` at ~11 px, because
+		// the letterforms are only WORDMARK_CAP_RATIO of the box — the disc takes the rest. The
+		// template solves for the letterforms instead, off Afacad's MEASURED 15 px cap height;
+		// the ~0.7 em a generic sans would give drew it 12% oversized. Arithmetic, not taste.
+		const height = Math.round(15 / WORDMARK_CAP_RATIO);
+		expect(height).toBe(33);
+		// Placed, not aligned: `align-items` cannot put a replaced element's INTERIOR on a text
+		// baseline, so the offset is solved — the title's baseline less the wordmark's own.
+		const top = 24 - height * WORDMARK_BASELINE_RATIO;
+		expect(html).toContain(
+			`.wordmark { flex: 0 0 auto; margin: ${top.toFixed(2)}px 0 0 auto; ` +
+				`width: ${(height * WORDMARK_ASPECT).toFixed(2)}px; height: ${height.toFixed(2)}px;`,
+		);
+	});
+
+	it("keeps the title on the left edge and the wordmark on the right", () => {
+		// An auto LEFT margin is what pushes the mark to the far edge; the title is simply first.
+		// `justify-content: space-between` would do it today and quietly stop the day the row
+		// gains a third element, so the rule lives on the element that has to move.
+		expect(html).toContain("header { display: flex; align-items: flex-start;");
+		expect(html).toMatch(/\.wordmark \{[^}]*margin: [-\d.]+px 0 0 auto;/);
+		expect(html).not.toContain("justify-content: space-between");
 	});
 
 	it("badges exactly the fastest bar", () => {

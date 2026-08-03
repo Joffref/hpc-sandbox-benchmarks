@@ -1,10 +1,11 @@
 // Invariant: the GitHub Actions layer stays hardened. (1) every actions/checkout opts out of
 // credential persistence unless it is an allowlisted pushing checkout, (2) ci-lint.yml runs
 // actionlint + zizmor at the agreed gate threshold, (3) custom-secret / write jobs declare
-// environment: privileged, and (4) toolchain publish is workflow_dispatch-only. The
-// runHardeningCheck() test against the real .github files IS the gate's CI enforcement point
-// (same precedent as workflow-registry-sync.test.ts); the rest is unit coverage of the pure checks
-// on synthetic drift so a regression names the offender. See ./lib/workflow-hardening.ts.
+// environment: privileged, (4) toolchain publish is workflow_dispatch-only, and (5) toolchain PR
+// smoke keeps expensive image inputs separate from lightweight setup-action coverage. The
+// runHardeningCheck() test against the real .github files IS the gate's CI enforcement point (same
+// precedent as workflow-registry-sync.test.ts); the rest is unit coverage of the pure checks on
+// synthetic drift so a regression names the offender. See ./lib/workflow-hardening.ts.
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -17,11 +18,15 @@ import {
 	checkPersistCredentials,
 	checkPrivilegedEnvironment,
 	checkToolchainDispatchOnly,
+	checkToolchainPrScope,
 	customSecretsIn,
 	listWorkflowFiles,
 	PRIVILEGED_ENVIRONMENT,
 	readWorkflow,
 	runHardeningCheck,
+	TOOLCHAIN_ACTION_SMOKE_PR_PATHS,
+	TOOLCHAIN_ACTION_SMOKE_WORKFLOW,
+	TOOLCHAIN_IMAGE_PR_PATHS,
 	TOOLCHAIN_WORKFLOW,
 	WORKFLOWS_DIR,
 } from "./lib/workflow-hardening.ts";
@@ -158,7 +163,11 @@ describe("Vercel CLI authentication", () => {
 		const workflowText = ["bench-smoke.yml", "bench-suite.yml", "toolchain-image.yml"]
 			.map((file) => readFileSync(join(root, WORKFLOWS_DIR, file), "utf8"))
 			.join("\n");
-		expect(workflowText.match(/uses: \.\/\.github\/actions\/vercel-auth/g)).toHaveLength(4);
+		// Three call sites: the reusable benchmark cell (bench-suite.yml) plus toolchain-image.yml's two.
+		// bench-smoke.yml is still read here — not because it authenticates (it reaches Vercel only
+		// through the reusable cell now) but so the "no hand-minted token" assertions below still cover
+		// it if a lane ever grows its own credential handling again.
+		expect(workflowText.match(/uses: \.\/\.github\/actions\/vercel-auth/g)).toHaveLength(3);
 		expect(workflowText).not.toContain("api.vercel.com/v1/projects");
 		expect(workflowText).not.toContain("VERCEL_OIDC_TOKEN_FILE");
 		expect(workflowText).not.toContain("docker login vcr.vercel.com");
@@ -193,6 +202,17 @@ describe("Vercel CLI authentication", () => {
 			script.indexOf("printf '::add-mask::%s\\n'"),
 		);
 		expect(script.indexOf("printf '::add-mask::%s\\n'")).toBeLessThan(script.indexOf("GITHUB_ENV"));
+	});
+});
+
+describe("Namespace token authentication", () => {
+	test("the composite explicitly bounds each minted token to the benchmark cell window", () => {
+		const action = readFileSync(
+			join(findRepoRoot(), ".github/actions/namespace-token/action.yml"),
+			"utf8",
+		);
+		expect(action).toContain("--expires_in 4h");
+		expect(action).not.toContain("--no_expiry");
 	});
 });
 
@@ -496,6 +516,72 @@ describe("checkToolchainDispatchOnly", () => {
 			jobs: { publish: gatedPublish },
 		};
 		expect(checkToolchainDispatchOnly(arrayForm, TOOLCHAIN_WORKFLOW)).toEqual([]);
+	});
+});
+
+describe("checkToolchainPrScope", () => {
+	const imageDoc = (paths: readonly string[] = TOOLCHAIN_IMAGE_PR_PATHS) => ({
+		on: { pull_request: { paths: [...paths] } },
+	});
+	const actionSmokeDoc = ({
+		paths = TOOLCHAIN_ACTION_SMOKE_PR_PATHS,
+		buildx = "true",
+		summaryIf = "always()",
+		run = `test "$(bun --version)" = "1.3.14"
+bun packages/templates/src/pins.ts >/dev/null
+docker buildx inspect --bootstrap`,
+	}: {
+		paths?: readonly string[];
+		buildx?: string;
+		summaryIf?: string;
+		run?: string;
+	} = {}) => ({
+		on: { pull_request: { paths: [...paths] } },
+		jobs: {
+			smoke: {
+				if: "github.event.pull_request.head.repo.full_name == github.repository",
+				"runs-on": "starsling-ubuntu-24.04-2",
+				"timeout-minutes": 5,
+				steps: [
+					{ uses: "./.github/actions/setup-toolchain", with: { buildx } },
+					{ run },
+					{ uses: "./.github/actions/release-summary", if: summaryIf },
+				],
+			},
+		},
+	});
+
+	test("passes the real expensive and lightweight toolchain workflows", () => {
+		expect(
+			checkToolchainPrScope(
+				readWorkflow(`${WORKFLOWS_DIR}/${TOOLCHAIN_WORKFLOW}`),
+				readWorkflow(`${WORKFLOWS_DIR}/${TOOLCHAIN_ACTION_SMOKE_WORKFLOW}`),
+			),
+		).toEqual([]);
+	});
+
+	test("rejects a broad action glob on the expensive image workflow", () => {
+		const errors = checkToolchainPrScope(
+			imageDoc([...TOOLCHAIN_IMAGE_PR_PATHS, ".github/actions/**"]),
+			actionSmokeDoc(),
+		);
+		expect(errors).toHaveLength(1);
+		expect(errors[0]).toContain(".github/actions/**");
+	});
+
+	test("rejects missing transitive action ownership and weakened runtime coverage", () => {
+		const paths = TOOLCHAIN_ACTION_SMOKE_PR_PATHS.filter(
+			(path) => path !== ".github/actions/setup-workspace/**",
+		);
+		const errors = checkToolchainPrScope(
+			imageDoc(),
+			actionSmokeDoc({ paths, buildx: "false", summaryIf: "success()", run: "bun --version" }),
+		);
+		expect(errors.some((error) => error.includes("setup-workspace/**"))).toBe(true);
+		expect(errors.some((error) => error.includes('buildx: "true"'))).toBe(true);
+		expect(errors.some((error) => error.includes("if: always()"))).toBe(true);
+		expect(errors.some((error) => error.includes("packages/templates/src/pins.ts"))).toBe(true);
+		expect(errors.some((error) => error.includes("docker buildx inspect --bootstrap"))).toBe(true);
 	});
 });
 

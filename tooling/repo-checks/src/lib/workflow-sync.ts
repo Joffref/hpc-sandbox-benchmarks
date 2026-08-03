@@ -4,35 +4,47 @@
 // the truth from PROVIDERS + SUITE_NAMES (packages/schema) and compares. It mirrors
 // runner-benchmarking's check-workflow-{env,suite}-sync.ts, adapted to this repo's workflows.
 //
-// Two workflows dispatch live benchmarks: bench-smoke.yml (one dispatched suite × provider) and
-// bench-matrix.yml (one suite-matrix job that calls the reusable bench-suite.yml once per suite, which
-// then fans out over the selected providers). The credential block + the run job's timeout therefore
-// live in bench-suite.yml for the matrix lane, so the "matrix side" of the credential/timeout checks
-// reads that reusable workflow, not bench-matrix.yml itself.
+// Two workflows dispatch live benchmarks — bench-matrix.yml (the full provider × suite matrix, ending
+// in a dataset commit) and bench-smoke.yml (the same pipeline narrowed to one dispatched provider ×
+// suite and stopped before that commit) — and they are now the SAME implementation: each is a `plan`
+// job over ./.github/actions/plan-bench-axes plus one suite-matrix job calling the reusable
+// bench-suite.yml. The credential block, the run-step env and the live-run timeout therefore exist
+// exactly once, in that reusable, which is what the credential/timeout checks read.
 //
 // Invariants (each maps to a real "added X, forgot the workflow" failure mode):
 //   1. bench-smoke.yml's `provider` dispatch input options == the PROVIDERS id set, and its default
 //      is one of them — a new provider must be dispatchable, a removed one must not linger.
 //   2. bench-smoke.yml's `suite` dispatch input options == SUITE_NAMES, with a valid default.
 //   3. Every provider's requiredEnvVars (schema) is present in the "Run suite and normalize" step env
-//      of BOTH bench-smoke.yml and the reusable bench-suite.yml — the secret a new provider needs must
-//      be wired into both the smoke lane and the matrix fan-out, or the live run silently skips it.
-//   4. A credential key shared across the two lanes maps to the same value expression — both must hand
-//      the suite the same secret, not plan one and run the other. Each lane scopes its secrets to the
-//      selected provider (so a cell only sees its own credential), and the two lanes pick that provider
-//      differently — `inputs.provider` in smoke, `matrix.provider` in the fan-out — so the comparison
-//      folds those two selector tokens together before checking.
-//   5. Both live-run jobs (smoke's job and the reusable fan-out) outlast the longest registered sandbox
-//      lifetime by a fixed margin, so a suite budget increase cannot leave an otherwise healthy job to
-//      be killed by Actions first.
-//   6. Nesting wiring (suite-matrix caller + reusable provider job name) and the replicate axis
-//      reaching the cell as BENCH_REPLICATES data rather than as a matrix axis — see workflow-nesting.ts.
+//      of the reusable bench-suite.yml — the secret a new provider needs must be wired into the one
+//      cell implementation, or every live run silently skips that provider.
+//  3b. NEITHER dispatch lane owns a benchmark cell: no "Run suite and normalize" step, no `run:` that
+//      invokes the cell driver, and no provider credential in any job- or step-level env (see
+//      checkLaneDelegates). This is the invariant that replaces the old cross-lane credential
+//      comparison — by removing the second lane's copy rather than diffing it. All three probes are
+//      needed: a name match alone misses a cell re-grown under a fresh step name, and a step-level
+//      scan alone misses credentials hung off a job-level env that every step inherits.
+//   4. checkCredentialEnv still compares a key's value expression ACROSS whatever workflows it is
+//      handed, folding each lane's provider selector. With one lane left it degenerates to a presence
+//      check; it stays cross-workflow so a future third caller is compared, not assumed.
+//   5. The live-run job (the reusable's fan-out) outlasts the longest registered sandbox lifetime by a
+//      fixed margin, so a suite budget increase cannot leave an otherwise healthy job to be killed by
+//      Actions first; and the budget literal it advertises equals that timeout.
+//   6. Nesting wiring for BOTH lanes' suite-matrix callers (they are held to one shape, with the two
+//      deliberate per-lane differences — the matrix's publish dependency, the smoke's
+//      require_providers assertion — stated explicitly at each lane, in both directions) plus the
+//      reusable's provider job name and the replicate axis reaching the cell as BENCH_REPLICATES data.
+//   7. A smoke dispatch measures ONE sandbox unless asked otherwise — the dispatch default AND the
+//      blank-value fallback, since `default:` alone does not survive a cleared field and blank means
+//      "each suite's Suite.defaultReplicas" (R=12 on realworld). See workflow-nesting.ts.
 //
 // YAML navigation lives in workflow-yaml.ts; nesting checks in workflow-nesting.ts. This file owns
 // credential/timeout invariants plus runCheck orchestration, and re-exports the public surface the
 // gate's tests import.
 import { PROVIDERS, SUITE_NAMES, SUITES } from "@sandbox-benchmarks/schema";
 import {
+	checkLaneDelegates,
+	checkSmokeSingleSandboxDefault,
 	checkSuiteMatrixCaller,
 	checkSuiteWorkflowNesting,
 	matrixSuiteCaller,
@@ -44,7 +56,6 @@ import {
 	MATRIX_WORKFLOW,
 	RUN_STEP,
 	readWorkflow,
-	SMOKE_JOB,
 	SMOKE_WORKFLOW,
 	SUITE_JOB,
 	SUITE_WORKFLOW,
@@ -53,17 +64,22 @@ import {
 } from "./workflow-yaml.ts";
 import { findRepoRoot } from "./workspace.ts";
 
-export type { SuiteMatrixCaller } from "./workflow-nesting.ts";
+export type { SuiteMatrixCaller, SuiteMatrixCallerOptions } from "./workflow-nesting.ts";
 export {
+	checkLaneDelegates,
+	checkSmokeSingleSandboxDefault,
 	checkSuiteMatrixCaller,
 	checkSuiteWorkflowNesting,
 	EXPECTED_PROVIDER_NAME_EXPR,
 	EXPECTED_REPLICATES_ARG,
 	EXPECTED_REPLICATES_ENV_EXPR,
 	EXPECTED_REPLICATES_INPUT_EXPR,
+	EXPECTED_REQUIRE_PROVIDERS_INPUT_EXPR,
+	EXPECTED_SMOKE_REPLICAS_INPUT_EXPR,
 	EXPECTED_SUITE_MATRIX_EXPR,
 	EXPECTED_SUITE_NAME_EXPR,
 	matrixSuiteCaller,
+	PLAN_STEP,
 	REPLICATES_ENV_KEY,
 } from "./workflow-nesting.ts";
 export type { DispatchInput } from "./workflow-yaml.ts";
@@ -73,7 +89,6 @@ export {
 	MATRIX_WORKFLOW,
 	RUN_STEP,
 	readWorkflow,
-	SMOKE_JOB,
 	SMOKE_WORKFLOW,
 	SUITE_JOB,
 	SUITE_WORKFLOW,
@@ -174,12 +189,13 @@ export function checkSuiteInput(input: DispatchInput, label: string = SMOKE_WORK
 }
 
 /**
- * Fold a credential value expression to its lane-independent form for cross-lane comparison. Each
- * lane scopes a secret to the selected provider so a cell receives only its own credential, but the
- * two lanes name that selector differently — `inputs.provider` (the smoke dispatch input) vs
- * `matrix.provider` (the matrix cell) — so both selector tokens collapse to one placeholder. A
- * genuine drift (a secret guarded on a different provider id, or a different secret entirely)
- * survives the fold and still fails Invariant 4.
+ * Fold a credential value expression to its lane-independent form for cross-workflow comparison. A
+ * lane scopes a secret to the selected provider so a cell receives only its own credential, and a
+ * caller may name that selector either way — `inputs.provider` (a dispatch input) or `matrix.provider`
+ * (a matrix cell) — so both selector tokens collapse to one placeholder. A genuine drift (a secret
+ * guarded on a different provider id, or a different secret entirely) survives the fold and still
+ * fails Invariant 4. Only the reusable declares the block today; the fold is kept so that if a second
+ * workflow ever declares one, the two are compared rather than assumed equal.
  */
 function canonicalCredentialExpr(value: string): string {
 	return value.replace(/\b(?:inputs|matrix)\.provider\b/g, "<provider>");
@@ -281,26 +297,38 @@ export function checkCellBudgetEnv(
 export function runCheck(root: string = findRepoRoot()): string[] {
 	const smoke = readWorkflow(SMOKE_WORKFLOW, root);
 	const matrix = readWorkflow(MATRIX_WORKFLOW, root);
-	// The matrix lane's credential block + run-job timeout live in the reusable bench-suite.yml that
-	// every suite job calls, so the "matrix side" of Invariants 3–5 reads that file.
+	// Both lanes' credential block + live-run timeout live in the one reusable bench-suite.yml they
+	// call, so Invariants 3–5 read that file — and Invariant 3b (checkLaneDelegates) is what keeps that
+	// true by rejecting a lane that grows a cell of its own again.
 	const suiteWf = readWorkflow(SUITE_WORKFLOW, root);
 	// Read once and share: the suite run step's env feeds both the credential gate and the cell-budget
 	// gate, and its job timeout feeds both the margin gate and that same budget gate.
 	const suiteEnv = stepEnv(suiteWf, SUITE_JOB, RUN_STEP, SUITE_WORKFLOW);
 	const suiteTimeout = jobTimeoutMinutes(suiteWf, SUITE_JOB, SUITE_WORKFLOW);
+	const credentialKeys = [...requiredCredentialKeys().keys()];
 	return [
 		...checkProviderInput(dispatchInput(smoke, "provider", SMOKE_WORKFLOW)),
 		...checkSuiteInput(dispatchInput(smoke, "suite", SMOKE_WORKFLOW)),
-		...checkCredentialEnv({
-			[SMOKE_WORKFLOW]: stepEnv(smoke, SMOKE_JOB, RUN_STEP, SMOKE_WORKFLOW),
-			[SUITE_WORKFLOW]: suiteEnv,
-		}),
-		...checkWorkflowTimeouts({
-			[SMOKE_WORKFLOW]: jobTimeoutMinutes(smoke, SMOKE_JOB, SMOKE_WORKFLOW),
-			[SUITE_WORKFLOW]: suiteTimeout,
-		}),
+		...checkCredentialEnv({ [SUITE_WORKFLOW]: suiteEnv }),
+		// The credential keys are what make Invariant 3b more than a step-name match: a lane that hangs
+		// any of them off a job- or step-level env is building a cell, whatever it calls the step.
+		...checkLaneDelegates(smoke, SMOKE_WORKFLOW, credentialKeys),
+		...checkLaneDelegates(matrix, MATRIX_WORKFLOW, credentialKeys),
+		...checkWorkflowTimeouts({ [SUITE_WORKFLOW]: suiteTimeout }),
 		...checkCellBudgetEnv(suiteEnv, suiteTimeout, SUITE_WORKFLOW),
-		...checkSuiteMatrixCaller(matrixSuiteCaller(matrix, MATRIX_WORKFLOW), MATRIX_WORKFLOW),
+		// Both lanes are held to one caller shape, and each states BOTH flags: the matrix owns the
+		// publish dependency and must not require a provider; the smoke is the mirror image. Spelling
+		// out both at each lane is what makes this the complete, declared list of permitted differences
+		// rather than a default someone can drift past.
+		...checkSuiteMatrixCaller(matrixSuiteCaller(matrix, MATRIX_WORKFLOW), MATRIX_WORKFLOW, {
+			requirePublishNeeds: true,
+			requireProviderAssertion: false,
+		}),
+		...checkSuiteMatrixCaller(matrixSuiteCaller(smoke, SMOKE_WORKFLOW), SMOKE_WORKFLOW, {
+			requirePublishNeeds: false,
+			requireProviderAssertion: true,
+		}),
+		...checkSmokeSingleSandboxDefault(smoke, SMOKE_WORKFLOW),
 		...checkSuiteWorkflowNesting(suiteWf, SUITE_WORKFLOW),
 	];
 }

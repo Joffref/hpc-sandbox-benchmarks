@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { config } from "@sandbox-benchmarks/providers";
 import { PROVIDERS } from "@sandbox-benchmarks/schema";
 import {
 	buildReleasePlan,
@@ -72,6 +73,7 @@ describe("buildReleasePlan matrix", () => {
 			"modal-gvisor",
 			"modal-vm",
 			"novita",
+			"runloop",
 			"namespace",
 			"vercel",
 			"runcloud",
@@ -112,12 +114,21 @@ describe("buildReleasePlan matrix", () => {
 		);
 	});
 
-	// Unscoped, the same provider is simply skipped — it is not in the required set, so a missing
+	test("accepts a scoped Runloop release and makes it required", () => {
+		const plan = buildReleasePlan({ ...backfillBase, providers: "runloop" });
+		expect(plan.matrix.include).toEqual([{ provider: "runloop", required: true }]);
+		expect(plan.required).toEqual(["runloop"]);
+		expect(plan.providers[0]?.artifact).toBe(config.runloopBlueprintCandidate);
+	});
+
+	// Unscoped, the same providers are simply skipped — they are not in the required set, so a missing
 	// credential is a skip and the release proceeds. Only a scope makes it a demand.
 	test("the same provider is fine in an unscoped release", () => {
 		const plan = buildReleasePlan(base);
 		expect(plan.matrix.include.map((c) => c.provider)).toContain("blaxel");
+		expect(plan.matrix.include.map((c) => c.provider)).toContain("runloop");
 		expect(plan.required).not.toContain("blaxel");
+		expect(plan.required).not.toContain("runloop");
 		expect(Object.keys(RELEASE_UNSCOPABLE_PROVIDERS)).toEqual(["blaxel"]);
 	});
 
@@ -204,7 +215,7 @@ describe("planOutputs", () => {
 		expect(matrixLine).toBeDefined();
 		// The matrix value must be valid, single-line JSON (the fromJSON contract).
 		const parsed = JSON.parse((matrixLine as string).slice("matrix=".length));
-		expect(parsed.include).toHaveLength(12);
+		expect(parsed.include).toHaveLength(PROVIDERS.length);
 		expect((matrixLine as string).includes("\n")).toBe(false);
 	});
 

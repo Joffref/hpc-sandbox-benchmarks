@@ -20,6 +20,7 @@ import { buildAndPushCandidate, resolveImageDigestRef } from "../lib/bake/image.
 import { bakeModalImage } from "../lib/bake/modal.ts";
 import { bakeNovitaTemplate } from "../lib/bake/novita.ts";
 import { promoteAll } from "../lib/bake/promote.ts";
+import { bakeRunloopBlueprint } from "../lib/bake/runloop.ts";
 import type { BakeReport, Log } from "../lib/bake/types.ts";
 import { baseImageUse, candidateCreateOptions } from "../lib/bake/validate.ts";
 import { isPartialScope, selectProviders } from "../lib/matrix.ts";
@@ -48,6 +49,7 @@ const bakers: Record<ProviderId, (image: string, log: Log) => Promise<void>> = {
 		log("blaxel boots the stock base image — no candidate artifact to bake");
 	},
 	novita: (image, log) => bakeNovitaTemplate(config.novitaTemplateCandidate, image, log),
+	runloop: (image, log) => bakeRunloopBlueprint(config.runloopBlueprintCandidate, image, log),
 	// Same shape as blaxel: namespace pulls the toolchain image straight into a container instance at
 	// create time (no template/snapshot system), so there's no candidate artifact to bake — the
 	// validate boot right after this proves reachability. Takes the pinned candidate image like the
@@ -89,8 +91,8 @@ function writeReport(report: unknown): void {
  * A PRESENT-but-valueless flag (`--provider`, `--provider=`, `--provider --force`) THROWS rather than
  * falling through to the all-providers default. `selectProviders` treats a blank list as "every
  * provider", which is the right default for an *absent* dispatch input but exactly wrong here: a matrix
- * cell whose value failed to interpolate would silently bake all five providers instead of its one, and
- * five such cells would race on the same artifact names. Asking to restrict and getting everything is a
+ * cell whose value failed to interpolate would silently bake every provider instead of its one, and
+ * those cells would race on the same artifact names. Asking to restrict and getting everything is a
  * failure, so it is reported as one.
  */
 export function requestedProviders(argv: string[]): ProviderId[] | undefined {
@@ -185,21 +187,18 @@ if (import.meta.main) {
 					daytonaSnapshot: config.daytonaSnapshotDefault,
 					daytonaContainerSnapshot: config.daytonaContainerSnapshotDefault,
 					novitaTemplate: config.novitaTemplateVersion,
+					runloopBlueprint: config.runloopBlueprintVersion,
 				},
-				reports: promoted,
+				reports: promoted.reports,
 			});
 		} finally {
 			// Promotion can validate run.cloud before writing its report. Preserve teardown even if either
 			// operation throws instead of returning a structured failed report.
 			await drainRuncloudBackgroundWork();
 		}
-		// promoteAll is self-gating: the D1 required-providers gate (CI passes `--require e2b,daytona-vm,modal-gvisor`)
-		// runs INSIDE promoteAll before the immutable base is written, and every abort path (version already
-		// published, candidate re-validation failed, artifact failed, unmet requirements) pushes a structured
-		// `{ status: "failed" }` report. So a single `some(failed)` is the whole exit contract — re-deriving
-		// `unmet` here would mislabel an early abort (e.g. "version already exists") as a provider-credentials
-		// failure, since the early `reports` carry no provider "ok" entries.
-		process.exit(promoted.some((r) => r.status === "failed") ? 1 : 0);
+		// The transaction outcome is separate from its diagnostics: an optional provider can fail and stay
+		// visible in the report without turning a successfully published shared version red after commit.
+		process.exit(promoted.ok ? 0 : 1);
 	}
 
 	if (only) log(`>>> restricting bake+validate to: ${only.join(", ")}`);
@@ -218,8 +217,8 @@ if (import.meta.main) {
 	// Resolve once after the push and validate the exact candidate bytes by immutable digest. This also
 	// makes a tag change between provider bakes unable to redirect Modal's validation to different bytes.
 	//
-	// Only providers that actually reference the base need it: vercel boots its own VCR mirror and
-	// blaxel the vendor's stock image, so a cell restricted to those must not die on a base candidate it
+	// Only providers that actually reference the base need it: vercel boots its own VCR mirror while
+	// blaxel boots a vendor stock image, so a cell restricted to either must not die on a base candidate it
 	// never reads — under `build: skip` that ref may legitimately be stale or absent, and failing there
 	// would break the one flow the scoped release exists for.
 	const needsBase = (only ?? PROVIDERS.map((p) => p.id)).some((id) => baseImageUse(id) !== "none");
@@ -242,6 +241,7 @@ if (import.meta.main) {
 		daytonaSnapshotCandidate: config.daytonaSnapshotCandidate,
 		daytonaContainerSnapshotCandidate: config.daytonaContainerSnapshotCandidate,
 		novitaTemplateCandidate: config.novitaTemplateCandidate,
+		runloopBlueprintCandidate: config.runloopBlueprintCandidate,
 		toolchainImageCandidate: pinnedBaseImage,
 		vercelImageCandidate: config.vercelImageCandidate,
 		daytonaVmTarget: config.daytonaVm.target,
@@ -299,6 +299,7 @@ if (import.meta.main) {
 				daytonaSnapshot: config.daytonaSnapshotCandidate,
 				daytonaContainerSnapshot: config.daytonaContainerSnapshotCandidate,
 				novitaTemplate: config.novitaTemplateCandidate,
+				runloopBlueprint: config.runloopBlueprintCandidate,
 			},
 			reports,
 		});

@@ -6,7 +6,8 @@
 //   1. Refuse if the public version tag already exists — it is immutable; bump to republish (or pass
 //      `--force`, wired only to a manual force_republish dispatch, to deliberately regenerate in place).
 //   2. Re-validate the candidate (boot + smoke) right now, so the bytes we publish are verified again
-//      (the candidate tag is mutable and may have changed since `bake`). Abort on any failure.
+//      (the candidate tag is mutable and may have changed since `bake`). Abort on a required failure;
+//      a failed best-effort provider is reported and its version artifact is not built.
 //   3. Build each provider's version-named artifact FROM the candidate base (the just-revalidated
 //      bytes), so the public artifact provably derives from validated bytes — BEFORE touching the base.
 //   3b. Required-providers gate: if `--require`/`REQUIRE_PROVIDERS` names providers a skipped one
@@ -32,6 +33,7 @@ import { config } from "@sandbox-benchmarks/providers";
 import type { ProviderId } from "@sandbox-benchmarks/schema";
 import { PROVIDERS } from "@sandbox-benchmarks/schema";
 import { isPartialScope } from "../matrix.ts";
+import type { ProviderRun } from "../providers-run.ts";
 import { forEachProviderWithCreds } from "../providers-run.ts";
 import { bakeDaytonaContainerSnapshot, bakeDaytonaVmSnapshot } from "./daytona.ts";
 import { bakeE2bTemplate } from "./e2b.ts";
@@ -43,6 +45,7 @@ import {
 	resolveImageDigestRef,
 } from "./image.ts";
 import { bakeNovitaTemplate } from "./novita.ts";
+import { bakeRunloopBlueprint } from "./runloop.ts";
 import type { BakeReport, Log } from "./types.ts";
 import type { CandidateRefs } from "./validate.ts";
 import { baseImageUse } from "./validate.ts";
@@ -73,23 +76,81 @@ export interface PromoteOptions {
 	only?: readonly ProviderId[];
 }
 
-export async function promoteAll(log: Log, options: PromoteOptions = {}): Promise<BakeReport[]> {
+/** Promotion diagnostics plus the transaction outcome. Optional-provider failures remain visible in
+ * `reports`, while `ok` records whether the requested publish transaction itself committed. */
+export interface PromoteResult {
+	reports: BakeReport[];
+	ok: boolean;
+}
+
+/** Finalize a full promotion after the immutable image retag attempt. Provider diagnostics do not
+ * decide the transaction status; the image commit point does. */
+export function fullPromotionResult(reports: BakeReport[]): PromoteResult {
+	return {
+		reports,
+		ok:
+			reports.some((report) => report.provider === "image" && report.status === "ok") &&
+			!reports.some((report) => report.provider === "image" && report.status === "failed"),
+	};
+}
+
+/**
+ * Select the providers whose version artifacts may be built after candidate re-validation. A
+ * best-effort provider is allowed to fail without blocking the shared image publish, but that must
+ * never turn into permission to publish an unvalidated provider artifact. Failed/skipped validations
+ * are carried into the promote report so the missing artifact remains visible to CI and operators.
+ */
+export function promotionScopeAfterValidation(
+	requested: readonly ProviderId[],
+	runs: readonly Pick<ProviderRun<unknown>, "provider" | "status" | "reason" | "durationMs">[],
+): { eligible: ProviderId[]; rejected: BakeReport[] } {
+	const byProvider = new Map(runs.map((run) => [run.provider, run]));
+	const eligible: ProviderId[] = [];
+	const rejected: BakeReport[] = [];
+	for (const provider of requested) {
+		const run = byProvider.get(provider);
+		if (run?.status === "ok") {
+			eligible.push(provider);
+			continue;
+		}
+		rejected.push({
+			provider,
+			status: run?.status ?? "failed",
+			reason: run?.reason ?? "candidate re-validation produced no result",
+			...(run?.durationMs !== undefined ? { durationMs: run.durationMs } : {}),
+		});
+	}
+	return { eligible, rejected };
+}
+
+/** A scoped promote is an explicit request to publish every named provider, so that scope is required
+ * even for a direct local invocation that did not also pass `--require`. Preserve any configured
+ * requirements as well so a typo or contradictory invocation still fails closed. */
+export function effectivePromotionRequirements(
+	configured: readonly string[],
+	only: readonly ProviderId[] | undefined,
+): string[] {
+	return [...new Set([...configured, ...(isPartialScope(only) ? (only ?? []) : [])])];
+}
+
+export async function promoteAll(log: Log, options: PromoteOptions = {}): Promise<PromoteResult> {
 	const { force = false, only } = options;
 	const partial = isPartialScope(only);
 	const reports: BakeReport[] = [];
 	const scope = only ? only.join(", ") : "every provider";
 	/** Record a refusal/abort as a structured `image` failure and stop — the shape every early exit
 	 *  below returns, so the refusal contract is written once. */
-	const refuse = (reason: string, verb = "refused"): BakeReport[] => {
+	const refuse = (reason: string, verb = "refused"): PromoteResult => {
 		log(`<<< promote ${verb} — ${reason}`);
 		reports.push({ provider: "image", status: "failed", reason });
-		return reports;
+		return { reports, ok: false };
 	};
 	// Only a REQUIRED provider gates the release (Option 1): a best-effort variant that shares a required
 	// variant's credentials — daytona-container ↔ daytona-vm, modal-vm ↔ modal-gvisor — runs rather than
-	// skips, so its re-validation or artifact failure is recorded but must NOT abort the publish. Locally
-	// (nothing required) any failure aborts, as a safety net for a hand-run promote.
-	const required = requiredProviders();
+	// skips, so its re-validation or artifact failure is recorded but must NOT abort a full publish.
+	// A scoped backfill is inherently strict: every provider explicitly named is required even if a
+	// direct local caller omitted the redundant `--require` flag.
+	const required = effectivePromotionRequirements(requiredProviders(), only);
 	const blocks = (r: { provider: string; status: string }): boolean =>
 		r.status === "failed" && (required.length === 0 || required.includes(r.provider));
 
@@ -142,7 +203,8 @@ export async function promoteAll(log: Log, options: PromoteOptions = {}): Promis
 	}
 
 	// 2. Re-validate the candidate immediately before publishing, so the bytes we promote are verified
-	//    again (the candidate tag is mutable). Abort the whole promote if any provider fails to validate.
+	//    again (the candidate tag is mutable). Required failures abort the whole promote; a failed
+	//    best-effort provider is excluded from step 3 and remains visible in the final report.
 	//    A PARTIAL promote pins the PUBLISHED version instead: it is not cutting a new version, it is
 	//    attaching a provider to the one already live, so the base under test must be that one.
 	const baseTag = releaseBaseTag(partial);
@@ -163,7 +225,8 @@ export async function promoteAll(log: Log, options: PromoteOptions = {}): Promis
 	//     would verify one image and publish an artifact built from another. Require that identity when
 	//     such a provider is in scope. The rest don't bake from the base at all (vercel's version artifact
 	//     is a retag of the exact candidate step 2 just booted; modal/namespace/microsandbox boot the
-	//     published base directly), so a drifted candidate tag is simply irrelevant to them.
+	//     published base directly), so a drifted candidate tag is simply
+	//     irrelevant to them.
 	const bakesFromBase = (only ?? PROVIDERS.map((p) => p.id)).filter(
 		(id) => baseImageUse(id) === "bakes",
 	);
@@ -189,6 +252,7 @@ export async function promoteAll(log: Log, options: PromoteOptions = {}): Promis
 		daytonaSnapshotCandidate: config.daytonaSnapshotCandidate,
 		daytonaContainerSnapshotCandidate: config.daytonaContainerSnapshotCandidate,
 		novitaTemplateCandidate: config.novitaTemplateCandidate,
+		runloopBlueprintCandidate: config.runloopBlueprintCandidate,
 		toolchainImageCandidate: pinnedBaseImage,
 		vercelImageCandidate: config.vercelImageCandidate,
 		daytonaVmTarget: config.daytonaVm.target,
@@ -208,8 +272,11 @@ export async function promoteAll(log: Log, options: PromoteOptions = {}): Promis
 				...(run.durationMs !== undefined ? { durationMs: run.durationMs } : {}),
 			});
 		}
-		return reports;
+		return { reports, ok: false };
 	}
+	const requested = only ?? PROVIDERS.map((provider) => provider.id);
+	const promotionScope = promotionScopeAfterValidation(requested, validateRuns);
+	reports.push(...promotionScope.rejected);
 
 	// 3. Build each in-scope provider's version-named artifact FROM the base we just revalidated (the
 	//    candidate base, or the published version base on a partial promote). Built BEFORE the base
@@ -219,66 +286,78 @@ export async function promoteAll(log: Log, options: PromoteOptions = {}): Promis
 	//    deletes first (no snapshot overwrite in the SDK), so a failed daytona create removes the
 	//    published snapshot — `bakeDaytonaSnapshot` says so in its error, which lands in the report's
 	//    `reason`. The base is still never written, so the version tag itself stays consistent.
-	const runs = await forEachProviderWithCreds(
-		async (provider) => {
-			log(`>>> ${provider.name}: building version artifact from ${pinnedBaseImage}…`);
-			switch (provider.name) {
-				case "e2b":
-					await bakeE2bTemplate(config.e2bTemplateVersion, pinnedBaseImage, (m) => log(`    ${m}`));
-					break;
-				case "daytona-vm":
-					await bakeDaytonaVmSnapshot(config.daytonaSnapshotDefault, pinnedBaseImage, (m) =>
-						log(`    ${m}`),
-					);
-					break;
-				case "daytona-container":
-					await bakeDaytonaContainerSnapshot(
-						config.daytonaContainerSnapshotDefault,
-						pinnedBaseImage,
-						(m) => log(`    ${m}`),
-					);
-					break;
-				case "modal-gvisor":
-				case "modal-vm":
-					log(`    ${provider.name} boots the published version image — nothing to build`);
-					break;
-				case "microsandbox-local":
-				case "microsandbox-cloud":
-					log(`    ${provider.name} boots the published version image — nothing to build`);
-					break;
-				case "blaxel":
-					log("    blaxel boots the stock base image — nothing to promote");
-					break;
-				case "novita":
-					await bakeNovitaTemplate(config.novitaTemplateVersion, pinnedBaseImage, (m) =>
-						log(`    ${m}`),
-					);
-					break;
-				case "namespace":
-					log("    namespace pulls the published version image — nothing to build");
-					break;
-				case "runcloud":
-					log("    runcloud pulls the published version image — nothing to build");
-					break;
-				case "vercel":
-					await promoteImage(log, config.vercelImageCandidate, config.vercelImageVersion);
-					break;
-				default: {
-					// Exhaustiveness: a new ProviderId must add a promote branch above (compile error here).
-					const unhandled: never = provider.name;
-					throw new Error(`unhandled provider: ${String(unhandled)}`);
-				}
-			}
-		},
-		{
-			log,
-			only,
-			onComplete: (run) => {
-				const time = run.durationMs !== undefined ? ` (${run.durationMs.toFixed(0)}ms)` : "";
-				log(`<<< ${run.provider}: ${run.status}${time}${run.reason ? ` — ${run.reason}` : ""}`);
-			},
-		},
-	);
+	const runs =
+		promotionScope.eligible.length === 0
+			? []
+			: await forEachProviderWithCreds(
+					async (provider) => {
+						log(`>>> ${provider.name}: building version artifact from ${pinnedBaseImage}…`);
+						switch (provider.name) {
+							case "e2b":
+								await bakeE2bTemplate(config.e2bTemplateVersion, pinnedBaseImage, (m) =>
+									log(`    ${m}`),
+								);
+								break;
+							case "daytona-vm":
+								await bakeDaytonaVmSnapshot(config.daytonaSnapshotDefault, pinnedBaseImage, (m) =>
+									log(`    ${m}`),
+								);
+								break;
+							case "daytona-container":
+								await bakeDaytonaContainerSnapshot(
+									config.daytonaContainerSnapshotDefault,
+									pinnedBaseImage,
+									(m) => log(`    ${m}`),
+								);
+								break;
+							case "modal-gvisor":
+							case "modal-vm":
+								log(`    ${provider.name} boots the published version image — nothing to build`);
+								break;
+							case "microsandbox-local":
+							case "microsandbox-cloud":
+								log(`    ${provider.name} boots the published version image — nothing to build`);
+								break;
+							case "blaxel":
+								log("    blaxel boots the stock base image — nothing to promote");
+								break;
+							case "novita":
+								await bakeNovitaTemplate(config.novitaTemplateVersion, pinnedBaseImage, (m) =>
+									log(`    ${m}`),
+								);
+								break;
+							case "runloop":
+								await bakeRunloopBlueprint(config.runloopBlueprintVersion, pinnedBaseImage, (m) =>
+									log(`    ${m}`),
+								);
+								break;
+							case "namespace":
+								log("    namespace pulls the published version image — nothing to build");
+								break;
+							case "runcloud":
+								log("    runcloud pulls the published version image — nothing to build");
+								break;
+							case "vercel":
+								await promoteImage(log, config.vercelImageCandidate, config.vercelImageVersion);
+								break;
+							default: {
+								// Exhaustiveness: a new ProviderId must add a promote branch above (compile error here).
+								const unhandled: never = provider.name;
+								throw new Error(`unhandled provider: ${String(unhandled)}`);
+							}
+						}
+					},
+					{
+						log,
+						only: promotionScope.eligible,
+						onComplete: (run) => {
+							const time = run.durationMs !== undefined ? ` (${run.durationMs.toFixed(0)}ms)` : "";
+							log(
+								`<<< ${run.provider}: ${run.status}${time}${run.reason ? ` — ${run.reason}` : ""}`,
+							);
+						},
+					},
+				);
 
 	for (const run of runs) {
 		reports.push({
@@ -319,7 +398,7 @@ export async function promoteAll(log: Log, options: PromoteOptions = {}): Promis
 					: "") +
 				rerunHint,
 		);
-		return reports;
+		return { reports, ok: false };
 	}
 
 	// Required-providers gate (D1), enforced HERE — before step 4 writes the immutable base — not
@@ -338,7 +417,7 @@ export async function promoteAll(log: Log, options: PromoteOptions = {}): Promis
 		// Push a structured failure (like the step-1 and step-4 aborts) so the emitted JSON is
 		// self-describing — a consumer sees the failed promote without re-deriving it from `--require`.
 		reports.push({ provider: "image", status: "failed", reason });
-		return reports;
+		return { reports, ok: false };
 	}
 
 	// 4. LAST: publish the candidate base as the immutable public version — the commit point. A partial
@@ -350,7 +429,7 @@ export async function promoteAll(log: Log, options: PromoteOptions = {}): Promis
 			`>>> partial promote complete: ${scope} now published for ${config.toolchainImageVersion}; ` +
 				"the public base and every other provider's artifact are unchanged",
 		);
-		return reports;
+		return { reports, ok: true };
 	}
 	log(`>>> promoting image ${pinnedBaseImage} → ${config.toolchainImageVersion}…`);
 	const imageStart = performance.now();
@@ -368,5 +447,5 @@ export async function promoteAll(log: Log, options: PromoteOptions = {}): Promis
 		});
 	}
 
-	return reports;
+	return fullPromotionResult(reports);
 }

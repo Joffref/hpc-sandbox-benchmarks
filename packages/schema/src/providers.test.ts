@@ -33,6 +33,7 @@ describe("@sandbox-benchmarks/schema providers", () => {
 			"namespace",
 			"novita",
 			"runcloud",
+			"runloop",
 			"vercel",
 		]);
 	});
@@ -119,6 +120,7 @@ describe("@sandbox-benchmarks/schema providers", () => {
 			e2b: 0.0504 * TARGET_SPEC.vcpus + 0.0162 * TARGET_SPEC.memoryGb,
 			"daytona-vm": 0.0504 * TARGET_SPEC.vcpus + 0.0162 * Math.max(0, TARGET_SPEC.memoryGb - 5),
 			novita: 0.03528 * TARGET_SPEC.vcpus + 0.01152 * TARGET_SPEC.memoryGb,
+			runloop: 0.108 * TARGET_SPEC.vcpus + 0.0252 * TARGET_SPEC.memoryGb,
 			// $0.00000492/physical-core-s ÷ 2 × 3600 = $0.008856/vCPU-hr;
 			// $0.00000083175/GiB-s × 3600 = $0.0029943/GiB-hr.
 			runcloud: 0.008856 * TARGET_SPEC.vcpus + 0.0029943 * TARGET_SPEC.memoryGb,
@@ -140,6 +142,7 @@ describe("@sandbox-benchmarks/schema providers", () => {
 		expect(diskRate("modal-gvisor")).toBe(0); // volumes free under the 1 TiB/mo tier
 		expect(diskRate("e2b")).toBeUndefined(); // no published overage rate
 		expect(diskRate("novita")).toBe(0); // 20 GB target spec inside the 60 GB free tier
+		expect(diskRate("runloop")).toBeCloseTo(0.00034236);
 	});
 
 	it("resolves retired provider ids through the legacy aliases", () => {

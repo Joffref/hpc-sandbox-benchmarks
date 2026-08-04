@@ -47,10 +47,9 @@ export const RELEASE_REQUIRED_PROVIDERS: readonly ProviderId[] = [
  * and, on a `build: full` dispatch, an hour of rebuild. Refusing in the plan turns that into a
  * fail-fast with an explanation.
  *
- * Keyed by provider so the reason travels with the refusal. Blaxel is the only entry: its bake is a
- * no-op (it boots the vendor's stock image, not our toolchain) and its promote publishes nothing, so
- * the release lane deliberately injects no BL_API_KEY/BL_WORKSPACE — those live in the bench lane
- * only (docs/ci-secrets.md). Adding credentials to the bake matrix is what would remove an entry here.
+ * Keyed by provider so the reason travels with the refusal. Blaxel still boots a stock vendor image,
+ * so its bake/promote publishes nothing. Adding a toolchain artifact and release credential wiring is
+ * what would remove the remaining entry here.
  */
 export const RELEASE_UNSCOPABLE_PROVIDERS: Readonly<Partial<Record<ProviderId, string>>> = {
 	blaxel:
@@ -76,6 +75,8 @@ function providerArtifact(id: ProviderId): string {
 			return "boots the candidate image directly (no baked artifact)";
 		case "blaxel":
 			return "boots the stock base image (no baked artifact)";
+		case "runloop":
+			return config.runloopBlueprintCandidate;
 		case "namespace":
 			// No template/snapshot system — pulls the candidate image straight into an instance at
 			// create time (same as modal), so there is no baked artifact to name.

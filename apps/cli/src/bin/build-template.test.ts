@@ -20,10 +20,27 @@ async function run(...args: string[]) {
 	return { stdout, stderr, exitCode };
 }
 
-describe("build-template CLI", () => {
+// Inherited Object properties the `in`-based guard used to let through: each must be rejected as an
+// unknown provider, never invoked off the prototype chain.
+const INHERITED = ["__proto__", "toString", "constructor"];
+
+/** Run every case of one scenario at once, tagged with its input so a failure names the case. */
+function runAll<T extends string>(cases: readonly T[], args: (value: T) => string[]) {
+	return Promise.all(cases.map(async (value) => [value, await run(...args(value))] as const));
+}
+
+// `describe.concurrent` because every case here is one `bun build-template.ts` boot, and a boot is
+// dominated by loading the CLI's module graph — the assertions are string compares. Serially the seven
+// boots cost seven module loads for work that is independent case by case. The runner's own construct,
+// rather than launching at collection time and awaiting later: a hoisted promise that rejects before
+// its await is reported against whichever test happens to be running, and hoisting spawns every
+// subprocess even under `bun test -t`.
+describe.concurrent("build-template CLI", () => {
 	it("routes every provider the templates package advertises", async () => {
-		for (const provider of templateProviders) {
-			const { stdout, exitCode } = await run(provider, "v1");
+		for (const [provider, { stdout, exitCode }] of await runAll(templateProviders, (p) => [
+			p,
+			"v1",
+		])) {
 			expect(`${provider}:${exitCode}`).toBe(`${provider}:0`);
 			expect(JSON.parse(stdout).provider).toBe(provider);
 		}
@@ -36,8 +53,7 @@ describe("build-template CLI", () => {
 	});
 
 	it("rejects inherited Object properties instead of invoking them", async () => {
-		for (const name of ["__proto__", "toString", "constructor"]) {
-			const { stderr, exitCode } = await run(name);
+		for (const [name, { stderr, exitCode }] of await runAll(INHERITED, (n) => [n])) {
 			expect(`${name}:${exitCode}`).toBe(`${name}:1`);
 			expect(stderr).toContain(`Unknown provider "${name}"`);
 		}

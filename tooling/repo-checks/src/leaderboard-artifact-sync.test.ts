@@ -52,15 +52,23 @@ const runFile = (runId: string) => join(ROOT, ...DATASET_RUNS_DIR.split("/"), `$
 const regenCmd = (runId: string) =>
 	`bun apps/cli/src/bin/leaderboard.ts ${DATASET_RUNS_DIR}/${runId}.json LEADERBOARD.md`;
 
-/** Independent R-7 percentile implementation for auditing the persisted Aggregates and displayed p50. */
-function auditPercentile(samples: readonly number[], p: number): number {
-	const sorted = [...samples].sort((a, b) => a - b);
+/** R-7 percentile of an ALREADY-SORTED buffer. Split out so the bootstraps below can sort one reused
+ *  scratch buffer in place instead of allocating a fresh sorted copy per resample — the audit still
+ *  reaches its order statistics BY SORTING, deliberately unlike the quickselect the renderer uses, so
+ *  the two remain independent implementations. */
+function auditPercentileOfSorted(sorted: ArrayLike<number>, p: number): number {
 	const h = (sorted.length - 1) * p;
 	const lo = Math.floor(h);
 	const hi = Math.ceil(h);
 	const a = sorted[lo] as number;
 	const b = sorted[hi] as number;
 	return a + (h - lo) * (b - a);
+}
+
+/** Independent R-7 percentile implementation for auditing the persisted Aggregates and displayed p50. */
+function auditPercentile(samples: readonly number[], p: number): number {
+	const sorted = [...samples].sort((a, b) => a - b);
+	return auditPercentileOfSorted(sorted, p);
 }
 
 /** Conventional two-pass aggregates: intentionally separate from schema.aggregate's Welford path. */
@@ -102,52 +110,59 @@ function auditMedianInterval(
 ): { lo: number; hi: number } | null {
 	if (samples.length === 1) return null;
 	const rng = auditRng(seed);
-	const medians = new Array<number>(10_000);
+	const n = samples.length;
+	const medians = new Float64Array(10_000);
+	// One scratch draw for all 10 000 resamples: a fresh Array per resample dominated this gate's
+	// runtime, and each draw is dead the moment its median is read.
+	const draw = new Float64Array(n);
 	for (let iteration = 0; iteration < medians.length; iteration++) {
-		const draw = Array.from(
-			{ length: samples.length },
-			() => samples[Math.floor(rng() * samples.length)] as number,
-		);
-		medians[iteration] = auditPercentile(draw, 0.5);
+		for (let i = 0; i < n; i++) draw[i] = samples[Math.floor(rng() * n)] as number;
+		draw.sort();
+		medians[iteration] = auditPercentileOfSorted(draw, 0.5);
 	}
+	medians.sort();
 	const tail = (1 - 0.95) / 2;
 	return {
-		lo: auditPercentile(medians, tail),
-		hi: auditPercentile(medians, 1 - tail),
+		lo: auditPercentileOfSorted(medians, tail),
+		hi: auditPercentileOfSorted(medians, 1 - tail),
 	};
 }
 
 /**
- * Independently reproduce the seeded 10k HIERARCHICAL median bootstrap the renderer uses once a Metric
- * carries a replicate breakdown (≥2 sandboxes): each resample draws R replicates WITH REPLACEMENT, then
- * within each drawn replicate draws its own Samples with replacement, pools the lot, and takes the median.
- * Mirrors schema/analysis.ts `hierarchicalBootstrapMedianInterval` — including the single shared RNG's
- * exact draw order (replicate index, then that replicate's sample indices, R times) — so the reproduced
- * bounds are byte-identical to the committed table rather than merely statistically close.
+ * Independently reproduce the seeded 10k CLUSTER bootstrap the renderer uses once a Metric carries a
+ * replicate breakdown (≥2 sandboxes): summarise each sandbox by its own median, then draw R of those
+ * summaries WITH REPLACEMENT and take the median of the draw. Whole sandboxes are resampled INTACT —
+ * there is deliberately no second, within-sandbox resampling stage, because each sandbox's observed
+ * Samples already carry one realization of that machine's within-noise and drawing them again would
+ * add a second copy of it.
+ *
+ * Mirrors schema/analysis.ts `clusterMedianInterval` — including the single shared RNG's exact draw
+ * order (R summary indices per resample) — so the reproduced bounds are byte-identical to the committed
+ * table rather than merely statistically close. Reaches its order statistics BY SORTING, deliberately
+ * unlike the renderer's quickselect, so the two stay independent implementations.
  */
-function auditHierarchicalMedianInterval(
+function auditClusterMedianInterval(
 	replicates: readonly (readonly number[])[],
 	seed: string,
 ): { lo: number; hi: number } | null {
-	// The pooled union is what the displayed median ranks on; a single pooled Sample has no spread, so the
-	// renderer degenerates to a point interval (rendered "—"), matching auditMedianInterval's n=1 return.
-	if (replicates.reduce((sum, replicate) => sum + replicate.length, 0) === 1) return null;
+	// One sandbox carries no between-machine information, so the renderer degenerates to a point interval
+	// (rendered "—"). Note this keys on the SANDBOX count, not the pooled Sample count.
+	if (replicates.length === 1) return null;
+	const summaries = replicates.map((replicate) => auditPercentile(replicate, 0.5));
 	const rng = auditRng(seed);
-	const R = replicates.length;
-	const medians = new Array<number>(10_000);
+	const R = summaries.length;
+	const medians = new Float64Array(10_000);
+	const draw = new Float64Array(R);
 	for (let iteration = 0; iteration < medians.length; iteration++) {
-		const pool: number[] = [];
-		for (let r = 0; r < R; r++) {
-			const chosen = replicates[Math.floor(rng() * R)] as readonly number[];
-			for (let i = 0; i < chosen.length; i++)
-				pool.push(chosen[Math.floor(rng() * chosen.length)] as number);
-		}
-		medians[iteration] = auditPercentile(pool, 0.5);
+		for (let i = 0; i < R; i++) draw[i] = summaries[Math.floor(rng() * R)] as number;
+		draw.sort();
+		medians[iteration] = auditPercentileOfSorted(draw, 0.5);
 	}
+	medians.sort();
 	const tail = (1 - 0.95) / 2;
 	return {
-		lo: auditPercentile(medians, tail),
-		hi: auditPercentile(medians, 1 - tail),
+		lo: auditPercentileOfSorted(medians, tail),
+		hi: auditPercentileOfSorted(medians, 1 - tail),
 	};
 }
 
@@ -168,6 +183,7 @@ interface AuditRow {
 	rank: number;
 	interval: string;
 	n: number;
+	sandboxes: number;
 	note: string;
 	p: string;
 	ks: string;
@@ -178,13 +194,19 @@ function auditRows(run: Run, metric: MetricDef): AuditRow[] {
 	const candidates = run.providers.flatMap((provider) => {
 		const result = provider.metrics.find(({ metricId }) => metricId === metric.id);
 		if (!result) return [];
-		const value = auditPercentile(result.samples, 0.5);
-		// Mirror the renderer's branch: once a Metric merged ≥2 replicate sandboxes it takes the
-		// hierarchical bootstrap (between-sandbox variance), else the ordinary percentile bootstrap.
 		const seed = `${run.runId}:${metric.id}:${provider.providerId}`;
 		const replicates = result.replicates?.map((replicate) => replicate.samples);
+		// Mirror the renderer's branch: with ≥2 replicate sandboxes the value is the median of the
+		// per-sandbox medians (one machine one vote, NOT the pooled trials) and the interval is the
+		// cluster bootstrap of that same statistic; without them, the ordinary percentile bootstrap.
+		const value = replicates
+			? auditPercentile(
+					replicates.map((replicate) => auditPercentile(replicate, 0.5)),
+					0.5,
+				)
+			: auditPercentile(result.samples, 0.5);
 		const interval = replicates
-			? auditHierarchicalMedianInterval(replicates, seed)
+			? auditClusterMedianInterval(replicates, seed)
 			: auditMedianInterval(result.samples, seed);
 		return [
 			{
@@ -213,6 +235,7 @@ function auditRows(run: Run, metric: MetricDef): AuditRow[] {
 				...candidate,
 				rank: 1,
 				n: candidate.result.samples.length,
+				sandboxes: candidate.result.replicates?.length ?? 1,
 				note: "",
 				p: "—",
 				ks: "—",
@@ -242,6 +265,7 @@ function auditRows(run: Run, metric: MetricDef): AuditRow[] {
 			// exact cluster permutation, never the bootstrapped difference interval.
 			const previousReplicates = previousCandidate.result.replicates?.map((r) => r.samples);
 			const candidateReplicates = candidate.result.replicates?.map((r) => r.samples);
+			let clusterP = Number.NaN;
 			if (previousReplicates || candidateReplicates) {
 				const cluster = mannWhitneyU(
 					(previousReplicates ?? [previousCandidate.result.samples]).map((c) =>
@@ -249,10 +273,12 @@ function auditRows(run: Run, metric: MetricDef): AuditRow[] {
 					),
 					(candidateReplicates ?? [candidate.result.samples]).map((c) => auditPercentile(c, 0.5)),
 				);
+				clusterP = cluster.pValue;
 				// The between-sandbox floor already meets α (2/C(6,3)=0.1 at R=3) → underpowered, never a
 				// tie; else the cluster test's own p decides separation.
 				if (cluster.minAttainablePValue >= DEFAULT_ALPHA) {
-					note = identical ? "n too small, equal medians" : "n too small";
+					// The cluster path decided, so the binding constraint is the SANDBOX count, not `n`.
+					note = identical ? "too few sandboxes, equal medians" : "too few sandboxes";
 					if (identical) rank = previousRow.rank;
 				} else if (cluster.pValue >= DEFAULT_ALPHA) {
 					rank = previousRow.rank;
@@ -265,7 +291,11 @@ function auditRows(run: Run, metric: MetricDef): AuditRow[] {
 				rank = previousRow.rank;
 				note = "tied";
 			}
-			p = `${formatPValue(mw.pValue)}${note ? ` (${note})` : ""}`;
+			// The rendered `p vs. above` is the p of the test that DECIDED — the cluster test wherever
+			// replicate sandboxes exist, the pooled Mann-Whitney only where a single sandbox left nothing
+			// else to test on. `p (KS)` stays the pooled shape diagnostic.
+			const decidingP = previousReplicates || candidateReplicates ? clusterP : mw.pValue;
+			p = `${formatPValue(decidingP)}${note ? ` (${note})` : ""}`;
 			ks = formatPValue(shape.pValue);
 		}
 
@@ -273,6 +303,7 @@ function auditRows(run: Run, metric: MetricDef): AuditRow[] {
 			...candidate,
 			rank,
 			n: candidate.result.samples.length,
+			sandboxes: candidate.result.replicates?.length ?? 1,
 			note,
 			p: p === "—" && note ? `— (${note})` : p,
 			ks,
@@ -286,6 +317,8 @@ interface MarkdownMetricRow {
 	provider: string;
 	value: string;
 	interval: string;
+	/** Sandboxes (the unit of replication) and pooled trials — rendered as two distinct columns. */
+	sandboxes: string;
 	n: string;
 	note: string;
 }
@@ -323,7 +356,7 @@ function parseMetricTables(markdown: string, emitted: Map<string, MetricDef>) {
 				.slice(1, -1)
 				.split("|")
 				.map((cell) => cell.trim());
-			const [rank, provider, value, interval, n, rawNote] = cells;
+			const [rank, provider, value, interval, sandboxes, n, rawNote] = cells;
 			const note = rawNote === "—" || rawNote === undefined ? "" : rawNote;
 			const key = metric.id;
 			const metricRows = rows.get(key) ?? [];
@@ -332,6 +365,7 @@ function parseMetricTables(markdown: string, emitted: Map<string, MetricDef>) {
 				provider: provider as string,
 				value: value as string,
 				interval: interval as string,
+				sandboxes: sandboxes as string,
 				n: n as string,
 				note,
 			});
@@ -415,6 +449,22 @@ function loadCommittedRun(): {
 		}
 		throw error;
 	}
+}
+
+/**
+ * ONE canonical board — "what the renderer produces from the committed Run right now" — used by every
+ * test below, including the determinism check, whose SECOND operand is deliberately a fresh build from
+ * a freshly parsed Run. Building a board is the most expensive thing in this package, and the tests
+ * were paying for four of them to ask three questions.
+ *
+ * Memoized lazily, never at module scope, for the same reason {@link loadCommittedRun} is called inside
+ * each test: a throw here must surface as the failure of the test that asked for it, not abort the file
+ * during collection and silently take the other checks with it.
+ */
+let sharedBoard: ReturnType<typeof buildLeaderboard> | undefined;
+function committedBoard(): ReturnType<typeof buildLeaderboard> {
+	sharedBoard ??= buildLeaderboard(loadCommittedRun().run);
+	return sharedBoard;
 }
 
 // This gate renders the WHOLE committed board — up to twice, for the determinism check — and both the
@@ -607,8 +657,8 @@ describe("LEADERBOARD.md stays in sync with the renderer", () => {
 	});
 
 	it("is byte-identical to a fresh render of the Run it names", () => {
-		const { committed, runId, run, figures } = loadCommittedRun();
-		const rendered = renderLeaderboardMarkdown(buildLeaderboard(run), figures);
+		const { committed, runId, figures } = loadCommittedRun();
+		const rendered = renderLeaderboardMarkdown(committedBoard(), figures);
 		if (committed !== rendered) {
 			// Name the remedy in the failure, rather than leaving whoever hits this to work it out.
 			throw new Error(
@@ -683,16 +733,22 @@ describe("LEADERBOARD.md stays in sync with the renderer", () => {
 
 	it("renders the same bytes twice, so this gate can't flake on an unseeded bootstrap", () => {
 		// Loads independently of the test above: each resolves the Run itself, so one failing reports
-		// its own diagnosis instead of aborting the file and taking the other down with it.
+		// its own diagnosis instead of aborting the file and taking the other down with it. The fresh
+		// build is deliberately fed a freshly parsed Run rather than the shared board's — two builds from
+		// two independent parses is what regenerating the artifact actually does.
 		const { run, figures } = loadCommittedRun();
-		expect(renderLeaderboardMarkdown(buildLeaderboard(run), figures)).toBe(
-			renderLeaderboardMarkdown(buildLeaderboard(run), figures),
-		);
+		// Mutation is asserted SEPARATELY, not inferred from the byte comparison: because the two builds
+		// read two independently parsed Runs, a `buildLeaderboard` that mutated its input after reading it
+		// would still render identical bytes and slip through. Snapshot the Run and diff it afterwards.
+		const before = JSON.stringify(run);
+		const rendered = renderLeaderboardMarkdown(buildLeaderboard(run), figures);
+		expect(JSON.stringify(run), "buildLeaderboard mutated the Run it was given").toBe(before);
+		expect(renderLeaderboardMarkdown(committedBoard(), figures)).toBe(rendered);
 	});
 
 	it("renders one row for every provider/Metric record in the source Run", () => {
 		const { run } = loadCommittedRun();
-		const board = buildLeaderboard(run);
+		const board = committedBoard();
 		const expected = run.providers
 			.flatMap((provider) =>
 				provider.metrics
@@ -790,6 +846,7 @@ describe("LEADERBOARD.md stays in sync with the renderer", () => {
 				provider: row.displayName,
 				value: formatValue(row.value),
 				interval: row.interval,
+				sandboxes: String(row.sandboxes),
 				n: String(row.n),
 				note: row.note,
 			}));

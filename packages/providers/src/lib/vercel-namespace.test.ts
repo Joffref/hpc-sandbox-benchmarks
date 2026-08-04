@@ -10,7 +10,7 @@ import {
 	VERCEL_VCR_REPOSITORY,
 } from "@sandbox-benchmarks/schema";
 
-const CONFIG_PATH = join(import.meta.dir, "config.ts");
+const CONFIG_PATH = join(import.meta.dir, "..", "config.ts");
 const NAMESPACE_KEYS = ["VERCEL_TEAM_SLUG", "VERCEL_PROJECT_NAME"] as const;
 
 const PROBE = `const { config } = await import(${JSON.stringify(CONFIG_PATH)});
@@ -54,7 +54,14 @@ async function resolveNamespace(
 	};
 }
 
-describe("Vercel VCR namespace resolution", () => {
+// `describe.concurrent` because each case is one `bun -e` boot whose cost is almost entirely loading
+// config.ts's module graph; the resolution being probed is a handful of string checks. The six probes
+// differ only in environment and share nothing, so overlapping them turns six serial module loads into
+// one batch. The runner's own construct, rather than launching at collection time and awaiting later:
+// `resolveNamespace` does `JSON.parse(stdout)` inside the promise, so a hoisted rejection would be
+// reported against whichever test happened to be running, and hoisting spawns all six even under
+// `bun test -t`.
+describe.concurrent("Vercel VCR namespace resolution", () => {
 	it("falls back to the schema defaults when neither override is set", async () => {
 		const { exitCode, resolved } = await resolveNamespace({
 			VERCEL_TEAM_SLUG: null,
@@ -103,13 +110,14 @@ describe("Vercel VCR namespace resolution", () => {
 	it("rejects the API-ID forms so they can never become registry path segments", async () => {
 		// VERCEL_ORG_ID / VERCEL_PROJECT_ID carry team_*/prj_* and are what `vercel pull` links with.
 		// Pasting either into the namespace vars is the obvious mix-up; fail loudly at load.
-		const team = await resolveNamespace({ VERCEL_TEAM_SLUG: "team_abc123" });
-		expect(team.exitCode).not.toBe(0);
-		expect(team.stderr).toContain("never an API ID");
-
-		const project = await resolveNamespace({ VERCEL_PROJECT_NAME: "prj_abc123" });
-		expect(project.exitCode).not.toBe(0);
-		expect(project.stderr).toContain("never an API ID");
+		const [team, project] = await Promise.all([
+			resolveNamespace({ VERCEL_TEAM_SLUG: "team_abc123" }),
+			resolveNamespace({ VERCEL_PROJECT_NAME: "prj_abc123" }),
+		]);
+		for (const { exitCode, stderr } of [team, project]) {
+			expect(exitCode).not.toBe(0);
+			expect(stderr).toContain("never an API ID");
+		}
 	});
 
 	it("rejects a namespace value that would escape the repository path", async () => {

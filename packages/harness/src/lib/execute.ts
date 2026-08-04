@@ -24,6 +24,7 @@
 
 import { randomUUID } from "node:crypto";
 import type { ProviderTransport } from "@sandbox-benchmarks/schema";
+import { PTS_STATE_SELECT_SH } from "@sandbox-benchmarks/schema";
 import { GapError } from "./gap-cause.ts";
 
 export const MIN = 60_000;
@@ -317,9 +318,10 @@ const PREAMBLE_HEAD = [
 	// Distro pythons are PEP 668 externally-managed, but PTS profiles pip-install their harness —
 	// fine in a throwaway sandbox; the baked image sets the same.
 	"export PIP_BREAK_SYSTEM_PACKAGES=1",
-	// Some providers inject an unprivileged runtime user. Point both PTS state and installed-profile
-	// discovery at the root-baked registry even if an image importer strips the Docker ENV/config.
-	"if [ -d /var/lib/phoronix-test-suite ]; then export PTS_USER_PATH_OVERRIDE=/var/lib/phoronix-test-suite/ PTS_TEST_INSTALL_ROOT_PATH=/var/lib/phoronix-test-suite/installed-tests/; fi",
+	// Keep the root-baked installed profiles shared, but never point an injected unprivileged user at
+	// root's mutable PTS state. Canonical snippet — see PTS_STATE_SELECT_SH for the full rationale and
+	// for why this must also run at runtime rather than only in the image ENV.
+	PTS_STATE_SELECT_SH,
 ];
 
 /**

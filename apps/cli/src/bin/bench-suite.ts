@@ -24,7 +24,11 @@ import {
 import { drainRuncloudBackgroundWork } from "@sandbox-benchmarks/providers";
 import { writeNormalizedRun } from "@sandbox-benchmarks/results";
 import type { Run, SuiteName } from "@sandbox-benchmarks/schema";
-import { SUITES } from "@sandbox-benchmarks/schema";
+import {
+	expectedRuntimeIdentity,
+	isUnexpectedRuntimeUser,
+	SUITES,
+} from "@sandbox-benchmarks/schema";
 import type { CellKind, SummaryRow } from "../lib/actions-log.ts";
 import {
 	escapeHtml,
@@ -59,6 +63,19 @@ import { describeSuiteTasks } from "../lib/suite-tasks.ts";
 
 function plural(n: number, singular: string, pluralForm: string = `${singular}s`): string {
 	return `${n} ${n === 1 ? singular : pluralForm}`;
+}
+
+/**
+ * Job-summary rendering for the observed effective user, with a visible warning on contract drift.
+ *
+ * The expectation is per-provider ({@link isUnexpectedRuntimeUser}), NOT a hardcoded "root": Runloop
+ * runs its lane as an unprivileged user by design, so a fixed expectation would mark all twelve of its
+ * replicates anomalous on a healthy run and bury the identity change this column exists to surface.
+ */
+export function runtimeUserSummary(providerId: string, user: string | undefined): string {
+	if (!user) return "—";
+	if (!isUnexpectedRuntimeUser(providerId, user)) return user;
+	return `⚠ ${user} (expected ${expectedRuntimeIdentity(providerId)})`;
 }
 
 function miseTaskSummary(plan: SuiteTaskPlan): string {
@@ -252,6 +269,7 @@ async function reportCell(
 			["Metrics", provider ? String(provider.metrics.length) : "", "plain"],
 			["Suites covered", provider ? String(provider.suitesCovered.length) : "", "plain"],
 			["Gaps", provider ? String(provider.gaps.length) : "", "plain"],
+			["Runtime user", runtimeUserSummary(opts.provider, provider?.observedSpecs.user), "plain"],
 			["Observed CPU", provider?.observedSpecs.cpuModel ?? "", "code"],
 			[
 				"Spec matched",
@@ -320,6 +338,7 @@ export function replicateSummaryRows(
 		{ data: "Metrics", header: true },
 		{ data: "Suites", header: true },
 		{ data: "Gaps", header: true },
+		{ data: "Runtime user", header: true },
 		// Per-SANDBOX, not per-cell, and that is the point: R replicates exist to measure a provider's
 		// fleet variation, and a replicate that landed on different host hardware (or off the target
 		// spec) is the single most likely explanation for an outlier. reportCell surfaces these for a
@@ -341,6 +360,7 @@ export function replicateSummaryRows(
 			escapeHtml(run ? String(run.metrics.length) : "—"),
 			escapeHtml(run ? String(run.suitesCovered.length) : "—"),
 			escapeHtml(run ? String(run.gaps.length) : "—"),
+			escapeHtml(runtimeUserSummary(provider, run?.observedSpecs.user)),
 			renderCell(run?.observedSpecs.cpuModel || "—", "code"),
 			escapeHtml(run?.observedSpecs.region || "—"),
 			escapeHtml(run?.specMatched === undefined ? "—" : String(run.specMatched)),
@@ -369,6 +389,13 @@ async function reportFleet(
 			o.run?.providers.find((p) => p.providerId === opts.provider)?.validationStatus ===
 			"validated",
 	).length;
+	const unexpectedRuntimeUsers = opts.outcomes.filter((outcome) =>
+		isUnexpectedRuntimeUser(
+			opts.provider,
+			outcome.run?.providers.find((provider) => provider.providerId === opts.provider)
+				?.observedSpecs.user,
+		),
+	).length;
 	await writeCellSummary({
 		// Identity rides through as-is; `outcomes` is spent on the counts and the table below.
 		...opts,
@@ -377,6 +404,13 @@ async function reportFleet(
 			["Replicates", String(opts.outcomes.length), "plain"],
 			["Validated replicates", `${validated}/${opts.outcomes.length}`, "plain"],
 			["Failed replicates", String(failures.length), "plain"],
+			[
+				"Unexpected runtime users",
+				unexpectedRuntimeUsers > 0
+					? `${unexpectedRuntimeUsers}/${opts.outcomes.length} sandbox(es) (expected ${expectedRuntimeIdentity(opts.provider)})`
+					: "",
+				"plain",
+			],
 			// The cell's wall clock IS its slowest replicate, so that number — not the mean — is what
 			// to compare against the job budget, and the spread next to it says whether one sandbox
 			// dragged the cell or the whole fleet was slow.

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import type { ProviderTransport } from "@sandbox-benchmarks/schema";
-import { getProvider } from "@sandbox-benchmarks/schema";
+import { getProvider, PTS_STATE_SELECT_SH } from "@sandbox-benchmarks/schema";
 import type { SandboxHandle } from "./execute.ts";
 import {
 	buildPreamble,
@@ -73,11 +73,21 @@ describe("sandbox preamble", () => {
 		expect(PREAMBLE).toContain("MISE_TASK_RUN_AUTO_INSTALL=0");
 	});
 
-	it("reuses the baked PTS registry for an injected unprivileged runtime user", () => {
-		expect(PREAMBLE).toContain("PTS_USER_PATH_OVERRIDE=/var/lib/phoronix-test-suite/");
+	it("separates an injected user's writable PTS state from the baked profile registry", () => {
+		// One canonical snippet, interpolated — not restated here, so this test cannot drift from the
+		// generated smoke probe the way three hand-written copies did.
+		expect(PREAMBLE).toContain(PTS_STATE_SELECT_SH);
 		expect(PREAMBLE).toContain(
 			"PTS_TEST_INSTALL_ROOT_PATH=/var/lib/phoronix-test-suite/installed-tests/",
 		);
+	});
+
+	// The preamble prefixes EVERY command and is joined under `set -eo pipefail`, so a failing write
+	// here takes down the whole step — including probes that never touch PTS. PTS creates its own state
+	// directory, so selecting state must stay read-only.
+	it("selects PTS state without writing to the filesystem", () => {
+		expect(PTS_STATE_SELECT_SH).not.toContain("mkdir");
+		expect(PTS_STATE_SELECT_SH).not.toContain("$HOME");
 	});
 
 	it("never disables the mise python — baked images have no distro python3 to fall back to", () => {

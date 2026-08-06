@@ -43,25 +43,16 @@ on:
         description: 'Comma-separated providers to benchmark (blank = every registered provider).'
         required: false
         type: string
-        # The default set spans the isolation technologies compared here: e2b, daytona-vm (the LINUX_VM
-        # reference), modal-gvisor (Modal's default gVisor runtime), modal-vm (Modal's gVisor-free
-        # microVM), blaxel (stock base image), novita (its own pre-baked template), microsandbox-cloud,
-        # namespace (dedicated instance), and vercel (the shared toolchain base mirrored into VCR) have
-        # all produced comparable committed results. modal-vm + blaxel graduated into the default once
-        # committed runs validated them; microsandbox-cloud, vercel, and namespace followed. runloop and
-        # runcloud join the default WITHOUT a committed validation run — the matrix itself is how they
-        # get one, so until then they surface as pending providers / leaderboard coverage gaps rather
-        # than scores, and a cell whose credential is missing skips cleanly instead of failing the run.
-        # daytona-container and microsandbox-local are the registered variants still opt-in (pass either
-        # explicitly);
-        # `plan-providers` rejects any name that is not in the registry. Listed in registry order — the
+        # A bare dispatch benchmarks blaxel (stock base image) alone. Every other registered provider
+        # stays dispatchable — pass them explicitly, comma-separated, to widen the axis back out (e.g.
+        # `e2b,daytona-vm,blaxel` for a cross-provider comparison), or leave the field blank for every
+        # registered provider. `plan-providers` rejects any name that is not in the registry, and the
         # plan re-sorts to registry order regardless, so the spelling here is cosmetic.
         #
-        # Vercel reports the fleet's smallest disk (~32 GB against the 40 GB target). That does not
-        # affect comparability — computeSpecMatched covers vCPUs and memory, the two axes providers are
-        # ranked on — but a disk-hungry suite will SKIP there and surface as a leaderboard coverage gap
-        # rather than a bad score. See packages/results/src/lib/specs.ts.
-        default: e2b,daytona-vm,blaxel,microsandbox-cloud,modal-gvisor,modal-vm,novita,runloop,namespace,vercel,runcloud
+        # Consequence of the narrowed default worth knowing before dispatching: a default run grows the
+        # dataset with blaxel shards only, so the other providers' leaderboard entries age rather than
+        # refresh. Widen the axis when the comparison surface is what you're after.
+        default: blaxel
       suites:
         description: 'Comma-separated suites to run (blank = every registered suite). E.g. "network" for a targeted pre-merge run.'
         required: false
@@ -129,7 +120,7 @@ jobs:
   plan:
     name: Plan matrix
     if: >
-      github.repository == 'starslingdev/hpc-sandbox-benchmarks' &&
+      github.repository == 'Joffref/hpc-sandbox-benchmarks' &&
       (github.ref == 'refs/heads/main' || inputs.allow_branch)
     runs-on: ubuntu-24.04
     outputs:
@@ -170,7 +161,7 @@ jobs:
     name: ${{ matrix.suite }}
     needs: plan
     if: >
-      github.repository == 'starslingdev/hpc-sandbox-benchmarks' &&
+      github.repository == 'Joffref/hpc-sandbox-benchmarks' &&
       (github.ref == 'refs/heads/main' || inputs.allow_branch)
     # A called workflow's token can never exceed its caller's, so the id-token: write that
     # bench-suite.yml's cells need for Namespace's GitHub OIDC federation has to be granted here too.
@@ -225,7 +216,7 @@ jobs:
       !cancelled() &&
       needs.plan.result == 'success' &&
       github.ref == 'refs/heads/main' &&
-      github.repository == 'starslingdev/hpc-sandbox-benchmarks'
+      github.repository == 'Joffref/hpc-sandbox-benchmarks'
     # Grant the reusable workflow the token scopes it needs: commit/push the dataset (contents), open
     # the PR (pull-requests), and download this run's shard artifacts by run-id (actions: read).
     permissions:

@@ -49,9 +49,12 @@ on:
         # workflow-registry-sync drift gate keeps this list in lockstep, so a new provider must be
         # added here too. The plan step re-validates it against the registry anyway, so a stale option
         # fails the plan rather than running nothing.
+        # Defaults to blaxel, matching bench-matrix.yml's default axis so a smoke rehearses the same
+        # provider the matrix will run. The options list stays the full registry (the drift gate above
+        # requires it), so any other provider is one dropdown change away.
         description: Provider to benchmark
         type: choice
-        default: daytona-vm
+        default: blaxel
         options:
           [
             daytona-vm,
@@ -153,7 +156,7 @@ jobs:
     # triggered by someone with write access, and `workflow_dispatch` resolves refs in THIS repository
     # (never a fork's branch), so widening the ref does not widen who can spend provider quota.
     if: >
-      github.repository == 'starslingdev/hpc-sandbox-benchmarks' &&
+      github.repository == 'Joffref/hpc-sandbox-benchmarks' &&
       (github.ref == 'refs/heads/main' || inputs.allow_branch)
     runs-on: ubuntu-24.04
     outputs:
@@ -198,7 +201,7 @@ jobs:
     name: ${{ matrix.suite }}
     needs: plan
     if: >
-      github.repository == 'starslingdev/hpc-sandbox-benchmarks' &&
+      github.repository == 'Joffref/hpc-sandbox-benchmarks' &&
       (github.ref == 'refs/heads/main' || inputs.allow_branch)
     # A called workflow's token can never exceed its caller's, so the id-token: write that
     # bench-suite.yml's cell needs for Namespace's GitHub OIDC federation has to be granted here too.

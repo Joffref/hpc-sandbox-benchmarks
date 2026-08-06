@@ -19,7 +19,7 @@ set -euo pipefail
 # only offered for workflows present on the default branch — so always dispatch the main copy.
 WORKFLOW="commit-dataset.yml"
 REF="main"
-REPO="starslingdev/hpc-sandbox-benchmarks"
+REPO="Joffref/hpc-sandbox-benchmarks"
 
 usage() {
   echo "Usage: scripts/backfill-dataset.sh <run-id>" >&2

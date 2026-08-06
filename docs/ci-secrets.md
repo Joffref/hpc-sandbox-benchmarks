@@ -48,7 +48,10 @@ Ungated: `ci.yml`, `ci-lint.yml`, and the toolchain `pr-gate` (Docker smoke, no 
 1. **No publish on merge.** Toolchain GHCR promote is `workflow_dispatch` only (never `push`).
 2. **Main only, this repo only.** Privileged jobs require
    `github.ref == 'refs/heads/main'` and
-   `github.repository == 'starslingdev/hpc-sandbox-benchmarks'`. The benchmark matrix and the smoke
+   `github.repository == 'Joffref/hpc-sandbox-benchmarks'` — except `toolchain-image.yml`, whose
+   publish job stays pinned to `starslingdev/hpc-sandbox-benchmarks` because the GHCR release lane
+   still belongs upstream (`checkToolchainDispatchOnly` in `tooling/repo-checks` asserts that
+   literal). The benchmark matrix and the smoke
    dispatch additionally permit an explicitly opted-in non-main dispatch (`allow_branch`) for
    pre-merge validation; those runs still require `privileged` approval, and every mutation of the
    repo — dataset publishing, GHCR promote, leaderboard — remains main-only.
@@ -286,7 +289,7 @@ Configure the `main` ruleset so the bot-authored dataset/leaderboard PRs can mer
    workflows use a direct `gh pr merge`, never `--auto` (arming auto-merge on a `GITHUB_TOKEN` PR
    whose required check can never run would strand it behind a green job).
 
-With that posture: a fork/public PR that touches `/.github/` still needs `@dbworku`; a
+With that posture: a fork/public PR that touches `/.github/` still needs `@Joffref`; a
 `leaderboard/update-*` PR that only changes `LEADERBOARD.md` and its rendered `docs/figures/*.webp`
 merges as soon as the workflow opens it.
 

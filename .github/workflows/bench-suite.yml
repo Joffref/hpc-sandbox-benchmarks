@@ -209,6 +209,11 @@ jobs:
       # bin writes ONE job summary for the whole fleet (a row per replicate) + a run annotation.
       - name: Run suite and normalize
         env:
+          # The sandbox clones the producer itself, so it needs the repo the job is running FOR — not
+          # the harness default, which names the upstream repo and would leave a fork's cells checking
+          # out a SHA that does not exist there. Derived from the run context so this stays correct
+          # across forks and renames.
+          BENCH_REPO_URL: ${{ github.server_url }}/${{ github.repository }}
           BENCH_REPO_REF: ${{ github.sha }}
           # Optional once the repo is public (anonymous clone works). Still passed so private forks and
           # rate-limited clones keep working via the short-lived job token.
@@ -255,6 +260,9 @@ jobs:
           MODAL_TOKEN_SECRET: ${{ (matrix.provider == 'modal-gvisor' || matrix.provider == 'modal-vm') && secrets.MODAL_TOKEN_SECRET || '' }}
           BL_API_KEY: ${{ matrix.provider == 'blaxel' && secrets.BL_API_KEY || '' }}
           BL_WORKSPACE: ${{ matrix.provider == 'blaxel' && secrets.BL_WORKSPACE || '' }}
+          # Not a credential — it picks which Blaxel control plane the SDK talks to (unset = prod).
+          # BL_API_KEY must be issued for the SAME environment, so these two move together.
+          BL_ENV: ${{ matrix.provider == 'blaxel' && 'dev' || '' }}
           NOVITA_API_KEY: ${{ matrix.provider == 'novita' && secrets.NOVITA_API_KEY || '' }}
           RUNLOOP_API_KEY: ${{ matrix.provider == 'runloop' && secrets.RUNLOOP_API_KEY || '' }}
           RUN_CLOUD_API_KEY: ${{ matrix.provider == 'runcloud' && secrets.RUN_CLOUD_API_KEY || '' }}

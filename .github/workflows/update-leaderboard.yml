@@ -55,7 +55,7 @@ jobs:
     # it to main too; this is defense in depth.)
     if: >
       github.ref == 'refs/heads/main' &&
-      github.repository == 'starslingdev/hpc-sandbox-benchmarks'
+      github.repository == 'Joffref/hpc-sandbox-benchmarks'
     runs-on: ubuntu-24.04
     environment: privileged
     # contents: write to commit + push the leaderboard branch; pull-requests: write to open the PR. No

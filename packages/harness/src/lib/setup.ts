@@ -64,6 +64,26 @@ export function setupSteps(suite: Suite): SetupStep[] {
 			label: "install mise",
 			// No-op on pre-baked images. Install the same pinned, checksum-verified static binary as the
 			// toolchain image; GitHub is already required for the repository clone immediately above.
+			//
+			// Fetch the .tar.gz, not the bare binary: the release's uncompressed linux-x64 asset is
+			// 85 MiB against 30 MiB compressed, and this is the ONE provider path that pays it at run
+			// time (blaxel has no baked snapshot, so every replicate of every suite downloads it). A
+			// suite matrix fans ~27 sandboxes out behind blaxel's single egress IP simultaneously, and
+			// 2.4 GB of concurrent GitHub pulls is what tips that IP into throttling. The tarball ships
+			// the byte-identical binary, so the sha256 pins below are unchanged and still name the
+			// EXECUTABLE (verified after extraction) rather than the archive — the same trust anchor as
+			// the toolchain image's 05-mise-binary.sh, which keeps its direct-binary fetch (a Docker
+			// build on a runner, not the shared sandbox egress). Only the exact member path is
+			// extracted, so a crafted archive cannot write outside the temp dir.
+			//
+			// Time-bound the fetch the way lib/bench.sh's seed_pts_download_cache does. Without
+			// --max-time a connection that opens and then stalls is never abandoned: curl neither fails
+			// nor retries, it just sits there until this step's timeoutMs kills it, burning the full
+			// 5 min AND both retries below on a single throttled cell (run 31064232149: 8 of 9 suites
+			// lost to `Step "install mise" timed out after 300s`). --retry-max-time bounds the whole
+			// retry window, because curl resets --max-time on every retry — a per-attempt cap alone
+			// bounds nothing. Worst case here is ~210s (the 120s retry window, plus one in-flight
+			// attempt that may start just under it), which leaves headroom inside timeoutMs.
 			script: [
 				"command -v mise >/dev/null 2>&1 || {",
 				'mkdir -p "$HOME/.local/bin";',
@@ -71,10 +91,12 @@ export function setupSteps(suite: Suite): SetupStep[] {
 				`aarch64|arm64) a=arm64; sha=${MISE_SHA256_ARM64};;`,
 				`x86_64|amd64) a=x64; sha=${MISE_SHA256_X64};;`,
 				'*) echo "Unsupported architecture for mise: $arch" >&2; exit 1;; esac;',
-				"tmp=$(mktemp); trap 'rm -f \"$tmp\"' EXIT;",
-				`curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 -o "$tmp" "https://github.com/jdx/mise/releases/download/${MISE_VERSION}/mise-${MISE_VERSION}-linux-$a"`,
-				'&& printf "%s  %s\\n" "$sha" "$tmp" | sha256sum -c -',
-				'&& chmod +x "$tmp" && mv "$tmp" "$HOME/.local/bin/mise"; };',
+				"tmp=$(mktemp -d); trap 'rm -rf \"$tmp\"' EXIT;",
+				"curl -fsSL --retry 3 --retry-all-errors --retry-delay 2 --retry-max-time 120",
+				`--connect-timeout 10 --max-time 90 -o "$tmp/mise.tar.gz" "https://github.com/jdx/mise/releases/download/${MISE_VERSION}/mise-${MISE_VERSION}-linux-$a.tar.gz"`,
+				'&& tar -xzf "$tmp/mise.tar.gz" -C "$tmp" mise/bin/mise',
+				'&& printf "%s  %s\\n" "$sha" "$tmp/mise/bin/mise" | sha256sum -c -',
+				'&& chmod +x "$tmp/mise/bin/mise" && mv "$tmp/mise/bin/mise" "$HOME/.local/bin/mise"; };',
 				"mise --version",
 			].join(" "),
 			timeoutMs: 5 * MIN,
@@ -124,11 +146,14 @@ export function setupSteps(suite: Suite): SetupStep[] {
 		steps.push({
 			label: "setup phoronix-test-suite",
 			// No-op on pre-baked images; on stock images the step above already populated apt's index and
-			// installed the profile build dependencies.
+			// installed the profile build dependencies. Same time bound as the mise fetch above, and for
+			// the same reason: an unbounded curl turns a stalled connection into the step's whole
+			// timeoutMs. The .deb is only ~2 MiB, so a transfer that cannot finish in 60s is stalled,
+			// not slow.
 			script:
 				"command -v phoronix-test-suite >/dev/null 2>&1 || { " +
 				[
-					`curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 "https://github.com/phoronix-test-suite/phoronix-test-suite/releases/download/v${PTS_VERSION}/phoronix-test-suite_${PTS_VERSION}_all.deb" -o /tmp/phoronix-test-suite.deb`,
+					`curl -fsSL --retry 3 --retry-all-errors --retry-delay 2 --retry-max-time 90 --connect-timeout 10 --max-time 60 "https://github.com/phoronix-test-suite/phoronix-test-suite/releases/download/v${PTS_VERSION}/phoronix-test-suite_${PTS_VERSION}_all.deb" -o /tmp/phoronix-test-suite.deb`,
 					"($SUDO dpkg -i /tmp/phoronix-test-suite.deb || $SUDO apt-get install -y -qq -f)",
 				].join(" && ") +
 				"; }; phoronix-test-suite version",

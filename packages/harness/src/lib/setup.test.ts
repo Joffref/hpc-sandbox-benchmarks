@@ -68,8 +68,38 @@ describe("setupSteps", () => {
 	it("checksum-verifies the pinned mise fallback without executing a remote installer", () => {
 		const miseStep = setupSteps(SUITES["cpu-node"]).find((step) => step.label === "install mise");
 		expect(miseStep?.script).toContain("sha256sum -c -");
-		expect(miseStep?.script).toContain("mise-v2026.5.16-linux-$a");
+		expect(miseStep?.script).toContain("mise-v2026.5.16-linux-$a.tar.gz");
 		expect(miseStep?.script).not.toContain("mise.run");
+		// The pin must name the extracted EXECUTABLE, not the archive, so this fallback keeps the same
+		// trust anchor as the toolchain image's direct-binary fetch (05-mise-binary.sh / pins.ts).
+		expect(miseStep?.script).toContain('"$sha" "$tmp/mise/bin/mise"');
+		// Extract one member path only — never the whole archive, which would let a crafted tarball
+		// write outside the temp dir.
+		expect(miseStep?.script).toContain("tar -xzf");
+		expect(miseStep?.script).toContain("mise/bin/mise");
+	});
+
+	it("time-bounds every setup download so a stalled connection cannot eat the step timeout", () => {
+		// Regression guard for run 31064232149, where 8 of 9 suites died on `Step "install mise" timed
+		// out after 300s`: curl with retries but no --max-time never abandons a stalled transfer, so it
+		// neither fails nor retries — it consumes the whole step budget, three times over. Every
+		// download that runs inside a sandbox needs a per-attempt cap AND a --retry-max-time window,
+		// since curl resets --max-time on each retry (see lib/bench.sh seed_pts_download_cache).
+		//
+		// Match an invocation (`curl -…`), not the bare word: "install base packages" names curl as a
+		// package and probes for it with `command -v curl`, neither of which transfers anything.
+		const downloads = setupSteps(SUITES["cpu-node"]).filter((step) =>
+			/\bcurl\s+-/.test(step.script),
+		);
+		expect(downloads.map((step) => step.label)).toEqual([
+			"install mise",
+			"setup phoronix-test-suite",
+		]);
+		for (const step of downloads) {
+			expect(step.script, `${step.label} needs --connect-timeout`).toContain("--connect-timeout");
+			expect(step.script, `${step.label} needs --max-time`).toMatch(/\s--max-time \d+/);
+			expect(step.script, `${step.label} needs --retry-max-time`).toContain("--retry-max-time");
+		}
 	});
 
 	it("emits syntactically valid shell for every setup step", () => {

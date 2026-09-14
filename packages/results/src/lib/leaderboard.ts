@@ -23,6 +23,7 @@
  * medians separate under Mann-Whitney U (with Kolmogorov-Smirnov reported alongside, since a bimodal
  * provider can match another's median while behaving nothing like it).
  */
+
 import type {
 	Dimension,
 	GapCause,
@@ -49,6 +50,8 @@ import {
 	SUITE_NAMES,
 	sandboxMedianOf,
 } from "@sandbox-benchmarks/schema";
+import type { CombineDatasetsOptions, LeaderboardDataset } from "./leaderboard-datasets.ts";
+import { combineLeaderboardDatasets } from "./leaderboard-datasets.ts";
 
 /**
  * The repository the published leaderboard lives in — the base for every provenance link in the header.
@@ -333,6 +336,8 @@ export interface AbsentProvider {
 
 /** The full comparison surface derived from one Run. */
 export interface Leaderboard {
+	sources?: readonly Run[];
+	poolingNotes?: readonly string[];
 	runId: string;
 	comparisonCohort?: string;
 	partial?: NonNullable<Run["experiment"]>["partial"];
@@ -367,7 +372,7 @@ export interface Leaderboard {
  * were written by a harness that predated the taxonomy. Gating on the version would strip the disk
  * classification off every backfilled run in the committed series; gating on the evidence does not.
  */
-function producerClassifiesGaps(run: Run): boolean {
+function producerClassifiesGaps(run: LeaderboardDataset): boolean {
 	return run.providers.some((provider) => provider.gaps.some((gap) => gap.cause !== undefined));
 }
 
@@ -410,7 +415,7 @@ const REGISTERED_SUITES = new Set<string>(SUITE_NAMES);
  * outlives the registry that validated it — a suite deregistered later would otherwise re-enter the
  * denominator and accuse every current provider of missing a suite nobody can run anymore.
  */
-function suitesExercised(run: Run): string[] {
+function suitesExercised(run: LeaderboardDataset): string[] {
 	const suites = new Set<string>();
 	for (const provider of run.providers) {
 		for (const suite of provider.suitesCovered) {
@@ -433,7 +438,7 @@ function suitesExercised(run: Run): string[] {
  * sandbox that died before writing its marker leaves behind, and it is invisible in every other view —
  * the ranked tables can only show providers that produced a value.
  */
-function coverageGapsOf(run: Run): CoverageGap[] {
+function coverageGapsOf(run: LeaderboardDataset): CoverageGap[] {
 	const exercised = suitesExercised(run);
 	// Computed once per Run, not per gap: whether an absent cause means "unclassified" or "this producer
 	// had no causes to give".
@@ -491,7 +496,7 @@ function coverageGapsOf(run: Run): CoverageGap[] {
 }
 
 /** Rank all providers that emitted one Metric; empty when the Run has no result for it. */
-function rankMetric(run: Run, metric: MetricDef): LeaderboardRow[] {
+function rankMetric(run: LeaderboardDataset, metric: MetricDef): LeaderboardRow[] {
 	// Carry each provider's raw Samples alongside its row: the ranking needs the full distributions,
 	// not just their medians, to tell a real difference from environmental noise.
 	const candidates = run.providers.flatMap((provider) => {
@@ -499,7 +504,16 @@ function rankMetric(run: Run, metric: MetricDef): LeaderboardRow[] {
 		if (!result) return [];
 		// The per-replicate sample slices, present only once the aggregate merged ≥2 replicate sandboxes.
 		const replicates = result.replicates?.map((r) => r.samples);
-		const seed = `${run.runId}:${metric.id}:${provider.providerId}`;
+		const contributingIds = run.sources
+			?.filter((source) =>
+				source.providers.some(
+					(p) =>
+						p.providerId === provider.providerId && p.metrics.some((m) => m.metricId === metric.id),
+				),
+			)
+			.map((source) => source.runId)
+			.join("+");
+		const seed = `${contributingIds ?? run.runId}:${metric.id}:${provider.providerId}`;
 		const row: LeaderboardRow = {
 			providerId: provider.providerId,
 			displayName: getProvider(provider.providerId)?.displayName ?? provider.providerId,
@@ -684,7 +698,7 @@ function isolationClass(declared: string | undefined): "gvisor" | "container" | 
  * recognized classes ("gvisor"/"container"/"vm") that disagrees with the declared one — a detected
  * "unknown" (the common case) or any unrecognized raw value never counts, so the declaration wins.
  */
-function buildRoster(run: Run): ProviderRosterEntry[] {
+function buildRoster(run: LeaderboardDataset): ProviderRosterEntry[] {
 	// "Every provider measured in this Run": a zero-evidence registry placeholder was not measured —
 	// it lands in the absent-providers note instead of a roster row claiming an isolation nobody probed.
 	const measured = run.providers.filter((p) => !providerReportedNothing(p));
@@ -714,7 +728,13 @@ function buildRoster(run: Run): ProviderRosterEntry[] {
 }
 
 /** Build the structured leaderboard from a validated Run. Pure — Run in, ranking out. */
-export function buildLeaderboard(run: Run): Leaderboard {
+export function buildLeaderboard(
+	input: LeaderboardDataset | readonly Run[],
+	options: CombineDatasetsOptions = {},
+): Leaderboard {
+	const isArray = (value: LeaderboardDataset | readonly Run[]): value is readonly Run[] =>
+		Array.isArray(value);
+	const run = isArray(input) ? combineLeaderboardDatasets(input, options) : input;
 	const dimensions: LeaderboardDimension[] = [];
 
 	for (const dimension of LEADERBOARD_DIMENSION_ORDER) {
@@ -735,6 +755,7 @@ export function buildLeaderboard(run: Run): Leaderboard {
 
 	return {
 		runId: run.runId,
+		...(run.sources ? { sources: run.sources, poolingNotes: run.poolingNotes } : {}),
 		...(run.experiment?.partial ? { partial: run.experiment.partial } : {}),
 		...(run.experiment?.cohortDigest ? { comparisonCohort: run.experiment.cohortDigest } : {}),
 		sha: run.sha,
@@ -1164,8 +1185,19 @@ export function renderLeaderboardMarkdown(
 	const lines: string[] = [
 		"# Sandbox provider leaderboard",
 		"",
-		`Run ${runSourceLinks(board.runId)} · commit ${commitSourceLink(board.sha)} ·`,
-		`dataset ${datasetSourceLink(board.runId)} · generated ${board.generatedAt}`,
+		...(board.sources
+			? [
+					"**Combined dataset analysis (not a new published experiment).**",
+					...board.sources.map(
+						(source) =>
+							`Source ${runSourceLinks(source.runId)} · commit ${commitSourceLink(source.sha)} · dataset ${datasetSourceLink(source.runId)}${source.experiment?.partial ? ` · ${source.experiment.partial.complete}/${source.experiment.partial.planned} cells complete` : ""}`,
+					),
+					...(board.poolingNotes ?? []),
+				]
+			: [
+					`Run ${runSourceLinks(board.runId)} · commit ${commitSourceLink(board.sha)} ·`,
+					`dataset ${datasetSourceLink(board.runId)} · generated ${board.generatedAt}`,
+				]),
 		...(board.partial
 			? [
 					"",

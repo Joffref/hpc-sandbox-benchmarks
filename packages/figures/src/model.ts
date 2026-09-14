@@ -84,7 +84,7 @@ export interface RealworldFigureModel {
  *  exactly the fields read, so the real registries satisfy it and a synthetic test registry
  *  needs no cast. */
 export interface FigureModelInput {
-	readonly run: Run;
+	readonly run: Pick<Run, "providers">;
 	/** The metric catalog — task labels come from here. */
 	readonly metrics: readonly Pick<MetricDef, "id" | "label">[];
 	/** Provider display names. String-keyed on purpose: the run side carries provider ids as

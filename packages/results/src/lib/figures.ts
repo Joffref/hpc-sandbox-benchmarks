@@ -10,6 +10,7 @@
  * gate re-implementing it, and a gate that re-implements what it checks is checking its own
  * copy.
  */
+
 import type {
 	ComparisonFigureModel,
 	ComparisonRunIdentity,
@@ -31,9 +32,10 @@ import {
 	pipelineChartHtml,
 } from "@sandbox-benchmarks/figures";
 import type { Run } from "@sandbox-benchmarks/schema";
-import { METRIC_CATALOG, PROVIDERS, SUITES } from "@sandbox-benchmarks/schema";
+import { METRIC_CATALOG, PROVIDERS, SUITES, sandboxMedianOf } from "@sandbox-benchmarks/schema";
 import type { Leaderboard, LeaderboardFigure, LeaderboardMetricFigure } from "./leaderboard.ts";
 import { buildLeaderboard, FIGURE_DIMENSION } from "./leaderboard.ts";
+import type { LeaderboardDataset } from "./leaderboard-datasets.ts";
 
 /**
  * Where the rendered leaderboard figures are written, relative to the directory holding the
@@ -81,7 +83,7 @@ export const FIGURE_DEVICE_SCALE = 2;
  * run, and the caption claimed it; now that each scales to its own slowest pipeline, a reader
  * comparing two charts must be told to read the totals rather than the lengths.
  */
-export function suiteFigureNote(suite: PipelineSuite): string {
+export function suiteFigureNote(suite: PipelineSuite, combined = false): string {
 	const counts = suite.bars.flatMap((bar) => bar.segments.map((segment) => segment.n));
 	const low = Math.min(...counts);
 	const high = Math.max(...counts);
@@ -96,7 +98,9 @@ export function suiteFigureNote(suite: PipelineSuite): string {
 			: ` Tasks without recorded measurements in this run are excluded from all bars: ` +
 				`**${suite.droppedTasks.join("**, **")}**.`;
 	return (
-		`Each segment is that task's median over ${trials} retained ${plural}; the bar is their sum, ` +
+		(combined
+			? `Each segment is the median of that task's per-sandbox medians, from ${trials} retained ${plural}; the bar is their sum, `
+			: `Each segment is that task's median over ${trials} retained ${plural}; the bar is their sum, `) +
 		`so it is the cost of the pipeline and not the timing of any single run.${dropped}${scale}`
 	);
 }
@@ -110,9 +114,24 @@ export function suiteFigureNote(suite: PipelineSuite): string {
  * completed every exercised task); this module adds only where the file goes. The registries go
  * in here, once, typed by the schema that owns them.
  */
-export function benchmarkDataOf(run: Run): RealworldFigureModel {
+export function benchmarkDataOf(run: LeaderboardDataset): RealworldFigureModel {
 	return buildRealworldFigureModel({
-		run,
+		run: run.sources
+			? {
+					providers: run.providers.map((provider) => ({
+						...provider,
+						metrics: provider.metrics.map((metric) => ({
+							...metric,
+							aggregates: {
+								...metric.aggregates,
+								p50: metric.replicates
+									? sandboxMedianOf(metric.replicates.map((r) => r.samples))
+									: metric.aggregates.p50,
+							},
+						})),
+					})),
+				}
+			: run,
 		metrics: METRIC_CATALOG,
 		providers: PROVIDERS.map((provider) => ({
 			id: provider.id,
@@ -157,7 +176,10 @@ const UNMARKED_ABSENCE = "No result and no marker: the metric never reported for
  * A metric with one ranked environment is not charted: a chart of one bar is not a comparison,
  * exactly as a suite one environment completed is not.
  */
-export function metricFigureModelOf(run: Run, board: Leaderboard): MetricFigureModel {
+export function metricFigureModelOf(
+	run: LeaderboardDataset,
+	board: Leaderboard,
+): MetricFigureModel {
 	const providers = benchmarkDataOf(run).providers;
 	const validated = new Set(providers.map((provider) => provider.id));
 	const suiteOf = new Map<string, string>();
@@ -287,7 +309,7 @@ export interface RenderedLeaderboardFigureHtml {
  * passes it in rather than paying twice.
  */
 export function renderLeaderboardFigureHtml(
-	run: Run,
+	run: LeaderboardDataset,
 	board: Leaderboard = buildLeaderboard(run),
 ): RenderedLeaderboardFigureHtml[] {
 	const data = benchmarkDataOf(run);
@@ -295,13 +317,31 @@ export function renderLeaderboardFigureHtml(
 	const suites = data.suites.map((suite, index) => ({
 		// Indexed, not looked up: both lists are the same map over `data.suites`.
 		figure: figures[index] as LeaderboardFigure,
-		html: pipelineChartHtml(buildPipelineChartModel(suite, data, suiteFigureNote(suite))),
+		html: pipelineChartHtml(
+			buildPipelineChartModel(
+				suite,
+				data,
+				suiteFigureNote(suite, !!run.sources) +
+					(run.sources
+						? " Combined datasets: task estimates give each sandbox one vote; source coverage remains separate."
+						: ""),
+			),
+		),
 	}));
 	const model = metricFigureModelOf(run, board);
 	const metricFigures = leaderboardMetricFigures(model);
 	const metrics = model.metrics.map((metric, index) => ({
 		figure: metricFigures[index] as LeaderboardMetricFigure,
-		html: metricChartHtml(buildMetricChartModel(metric, model, metricFigureNote(metric))),
+		html: metricChartHtml(
+			buildMetricChartModel(
+				metric,
+				model,
+				metricFigureNote(metric) +
+					(run.sources
+						? " Pooled across selected runs, assuming exchangeable sandboxes; future-run variability is not estimated."
+						: ""),
+			),
+		),
 	}));
 	return [...suites, ...metrics];
 }

@@ -6,6 +6,13 @@
 // are implementation detail. This surface exposes only the entry points consumers (the CLI) need:
 // normalize a raw tree, write the Run, and summarize it.
 export { aggregateRuns } from "./lib/aggregate.ts";
+export {
+	type DatasetImpact,
+	datasetImpact,
+	type ImpactEstimate,
+	type MetricImpact,
+	renderDatasetImpact,
+} from "./lib/dataset-impact.ts";
 export type {
 	AttemptWithRun,
 	CoverageReport,
@@ -70,6 +77,12 @@ export {
 	renderLeaderboardMarkdown,
 	SYNTHETIC_DIMENSIONS,
 } from "./lib/leaderboard.ts";
+export {
+	type CombineDatasetsOptions,
+	combineLeaderboardDatasets,
+	type DatasetCell,
+	type LeaderboardDataset,
+} from "./lib/leaderboard-datasets.ts";
 export { type NormalizeInput, normalizeResultsTree } from "./lib/normalize-tree.ts";
 export {
 	buildObservedMixtures,

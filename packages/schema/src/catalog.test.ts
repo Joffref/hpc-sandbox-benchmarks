@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { catalogSchema } from "./catalog.ts";
 import {
 	DIMENSIONS,
+	expectedHeadlines,
 	getMetric,
 	headlineMetric,
 	METRIC_CATALOG,
@@ -45,7 +46,7 @@ describe("metric catalog", () => {
 		// Check all declared dimensions, including any absent entirely from the catalog.
 		for (const dimension of DIMENSIONS) {
 			const headlines = metricsForDimension(dimension).filter((metric) => metric.headline);
-			expect(headlines.length).toBe(dimension === "network" ? 2 : 1);
+			expect(headlines.length).toBe(expectedHeadlines(dimension));
 		}
 	});
 

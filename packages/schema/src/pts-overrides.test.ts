@@ -4,7 +4,8 @@
 // after the merge (two WAN directions for network, one for every other populated dimension).
 import { describe, expect, test } from "bun:test";
 import { type } from "arktype";
-import { metricDefSchema } from "./metrics.ts";
+import type { Dimension } from "./metrics.ts";
+import { expectedHeadlines, metricDefSchema } from "./metrics.ts";
 import { ptsGenerated } from "./pts-generated.ts";
 import { ptsOverrides } from "./pts-overrides.ts";
 
@@ -22,7 +23,7 @@ describe("ptsOverrides", () => {
 	});
 
 	test("each populated dimension has its expected headlines after merge", () => {
-		const headlinesByDimension = new Map<string, number>();
+		const headlinesByDimension = new Map<Dimension, number>();
 		for (const def of merged) {
 			if (def.headline)
 				headlinesByDimension.set(def.dimension, (headlinesByDimension.get(def.dimension) ?? 0) + 1);
@@ -31,7 +32,7 @@ describe("ptsOverrides", () => {
 		for (const dimension of dimensions) {
 			expect([dimension, headlinesByDimension.get(dimension) ?? 0]).toEqual([
 				dimension,
-				dimension === "network" ? 2 : 1,
+				expectedHeadlines(dimension),
 			]);
 		}
 	});

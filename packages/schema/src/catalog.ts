@@ -13,7 +13,7 @@
 import { economicsMetrics } from "./economics.ts";
 import { harnessMetrics } from "./harness-metrics.ts";
 import type { Dimension, MetricDef } from "./metrics.ts";
-import { metricDefSchema, ptsKey } from "./metrics.ts";
+import { expectedHeadlines, metricDefSchema, ptsKey } from "./metrics.ts";
 import { ptsGenerated } from "./pts-generated.ts";
 import { ptsOverrides } from "./pts-overrides.ts";
 
@@ -121,8 +121,8 @@ export const catalogSchema = metricDefSchema.array().narrow((cat, ctx) => {
  *
  * The PTS-derived slice (generated + curated) is followed by the hand-authored harness-measured
  * Metrics (lifecycle + control-plane) and the derived economics Metrics; neither carries a `pts` field,
- * so the PTS-mapping invariant skips them while id-uniqueness and the one-headline-per-dimension check
- * below still cover them.
+ * so the PTS-mapping invariant skips them while id-uniqueness and the headline-count check below
+ * ({@link expectedHeadlines}) still cover them.
  */
 export const METRIC_CATALOG: readonly MetricDef[] = catalogSchema.assert([
 	...ptsCurated,
@@ -138,13 +138,14 @@ if (byId.size !== METRIC_CATALOG.length) {
 	throw new Error("METRIC_CATALOG contains duplicate metric ids");
 }
 
-// Network deliberately presents both WAN directions (ADR-0015). Every other dimension
-// retains one headline; reject accidental additions and missing headlines at load time.
+// Reject accidental additions and missing headlines at load time. Iterating the dimensions PRESENT
+// in the catalog (not all of DIMENSIONS) is deliberate: a dimension lands in the display order
+// before its Metrics are ported, and an unpopulated one has no headline to require yet.
 for (const dimension of new Set(METRIC_CATALOG.map((metric) => metric.dimension))) {
 	const count = METRIC_CATALOG.filter(
 		(metric) => metric.dimension === dimension && metric.headline,
 	).length;
-	const expected = dimension === "network" ? 2 : 1;
+	const expected = expectedHeadlines(dimension);
 	if (count !== expected) {
 		throw new Error(
 			`dimension "${dimension}" requires ${expected} headline metrics; found ${count}`,

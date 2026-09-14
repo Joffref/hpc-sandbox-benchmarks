@@ -105,7 +105,8 @@ bun run check:provider-wiring                                   # fail if genera
    recorded `composite.xml` fixture under `packages/results/src/lib/__fixtures__/` (the
    [golden gate](./packages/results/src/lib/pts-golden.test.ts) proves it).
 3. Curate editorial fields in [`pts-overrides.ts`](./packages/schema/src/pts-overrides.ts): a short
-   `label`, any `dimension` correction, and exactly one `headline: true` per dimension.
+   `label`, any `dimension` correction, and the curated `headline: true` metrics (one per
+   dimension, except network's two WAN directions — ADR-0015).
 4. Commit the regenerated `pts-generated.ts` (the drift gate diffs it; overrides are excluded).
 
 **Non-PTS metric** (harness-measured or derived): add the `MetricDef` to the relevant hand-authored
@@ -117,7 +118,7 @@ don't trip the drift gate.
 
 - **Parse, don't validate**: arktype schemas at every boundary; the TypeScript types are inferred from
   the runtime schema, never hand-written twice.
-- **Cross-registry invariants** (id-uniqueness, one-headline-per-dimension, the suite contract) are
+- **Cross-registry invariants** (id-uniqueness, the per-dimension headline count, the suite contract) are
   plain throws at module load over typed in-repo constants — fail fast at import.
 - Keep packages within the [dependency DAG](./docs/architecture.md#dependency-dag-enforced); `@repo/repo-checks`
   fails CI on a boundary violation.

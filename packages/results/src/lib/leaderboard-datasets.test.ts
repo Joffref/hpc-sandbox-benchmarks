@@ -83,6 +83,17 @@ describe("combineLeaderboardDatasets", () => {
 		);
 	});
 
+	it("rejects several inputs that all name one run, while distinct repeats stay idempotent", () => {
+		// Otherwise this returns the single-input arm: a PUBLISHED board for a request to pool, with no
+		// pooling notes and nothing saying a source was dropped. Identity is only knowable here.
+		const a = run("a", [[1]]);
+		expect(() => combineLeaderboardDatasets([a, a], options)).toThrow("all name Run a");
+		expect(() => combineLeaderboardDatasets([a, structuredClone(a)], options)).toThrow(
+			"all name Run a",
+		);
+		expect(combineLeaderboardDatasets([a], options)).toEqual(a);
+	});
+
 	it("requires explicit cohort review and rejects hard measurement mismatches even with review", () => {
 		const a = run("a", [[1]]),
 			b = run("b", [[2]]);

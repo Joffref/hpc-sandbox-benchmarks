@@ -62,9 +62,11 @@ export function datasetImpact(
 	options: CombineDatasetsOptions = {},
 ) {
 	const combined = combineLeaderboardDatasets([baseline, ...additions], options);
-	const addedRuns = (combined.sources ?? [baseline]).filter(
-		(source) => source.runId !== baseline.runId,
-	);
+	// One narrow for one condition: `sources`, `poolingNotes` and `cells` arrive together on the pooled
+	// arm or not at all, so the three per-field fallbacks this replaced could not disagree — but only
+	// the type says so. `pooled` is null when every addition pooled into the baseline.
+	const pooled = combined.sources ? combined : null;
+	const addedRuns = (pooled?.sources ?? []).filter((source) => source.runId !== baseline.runId);
 	const selected = [baseline, ...addedRuns];
 	const before = estimates(baseline);
 	const after = estimates(combined);
@@ -153,7 +155,7 @@ export function datasetImpact(
 	return {
 		baseline: baseline.runId,
 		additions: addedRuns.map((r) => r.runId),
-		notes: combined.poolingNotes ?? [],
+		notes: pooled?.poolingNotes ?? [],
 		summary: {
 			paired: metrics.filter((m) => m.baseline).length,
 			narrower: metrics.filter((m) => m.intervalChange === "narrower").length,
@@ -163,7 +165,7 @@ export function datasetImpact(
 		},
 		metrics,
 		suites,
-		cells: combined.cells ?? [],
+		cells: pooled?.cells ?? [],
 	};
 }
 export type DatasetImpact = ReturnType<typeof datasetImpact>;

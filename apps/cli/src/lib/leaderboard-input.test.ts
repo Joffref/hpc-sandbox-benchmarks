@@ -61,7 +61,12 @@ it("loads paths relative to the manifest and records every source instead of sil
 		expect(code, errors).toBe(0);
 		expect(output).toContain("Combined dataset analysis");
 		await Bun.write(path, "[]");
-		await expect(loadLeaderboardInput(path)).rejects.toThrow("non-empty array");
+		await expect(loadLeaderboardInput(path)).rejects.toThrow("must be non-empty");
+		// A repeated path is named where the operator wrote it; see datasetManifestSchema.
+		await Bun.write(path, JSON.stringify(["a.json", "a.json"]));
+		await expect(loadLeaderboardInput(path, "Reviewed fixture")).rejects.toThrow(
+			"distinct Run paths (repeated: a.json)",
+		);
 	} finally {
 		rmSync(directory, { recursive: true, force: true });
 	}

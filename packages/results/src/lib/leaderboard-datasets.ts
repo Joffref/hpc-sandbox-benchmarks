@@ -9,15 +9,39 @@ import {
 
 import { evidenceDigest } from "./experiment.ts";
 
-/** A consumption-only view, never a publishable Run or a replacement experiment. */
-export type LeaderboardDataset = Pick<
+/** The Run-shaped fields every consumer of a dataset reads, whichever arm it is. */
+type DatasetFields = Pick<
 	Run,
 	"runId" | "sha" | "generatedAt" | "targetSpec" | "providers" | "experiment"
-> & {
-	readonly sources?: readonly Run[];
-	readonly poolingNotes?: readonly string[];
-	readonly cells?: readonly DatasetCell[];
+>;
+
+/**
+ * One published experiment, read as itself. The pooled fields are declared `?: undefined` rather
+ * than omitted: that is what makes the two arms a discriminated union on `sources`, so
+ * `if (dataset.sources)` narrows to {@link PooledDataset} and a HALF-pooled object — `sources`
+ * without `cells`, the state the optional-triple permitted — stops type-checking. A `Run` is still
+ * assignable, since it has none of the three.
+ */
+export type PublishedDataset = DatasetFields & {
+	readonly sources?: undefined;
+	readonly poolingNotes?: undefined;
+	readonly cells?: undefined;
 };
+
+/**
+ * Several published experiments read together: a consumption-only view, never a publishable Run or
+ * a replacement experiment. All three pooled fields are REQUIRED — `combineLeaderboardDatasets`
+ * has only ever set them together, and a reader that has `sources` needs `cells` and
+ * `poolingNotes` to describe what it is looking at.
+ */
+export type PooledDataset = DatasetFields & {
+	readonly sources: readonly Run[];
+	readonly poolingNotes: readonly string[];
+	readonly cells: readonly DatasetCell[];
+};
+
+/** A published experiment or a pooled view of several. Discriminated on `sources`. */
+export type LeaderboardDataset = PublishedDataset | PooledDataset;
 
 export interface DatasetCell {
 	readonly runId: string;
@@ -77,6 +101,16 @@ export function combineLeaderboardDatasets(
 	);
 	const first = sources[0];
 	if (!first) throw new Error("At least one dataset is required");
+	// Several inputs that all name ONE run is a caller mistake, not a pooling result. Identity is only
+	// known here — by the time this returns, "these datasets pooled to one" and "the same dataset was
+	// passed twice" are the same value, and the single-input return below would hand back a published
+	// board for a request to pool. Distinct ids that merely repeat are still idempotent (the documented
+	// contract): this rejects only the degenerate all-identical case.
+	if (inputs.length > 1 && byId.size === 1) {
+		throw new Error(
+			`${inputs.length} datasets requested but all name Run ${first.runId}; pass distinct datasets`,
+		);
+	}
 	if (sources.length === 1) return first;
 	for (const run of sources) {
 		if (canonicalJsonString(run.targetSpec) !== canonicalJsonString(first.targetSpec))

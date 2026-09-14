@@ -50,7 +50,11 @@ import {
 	SUITE_NAMES,
 	sandboxMedianOf,
 } from "@sandbox-benchmarks/schema";
-import type { CombineDatasetsOptions, LeaderboardDataset } from "./leaderboard-datasets.ts";
+import type {
+	CombineDatasetsOptions,
+	LeaderboardDataset,
+	PooledDataset,
+} from "./leaderboard-datasets.ts";
 import { combineLeaderboardDatasets } from "./leaderboard-datasets.ts";
 
 /**
@@ -334,10 +338,8 @@ export interface AbsentProvider {
 	displayName: string;
 }
 
-/** The full comparison surface derived from one Run. */
-export interface Leaderboard {
-	sources?: readonly Run[];
-	poolingNotes?: readonly string[];
+/** The fields every comparison surface carries, whichever kind of dataset produced it. */
+interface LeaderboardFields {
 	runId: string;
 	comparisonCohort?: string;
 	partial?: NonNullable<Run["experiment"]>["partial"];
@@ -361,6 +363,21 @@ export interface Leaderboard {
 	 */
 	absentProviders: AbsentProvider[];
 }
+
+/**
+ * The comparison surface of ONE published experiment. Shaped like {@link PublishedDataset}, and for
+ * the same reason.
+ */
+export type PublishedLeaderboard = LeaderboardFields & {
+	sources?: undefined;
+	poolingNotes?: undefined;
+};
+
+/** The comparison surface of a pooled view. The pooled contract is stated once, by the dataset. */
+export type PooledLeaderboard = LeaderboardFields & Pick<PooledDataset, "sources" | "poolingNotes">;
+
+/** The full comparison surface derived from one published Run, or from a pooled view of several. */
+export type Leaderboard = PublishedLeaderboard | PooledLeaderboard;
 
 /**
  * Whether the Run's producer was able to classify gaps at all — true once ANY gap carries a structured
@@ -753,9 +770,8 @@ export function buildLeaderboard(
 		}
 	}
 
-	return {
+	const fields: LeaderboardFields = {
 		runId: run.runId,
-		...(run.sources ? { sources: run.sources, poolingNotes: run.poolingNotes } : {}),
 		...(run.experiment?.partial ? { partial: run.experiment.partial } : {}),
 		...(run.experiment?.cohortDigest ? { comparisonCohort: run.experiment.cohortDigest } : {}),
 		sha: run.sha,
@@ -780,6 +796,9 @@ export function buildLeaderboard(
 		),
 		coverageGaps: coverageGapsOf(run),
 	};
+	// One arm or the other, never a spread that could produce neither: a board with pooling notes
+	// and no sources to attribute them to is now unconstructable rather than merely unintended.
+	return run.sources ? { ...fields, sources: run.sources, poolingNotes: run.poolingNotes } : fields;
 }
 
 /**
@@ -1192,7 +1211,7 @@ export function renderLeaderboardMarkdown(
 						(source) =>
 							`Source ${runSourceLinks(source.runId)} · commit ${commitSourceLink(source.sha)} · dataset ${datasetSourceLink(source.runId)}${source.experiment?.partial ? ` · ${source.experiment.partial.complete}/${source.experiment.partial.planned} cells complete` : ""}`,
 					),
-					...(board.poolingNotes ?? []),
+					...board.poolingNotes,
 				]
 			: [
 					`Run ${runSourceLinks(board.runId)} · commit ${commitSourceLink(board.sha)} ·`,

@@ -55,7 +55,8 @@
     "modal": "catalog:computesdk",
     "novita-sandbox": "catalog:computesdk",
     "dotenv": "catalog:",
-    "@sandbox-benchmarks/modal": "workspace:*"
+    "@sandbox-benchmarks/modal": "workspace:*",
+    "arktype": "catalog:"
   },
   "devDependencies": {
     "@repo/tsconfig": "workspace:*",

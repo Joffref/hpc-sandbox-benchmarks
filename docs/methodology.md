@@ -38,8 +38,8 @@ disk is measured in the guest and disk-gated suites skip honestly when the obser
 Results land on a closed, ordered set of [`DIMENSIONS`](../packages/schema/src/metrics.ts): `lifecycle`,
 `control-plane`, `cpu`, `disk`, `memory`, `network`, `system`, `realworld`, `economics`. Each catalogued
 [`MetricDef`](../packages/schema/src/metrics.ts) declares its `dimension`, `unit`, `direction` (HIB =
-higher-is-better, LIB = lower-is-better), and whether it `headline`s its dimension. A dimension has at
-most one headline metric (enforced at catalog load); the leaderboard ranks *every* emitted metric and
+higher-is-better, LIB = lower-is-better), and whether it `headline`s its dimension. A dimension has one headline metric, except network which has both WAN directions
+(enforced at catalog load; see ADR-0015); the leaderboard ranks *every* emitted metric and
 leads each dimension with its headline.
 
 ### How the leaderboard is laid out
@@ -54,7 +54,7 @@ order and the emphasis are editorial, and they follow this document's argument:
 - **The synthetic microbenchmarks collapse — but each is charted too.** `cpu`, `disk`, `memory`,
   `network` and `system` each load one hardware axis in isolation, so their tables render inside a
   collapsed `<details>`. The `##` heading stays outside it: a measured axis must never look like one
-  that never ran. Above the collapse sits the dimension's headline metric as a ranked bar chart, and
+  that never ran. Above the collapse sits the dimension's headline metrics as ranked bar charts, and
   every other ranked metric's chart sits beside its table inside — see
   [The metric charts](#the-metric-charts).
 - **Everything else stays expanded.** `lifecycle` and `control-plane` are harness-measured timings of

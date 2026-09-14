@@ -146,7 +146,7 @@ export interface LeaderboardMetricFigure {
 	readonly label: string;
 	/** The dimension whose section embeds it. */
 	readonly dimension: string;
-	/** Whether it is the dimension's headline — the one chart that sits above the collapse. */
+	/** Whether this metric's chart sits above the dimension's collapse. */
 	readonly headline: boolean;
 	/** Path the Markdown links, relative to the directory holding it. */
 	readonly file: string;
@@ -882,8 +882,10 @@ function datasetSourceLink(runId: string): string {
  */
 function syntheticSummary(metrics: readonly LeaderboardMetric[]): string {
 	const count = `<strong>${metrics.length} synthetic metric${metrics.length === 1 ? "" : "s"}</strong>`;
-	const headline = metrics.find(({ metric }) => metric.headline);
-	return headline ? `${count} · headline: ${escapeHtml(headline.metric.label)}` : count;
+	const headlines = metrics.filter(({ metric }) => metric.headline);
+	return headlines.length
+		? `${count} · headline${headlines.length === 1 ? "" : "s"}: ${headlines.map(({ metric }) => escapeHtml(metric.label)).join(" · ")}`
+		: count;
 }
 
 /**
@@ -1219,8 +1221,8 @@ export function renderLeaderboardMarkdown(
 	}
 	if (metricFigures.length > 0) {
 		lines.push(
-			"**Every synthetic metric is charted too.** Each dimension shows its headline metric's ranked bar",
-			"chart above the triangle, and every other metric's chart sits beside its table inside. Bars are",
+			"**Every synthetic metric is charted too.** Each dimension shows its headline metrics as ranked bar",
+			"charts above the triangle, and every other metric's chart sits beside its table inside. Bars are",
 			"the same medians the tables print, best first, with the 95% interval as a whisker; each chart",
 			"scales to its own largest value, so lengths compare within a chart and never across two.",
 			"",
@@ -1255,10 +1257,10 @@ export function renderLeaderboardMarkdown(
 		if (dimension === FIGURE_DIMENSION) lines.push(...figureSection(figures));
 		// A synthetic dimension leads with its headline chart, above the collapse, for the same reason
 		// the figure dimension leads with its pipelines: the picture is what the section is for.
-		const headlineFigure = metrics
+		const headlineFigures = metrics
 			.map(({ metric }) => metricFigureById.get(metric.id))
-			.find((figure) => figure?.headline === true);
-		if (headlineFigure) lines.push(metricFigureImage(headlineFigure), "");
+			.filter((figure): figure is LeaderboardMetricFigure => figure?.headline === true);
+		for (const figure of headlineFigures) lines.push(metricFigureImage(figure), "");
 		// A synthetic dimension collapses its TABLES, never its heading: the heading stays in the rendered
 		// document outline so the board still discloses which hardware axes were measured — collapsing it
 		// too would make a measured dimension indistinguishable from one that never ran.
@@ -1282,7 +1284,7 @@ export function renderLeaderboardMarkdown(
 			// the collapse: the same image twice in one section would be noise, not disclosure.
 			const metricFigure = metricFigureById.get(metric.id);
 			const chartLines =
-				metricFigure && metricFigure !== headlineFigure
+				metricFigure && !headlineFigures.includes(metricFigure)
 					? [metricFigureImage(metricFigure), ""]
 					: [];
 			lines.push(

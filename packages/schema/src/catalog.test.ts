@@ -41,15 +41,11 @@ describe("metric catalog", () => {
 		}
 	});
 
-	it("gives every dimension EXACTLY one headline metric", () => {
-		// Both directions matter and neither is checked at load: the catalog's load check rejects a
-		// SECOND headline but never a MISSING one, and headlineMetric reads the METRIC_CATALOG singleton
-		// (it takes no catalog parameter), so its no-headline throw is unreachable from a crafted
-		// catalog. This test IS the zero-headline guard — dropping `headline: true` from any dimension's
-		// metric turns it red here rather than at runtime inside headlineMetric().
+	it("gives every dimension its expected headline metrics", () => {
+		// Check all declared dimensions, including any absent entirely from the catalog.
 		for (const dimension of DIMENSIONS) {
 			const headlines = metricsForDimension(dimension).filter((metric) => metric.headline);
-			expect(headlines.length).toBe(1);
+			expect(headlines.length).toBe(dimension === "network" ? 2 : 1);
 		}
 	});
 
@@ -73,11 +69,14 @@ describe("metric catalog", () => {
 		expect(getMetric("node_web_tooling_runs_per_s")?.headline).toBe(true);
 	});
 
-	it("resolves the PyBench headline for the system dimension (both system metrics catalogued)", () => {
+	it("resolves Git common operations as the system headline and retains other system metrics", () => {
 		const metric = headlineMetric("system");
-		expect(metric.id).toBe("pybench_milliseconds");
-		expect(metric.label).toBe("PyBench"); // curated short label
-		expect(metric.pts?.test).toBe("pts/pybench");
+		expect(metric.id).toBe("git_seconds");
+		expect(metric.label).toBe("Git common operations"); // curated short label
+		expect(metric.pts?.test).toBe("pts/git");
+		expect(metric.unit).toBe("Seconds");
+		expect(metric.direction).toBe("LIB");
+		expect(getMetric("pybench_milliseconds")?.headline).toBe(false);
 		// Single-result wildcard: no pts.description (so the byte-match gate needs no recorded composite).
 		expect(metric.pts?.description).toBeUndefined();
 		expect(getMetric("sqlite_speedtest_seconds")?.dimension).toBe("system");
@@ -98,12 +97,12 @@ describe("metric catalog", () => {
 		).toEqual(["stream_type_add", "stream_type_copy", "stream_type_scale", "stream_type_triad"]);
 	});
 
-	it("resolves the fio 4K random-read IOPS headline for the disk dimension", () => {
+	it("resolves the fio buffered 4KB random-write bandwidth headline for the disk dimension", () => {
 		const metric = headlineMetric("disk");
 		expect(metric.id).toBe(
-			"fio_type_random_read_engine_linux_aio_direct_yes_block_size_4kb_job_count_1_disk_target_default_test_directory_iops",
+			"fio_type_random_write_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_mb_per_s",
 		);
-		expect(metric.label).toBe("fio rand read 4KB, O_DIRECT (IOPS)");
+		expect(metric.label).toBe("fio rand write 4KB, buffered (MB/s)");
 		expect(metric.direction).toBe("HIB");
 	});
 
@@ -119,19 +118,15 @@ describe("metric catalog", () => {
 		expect(getMetric("not_a_metric")).toBeUndefined();
 	});
 
-	it("keeps the controlled localhost iperf3 measurement as the network headline", () => {
-		const metric = headlineMetric("network");
-		expect(metric.id).toBe(
-			"iperf_server_address_localhost_server_port_5201_duration_10_seconds_test_tcp_parallel_1",
-		);
-		expect(metric.label).toBe("iperf3 loopback TCP, 1 stream");
-		expect(metric.direction).toBe("HIB");
-		// The vendored subset's pinned axes travel in the runtime description the catalog joins on.
-		expect(metric.pts).toEqual({
-			test: "pts/iperf",
-			description:
-				"Server Address: localhost - Server Port: 5201 - Duration: 10 Seconds - Test: TCP - Parallel: 1",
-		});
+	it("headlines both WAN directions with their measured bandwidth unit", () => {
+		expect(
+			metricsForDimension("network")
+				.filter((metric) => metric.headline)
+				.map((metric) => [metric.id, metric.unit, metric.direction]),
+		).toEqual([
+			["iperf_wan_direction_download", "Mbits/sec", "HIB"],
+			["iperf_wan_direction_upload", "Mbits/sec", "HIB"],
+		]);
 		// The third pinned localhost combination — the UDP datagram-path discriminator — resolves
 		// through the same full-matrix enumeration with its curated label.
 		const udp = getMetric(
@@ -155,7 +150,7 @@ describe("metric catalog", () => {
 	it("keeps the retired-from-suite network profiles catalogued for manual runs (sans headline)", () => {
 		// fast-cli and network-loopback left the SUITE, not the repo: their profiles stay vendored and
 		// manually runnable, so their metrics stay catalogued — but the network headline moved to the
-		// localhost iperf3 metric above.
+		// WAN pair above.
 		const loopback = getMetric("network_loopback_seconds");
 		expect(loopback?.label).toBe("Loopback TCP (10GB)");
 		expect(loopback?.headline).toBe(false);

@@ -1491,6 +1491,35 @@ describe("the metric charts: headline above the collapse, the rest beside their 
 		expect(memory[add + 2]?.startsWith("| Rank |")).toBe(true);
 	});
 
+	it("shows both WAN headlines once above the collapse, even when one direction is absent", () => {
+		const ids = ["iperf_wan_direction_download", "iperf_wan_direction_upload"];
+		for (const measured of [ids, ids.slice(1)]) {
+			const networkBoard = buildLeaderboard(
+				run([
+					provider(
+						"daytona-vm",
+						measured.map((id) => metric(id, [100, 110])),
+					),
+					provider(
+						"modal-vm",
+						measured.map((id) => metric(id, [80, 90])),
+					),
+				]),
+			);
+			const figures = measured.map((id) =>
+				chart({ metricId: id, dimension: "network", file: `docs/figures/${id}.webp` }),
+			);
+			const network = section(renderLeaderboardMarkdown(networkBoard, [], figures), "network");
+			for (const id of measured) {
+				const occurrences = network.filter((line) =>
+					line.includes(`src="docs/figures/${id}.webp"`),
+				);
+				expect(occurrences).toHaveLength(1);
+				expect(network.indexOf(occurrences[0] ?? "")).toBeLessThan(network.indexOf("<details>"));
+			}
+		}
+	});
+
 	it("embeds each chart exactly once, at its logical width, with the claim in the alt text", () => {
 		const md = renderLeaderboardMarkdown(board(), [], charts());
 		expect(md.match(new RegExp(`src="docs/figures/${TRIAD}.webp"`, "g"))?.length).toBe(1);

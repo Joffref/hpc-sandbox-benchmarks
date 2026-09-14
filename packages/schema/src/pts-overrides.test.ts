@@ -1,7 +1,7 @@
 // Validates the hand-authored curation against the committed generator output, without wiring either
 // into METRIC_CATALOG. Catches the two ways the override map silently rots: a key that no longer
-// matches a generated id (a typo or a removed metric), and a dimension left with zero or multiple
-// headlines after the merge (headlineMetric throws on zero; multiple is ambiguous on the leaderboard).
+// matches a generated id (a typo or a removed metric), and an unexpected headline count
+// after the merge (two WAN directions for network, one for every other populated dimension).
 import { describe, expect, test } from "bun:test";
 import { type } from "arktype";
 import { metricDefSchema } from "./metrics.ts";
@@ -21,7 +21,7 @@ describe("ptsOverrides", () => {
 		expect(metricDefSchema.array()(merged)).not.toBeInstanceOf(type.errors);
 	});
 
-	test("each populated dimension has exactly one headline after merge", () => {
+	test("each populated dimension has its expected headlines after merge", () => {
 		const headlinesByDimension = new Map<string, number>();
 		for (const def of merged) {
 			if (def.headline)
@@ -29,7 +29,10 @@ describe("ptsOverrides", () => {
 		}
 		const dimensions = new Set(merged.map((def) => def.dimension));
 		for (const dimension of dimensions) {
-			expect([dimension, headlinesByDimension.get(dimension) ?? 0]).toEqual([dimension, 1]);
+			expect([dimension, headlinesByDimension.get(dimension) ?? 0]).toEqual([
+				dimension,
+				dimension === "network" ? 2 : 1,
+			]);
 		}
 	});
 });

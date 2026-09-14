@@ -1,7 +1,7 @@
 // Hand-authored curation for the generated PTS catalog (pts-generated.ts), keyed by metric id. The
 // generator owns the XML-derived fields and emits an uncurated draft (verbose `label`,
 // `headline:false`, a TestType-default `dimension`); this map supplies the editorial fields the XML
-// can't: a curated short `label`, the single `headline:true` per dimension the leaderboard shows, and
+// can't: a curated short `label`, the curated `headline:true` metrics the leaderboard shows, and
 // any `dimension` correction. The seam merges them at import time (`{ ...generated, ...override }`);
 // the catalog drift gate diffs only pts-generated.ts, so editing this file never trips it.
 //
@@ -15,9 +15,8 @@ export type MetricOverride = Partial<Pick<MetricDef, "dimension" | "headline" | 
 export const ptsOverrides: Record<string, MetricOverride> = {
 	// Node.js web tooling is the cpu dimension's headline (the existing hand-authored choice).
 	node_web_tooling_runs_per_s: { headline: true, label: "Node.js web tooling" },
-	// System dimension: PyBench is its headline (a broad Python interpreter workload); SQLite Speedtest
-	// rounds it out. Both single-result wildcards, so curation only supplies labels + the one headline.
-	pybench_milliseconds: { headline: true, label: "PyBench" },
+	// System dimension: PyBench and SQLite Speedtest complement the Git headline below.
+	pybench_milliseconds: { label: "PyBench" },
 	sqlite_speedtest_seconds: { label: "SQLite Speedtest" },
 	// System dimension: PostgreSQL via pgbench, pinned by the producer to scale 100 / 50 clients per
 	// mode (the generator's other 156 combination entries keep draft labels and never get samples).
@@ -45,12 +44,7 @@ export const ptsOverrides: Record<string, MetricOverride> = {
 	// is probed at run time (O_DIRECT
 	// fails on some sandbox filesystems), so each scenario has an O_DIRECT and a buffered variant —
 	// the mode travels in the metric identity rather than being silently mixed across providers.
-	// 4K random-read IOPS (O_DIRECT) is the dimension's headline — the canonical disk figure, and the
-	// honest one (buffered 4K reads measure the page cache). Two consequences of pinning the headline
-	// to the O_DIRECT variant: the leaderboard omits its disk row until a matrix run publishes fio
-	// samples, and a provider whose filesystem rejects O_DIRECT (the probe's buffered fallback) never
-	// appears in the disk ranking — its numbers land on the buffered variants, visible on the Run but
-	// deliberately not ranked against O_DIRECT results.
+	// Buffered 4KB random-write bandwidth leads disk; direct I/O remains a separate metric.
 	fio_type_sequential_read_engine_linux_aio_direct_yes_block_size_1mb_job_count_1_disk_target_default_test_directory_mb_per_s:
 		{ label: "fio seq read 1MB, O_DIRECT (MB/s)" },
 	fio_type_sequential_read_engine_linux_aio_direct_yes_block_size_1mb_job_count_1_disk_target_default_test_directory_iops:
@@ -60,7 +54,7 @@ export const ptsOverrides: Record<string, MetricOverride> = {
 	fio_type_sequential_write_engine_linux_aio_direct_yes_block_size_1mb_job_count_1_disk_target_default_test_directory_iops:
 		{ label: "fio seq write 1MB, O_DIRECT (IOPS)" },
 	fio_type_random_read_engine_linux_aio_direct_yes_block_size_4kb_job_count_1_disk_target_default_test_directory_iops:
-		{ headline: true, label: "fio rand read 4KB, O_DIRECT (IOPS)" },
+		{ label: "fio rand read 4KB, O_DIRECT (IOPS)" },
 	fio_type_random_read_engine_linux_aio_direct_yes_block_size_4kb_job_count_1_disk_target_default_test_directory_mb_per_s:
 		{ label: "fio rand read 4KB, O_DIRECT (MB/s)" },
 	fio_type_random_write_engine_linux_aio_direct_yes_block_size_4kb_job_count_1_disk_target_default_test_directory_iops:
@@ -82,21 +76,11 @@ export const ptsOverrides: Record<string, MetricOverride> = {
 	fio_type_random_write_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_iops:
 		{ label: "fio rand write 4KB, buffered (IOPS)" },
 	fio_type_random_write_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_mb_per_s:
-		{ label: "fio rand write 4KB, buffered (MB/s)" },
+		{ headline: true, label: "fio rand write 4KB, buffered (MB/s)" },
 
-	// Network dimension. The suite's composition is the five iperf metrics: localhost isolates
-	// sandbox network-stack/virtualization overhead (virtio/KVM vs gVisor netstack) with no Internet
-	// path — single-stream is the dimension's headline (it took the slot from network_loopback when
-	// the suite moved off the dd|nc leaf; the catalog allows one headline per dimension), and the
-	// 10-stream variant captures per-stream overhead scaling (iperf 3.14 is single-threaded, so it
-	// multiplexes streams in one process rather than across cores). pts/iperf is vendored
-	// byte-identical to upstream, so the generator enumerates its full option matrix (fio-style);
-	// only the three combinations the producer pins are curated here — the rest keep draft labels and
-	// never receive samples. The WAN pair measures both directions against the closest curated
-	// public iperf3 server (chosen per run by RTT probe, recorded in
-	// pts_iperf-wan--server-choices.ndjson provenance).
+	// WAN download and upload lead network together. Loopback remains a separate
+	// network-stack measurement; WAN includes the public server and Internet path.
 	iperf_server_address_localhost_server_port_5201_duration_10_seconds_test_tcp_parallel_1: {
-		headline: true,
 		label: "iperf3 loopback TCP, 1 stream",
 	},
 	iperf_server_address_localhost_server_port_5201_duration_10_seconds_test_tcp_parallel_10: {
@@ -107,8 +91,8 @@ export const ptsOverrides: Record<string, MetricOverride> = {
 	// as constants on every provider and plain UDP defaults to 1 Mbit/s, so neither is pinned.
 	iperf_server_address_localhost_server_port_5201_duration_10_seconds_test_udp_10000mbit_objective_parallel_1:
 		{ label: "iperf3 loopback UDP, 10G objective" },
-	iperf_wan_direction_download: { label: "iperf3 WAN download" },
-	iperf_wan_direction_upload: { label: "iperf3 WAN upload" },
+	iperf_wan_direction_download: { headline: true, label: "iperf3 WAN download" },
+	iperf_wan_direction_upload: { headline: true, label: "iperf3 WAN upload" },
 	// Retained profiles the suite no longer runs (manual benchmark:network:all composition): labels
 	// kept so manual results stay readable; loopback's former headline moved to iperf above.
 	fast_cli_internet_download_speed: { label: "fast.com download" },
@@ -119,7 +103,7 @@ export const ptsOverrides: Record<string, MetricOverride> = {
 
 	// System dimension: the synthetic Git profile complements the realworld repo tasks by isolating a
 	// fixed command sequence over a fixed GTK corpus.
-	git_seconds: { label: "Git common operations" },
+	git_seconds: { headline: true, label: "Git common operations" },
 
 	// Realworld dimension (ENG-135/137): mastra-ai/mastra run through its own CI tasks, a repo-local
 	// PTS profile with a Task option axis. TestType System's default dimension is corrected to

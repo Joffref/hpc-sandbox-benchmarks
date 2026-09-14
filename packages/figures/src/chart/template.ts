@@ -38,7 +38,7 @@ export const BAR_HEIGHT = 20;
 export const SEGMENT_GAP = 2;
 export const TOTAL_GAP = 10;
 /** `space-y-3` between bar rows. */
-export const ROW_GAP = 12;
+export const ROW_GAP = 16;
 /**
  * The title's own metrics, at `500 24px Afacad`, READ OFF THE PINNED FACE rather than assumed —
  * canvas `TextMetrics` in the rendered document, which is the only thing that knows what the
@@ -156,7 +156,7 @@ body { margin: 0; background: ${pageColors.bg}; }
 header { display: flex; align-items: flex-start; gap: 24px; margin: 0 0 4px; }
 h1 { margin: 0; font: 500 24px/32px ${HEADING}; color: ${pageColors.fg}; }
 .wordmark { flex: 0 0 auto; margin: ${px(WORDMARK_TOP)} 0 0 auto; width: ${px(WORDMARK_HEIGHT * WORDMARK_ASPECT)}; height: ${px(WORDMARK_HEIGHT)}; color: ${pageColors.fg}; }
-.summary { margin: 0 0 14px; font: 400 11px/16.5px ${MONO}; letter-spacing: 0.14em; text-transform: uppercase; color: ${pageColors.muted70}; }
+.summary { margin: 0 0 14px; font: 400 11px/16.5px ${MONO}; letter-spacing: 0.14em; text-transform: uppercase; color: ${pageColors.muted}; }
 .note { margin: 0 0 24px; font: 400 14px/22.75px ${SANS}; color: ${pageColors.muted}; }
 .note code { font: 400 13px ${MONO}; }
 /* The disk aside wraps as ONE unit. It is a parenthetical in a different face at a different
@@ -164,7 +164,7 @@ h1 { margin: 0; font: 500 24px/32px ${HEADING}; color: ${pageColors.fg}; }
    fragments rather than one aside — the full-width note made that break reachable. It is ~145 px
    at its longest, so refusing to break it can never overflow a 912 px line. */
 .note .disk { white-space: nowrap; font: 400 11px ${MONO}; color: ${pageColors.muted40}; }
-.legend { display: flex; align-items: center; gap: ${COLUMN_GAP}px; margin: 22px 0 0; padding: 14px 0 0; border-top: 1px solid ${pageColors.muted40}; list-style: none; font: 400 11px/16.5px ${MONO}; color: ${pageColors.muted}; }
+.legend { display: flex; align-items: center; gap: ${COLUMN_GAP}px; margin: 22px 0 0; padding: 14px 0 0; border-top: 1px solid ${pageColors.muted40}; flex-wrap: wrap; list-style: none; font: 400 11px/16.5px ${MONO}; color: ${pageColors.muted}; }
 .legend li { display: flex; align-items: center; gap: 6px; }
 .swatch { width: 10px; height: 10px; border-radius: 2px; }
 .legend-note { margin-left: auto; font: 400 10px/15px ${MONO}; letter-spacing: 0.14em; text-transform: uppercase; color: ${pageColors.muted50}; }
@@ -181,7 +181,7 @@ h1 { margin: 0; font: 500 24px/32px ${HEADING}; color: ${pageColors.fg}; }
 .badge { font: 400 9px/13.5px ${MONO}; letter-spacing: 0.14em; text-transform: uppercase; color: ${pageColors.teal}; border: 1px solid ${pageColors.tealBorder}; border-radius: 4px; padding: 1px 4px; white-space: nowrap; }
 .incomplete { align-items: flex-start; }
 .incomplete .provider { color: ${pageColors.muted50}; }
-.gap { font: 400 11px/16.5px ${MONO}; color: ${pageColors.muted50}; }
+.gap { min-width: 0; overflow-wrap: anywhere; font: 400 11px/16.5px ${MONO}; color: ${pageColors.muted}; }
 `;
 
 /** A provider cell: the concise title, and the isolation chip beneath it when metadata was

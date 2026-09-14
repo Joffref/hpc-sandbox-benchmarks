@@ -28,6 +28,8 @@ Two kinds of chart, in one style — the same frame, faces, geometry and provide
   the board's shared-rank badge on every environment it could not separate. Each scales to its
   own largest value. The dimension's
   headline chart sits above its section's collapse; the rest sit beside their tables inside it.
+  Synthetic values align in a separate column beyond the fixed tracks, with best-rank badges
+  beneath the values so intervals never collide with labels.
 
 ## Seams
 

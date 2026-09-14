@@ -45,7 +45,7 @@ describe("metricChartHtml", () => {
 		expect(html.match(/class="whisker"/g)?.length).toBe(2);
 	});
 
-	it("sizes the lane to the whisker when it reaches past the bar, so the value never sits on it", () => {
+	it("uses a fixed lane so values align and never overlap intervals", () => {
 		// Beta: bar 190/230 → 462.61 px, interval to the edge → 560 px; the lane is the further one.
 		expect(html).toContain(
 			`<div class="lane" style="width: 560.00px;"><span class="fill" style="width: 462.61px;`,

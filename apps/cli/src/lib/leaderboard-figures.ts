@@ -9,6 +9,7 @@ import { join } from "node:path";
 import { screenshotHtml } from "@sandbox-benchmarks/figures/screenshot";
 import type {
 	Leaderboard,
+	LeaderboardDataset,
 	LeaderboardFigure,
 	LeaderboardMetricFigure,
 } from "@sandbox-benchmarks/results";
@@ -21,7 +22,6 @@ import {
 	metricFigureModelOf,
 	renderLeaderboardFigureHtml,
 } from "@sandbox-benchmarks/results";
-import type { Run } from "@sandbox-benchmarks/schema";
 
 export interface WrittenFigures {
 	/** The suite (pipeline) charts the Markdown must link, in the order it links them. */
@@ -58,7 +58,7 @@ export interface WrittenFigures {
  * either, and the links are still rendered, which keeps the piped output the same document.
  */
 export async function writeLeaderboardFigures(
-	run: Run,
+	run: LeaderboardDataset,
 	board: Leaderboard,
 	markdownDir: string,
 	options: { readonly dryRun?: boolean } = {},

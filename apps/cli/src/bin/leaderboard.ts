@@ -6,10 +6,10 @@
 import { dirname } from "node:path";
 import * as core from "@actions/core";
 import { buildLeaderboard, renderLeaderboardMarkdown } from "@sandbox-benchmarks/results";
-import { parseRun } from "@sandbox-benchmarks/schema";
 import { fail, inActions, logInfo, withGroup, writeJobSummary } from "../lib/actions-log.ts";
 import { handleDiscovery } from "../lib/discovery.ts";
 import { writeLeaderboardFigures } from "../lib/leaderboard-figures.ts";
+import { loadLeaderboardInput } from "../lib/leaderboard-input.ts";
 
 /** Agent-facing usage. The Run document names the providers/suites it covers, so the registry
  *  listings are offered only as cross-CLI-consistent discovery, not the primary input. */
@@ -18,7 +18,8 @@ export const HELP = `leaderboard — render a published Run document into the Ma
 usage: leaderboard <run.json> [outFile.md]
        leaderboard [--help] [--list-providers] [--list-suites] [--json]
 
-  <run.json>         Path to a normalized Run document (required).
+  <run.json>         Run document or JSON array of Run paths, relative to the array file.
+  --cohort-review <reason>  Recorded review for exploratory pooling of differing cohorts.
   [outFile.md]       Write the Markdown here; omit to print to stdout.
   --list-providers   List the registered providers.
   --list-suites      List the registered suites.
@@ -32,8 +33,14 @@ examples:
 Next: produce a Run with  bench-suite <provider> <suite> <runId>`;
 
 if (import.meta.main) {
-	const argv = process.argv.slice(2);
-	const discovery = handleDiscovery(argv, HELP);
+	const argv = process.argv
+		.slice(2)
+		.flatMap((arg) =>
+			arg.startsWith("--cohort-review=")
+				? ["--cohort-review", arg.slice("--cohort-review=".length)]
+				: [arg],
+		);
+	const discovery = handleDiscovery(argv, HELP, ["--cohort-review"]);
 	if (discovery !== null) {
 		if (discovery.ok) {
 			process.stdout.write(`${discovery.text}\n`);
@@ -45,7 +52,14 @@ if (import.meta.main) {
 		});
 	}
 
-	const [runFile, outFile] = argv;
+	const reviewAt = argv.indexOf("--cohort-review");
+	const cohortReview = reviewAt >= 0 ? argv[reviewAt + 1] : undefined;
+	if (reviewAt >= 0 && !cohortReview?.trim()) throw new Error("--cohort-review requires a reason");
+	const positional =
+		reviewAt >= 0 ? [...argv.slice(0, reviewAt), ...argv.slice(reviewAt + 2)] : argv;
+	const [runFile, outFile] = positional;
+	if (positional.length > 2)
+		throw new Error("Expected an input Run or manifest and optional output Markdown path");
 	if (!runFile) {
 		fail("usage: leaderboard <run.json> [outFile.md] (see --help)", {
 			properties: { title: "leaderboard usage" },
@@ -54,7 +68,7 @@ if (import.meta.main) {
 	}
 
 	const run = await withGroup(`Load Run ${runFile}`, async () => {
-		const parsed = parseRun(await Bun.file(runFile).json());
+		const parsed = await loadLeaderboardInput(runFile, cohortReview);
 		logInfo(`runId=${parsed.runId} providers=${parsed.providers.length} sha=${parsed.sha}`);
 		return parsed;
 	});

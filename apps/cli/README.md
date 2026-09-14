@@ -82,3 +82,23 @@ The protected journal retains the later attestation. Fresh `workflow-experiment 
 the immutable attempts and attaches the matching recovery record separately. Re-run the existing
 partial backfill after recovery: both aggregate and promote re-verify it, and the Run records recovery
 under `experiment.cleanupRecoveries`. Failed cells remain failed and supply no numerical results.
+
+### Local multi-dataset leaderboard and impact report
+
+The `leaderboard` input can be a Run or a JSON array of Run file paths. Paths in an array are
+relative to that manifest. The canonical output-file invocation still generates both Markdown and
+figures through the same renderer. Use a scratch directory for exploratory combinations so the
+published single-run leaderboard remains unchanged:
+
+```sh
+bun apps/cli/src/bin/leaderboard.ts /tmp/datasets.json /tmp/combined/LEADERBOARD.md \
+  --cohort-review 'Document the compatibility review and remaining assumptions here'
+bun apps/cli/src/bin/dataset-impact.ts data/dataset/runs/34804682438.json \
+  data/dataset/runs/34853816482.json --out /tmp/combined/report.md \
+  --cohort-review 'Document the compatibility review and remaining assumptions here'
+```
+
+`dataset-impact` accepts multiple added Run paths. It writes the Markdown report and a sibling JSON
+with every provider/metric estimate and source cell. The review flag is necessary only when cohort
+digests differ or are missing; it cannot override hard measurement incompatibilities. Neither command
+republishes a dataset or dispatches a workflow.

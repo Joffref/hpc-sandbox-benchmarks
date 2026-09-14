@@ -16,11 +16,13 @@ import {
 	executionReceiptSchema,
 	experimentAttemptSchema,
 	experimentPlanSchema,
+	getMetric,
 	getProvider,
 	parseRun,
 	providerReportedNothing,
 } from "@sandbox-benchmarks/schema";
 import { aggregateRuns } from "./aggregate.ts";
+import type { PtsTrialEvidence } from "./pts-trial-evidence.ts";
 
 export function evidenceDigest(value: unknown): string {
 	// Full experiment/Run envelopes are larger than individual vendor response diagnostics.
@@ -177,6 +179,8 @@ export interface AttemptWithRun {
 	run?: Run;
 	execution?: ExecutionReceipt;
 	cleanup?: CleanupReceipt;
+	/** When present, raw verification takes precedence over a shard's declared sample origin. */
+	ptsTrials?: PtsTrialEvidence[];
 }
 
 export interface CoverageReport {
@@ -188,6 +192,9 @@ export interface CoverageReport {
 		status: "complete" | "missing" | "failed" | "cancelled" | "excluded";
 		missingMetrics: string[];
 		excludedMetrics: string[];
+		attemptId?: string;
+		retainedMetrics?: string[];
+		passShortfalls?: Array<PtsTrialEvidence & { expected: number }>;
 	}>;
 	conflicts: string[];
 }
@@ -223,7 +230,10 @@ export function describeCoverageShortfall(report: CoverageReport, limit = 20): s
 				cell.status !== "missing" && cell.missingMetrics.length > 0
 					? ` missing=${cell.missingMetrics.join(",")}`
 					: "";
-			return `${cell.status}: ${cell.id}${missing}`;
+			const passes = cell.passShortfalls?.length
+				? ` passes=${cell.passShortfalls.map((entry) => `${entry.metricId}:${entry.observed ?? "unknown"}/${entry.expected}(${entry.source})`).join(",")}`
+				: "";
+			return `${cell.status}: ${cell.id}${missing}${passes}`;
 		}),
 	];
 	if (short.length > limit) lines.push(`… and ${short.length - limit} more incomplete cell(s)`);
@@ -338,12 +348,44 @@ export function evaluateExperiment(
 		// Declared metrics need real samples — an empty samples array (or non-positive values) is a
 		// shortfall, not coverage. Frozen CPU run 34672199543 finished PTS exit 0 for mastra/openclaw
 		// while Test Core / Shrinkwrap / Test Unit Fast produced no positive samples.
+		const passShortfalls = (provider?.metrics ?? [])
+			.filter((metric) => {
+				const definition = getMetric(metric.metricId);
+				// Only a known non-PTS definition establishes an independent sampling contract.
+				// Retiring a catalog entry cannot turn a frozen PTS metric into a harness timing.
+				return eligible.includes(metric.metricId) && (!definition || definition.pts !== undefined);
+			})
+			.map((metric): PtsTrialEvidence & { expected: number } => ({
+				providerId: cell.provider,
+				metricId: metric.metricId,
+				expected: cell.passes,
+				...(!getMetric(metric.metricId)
+					? { source: "unverified" as const }
+					: selected?.ptsTrials !== undefined
+						? (selected.ptsTrials.find(
+								(entry) => entry.providerId === cell.provider && entry.metricId === metric.metricId,
+							) ?? { source: "unverified" as const })
+						: {
+								source: metric.ptsSampleSource ?? "unverified",
+								...(metric.ptsSampleSource === "raw-string"
+									? { observed: metric.samples.length }
+									: {}),
+							}),
+			}))
+			.filter((entry) =>
+				entry.source === "single-trial-value"
+					? entry.observed !== 1 || entry.expected !== 1
+					: entry.source !== "raw-string" || entry.observed !== entry.expected,
+			);
 		const measured = new Set(
 			(provider?.metrics ?? [])
 				.filter(
 					(metric) =>
 						metric.samples.length > 0 &&
-						metric.samples.every((sample) => Number.isFinite(sample) && sample > 0),
+						metric.samples.every((sample) => Number.isFinite(sample) && sample > 0) &&
+						// PTS Value alone has unknown trial count; verified one-execution metadata can
+						// prove one trial. Harness timings have their own sampling contract.
+						!passShortfalls.some((entry) => entry.metricId === metric.metricId),
 				)
 				.map((metric) => metric.metricId),
 		);
@@ -369,7 +411,7 @@ export function evaluateExperiment(
 				(step) => step.state === "completed" && stepAccepted(step),
 			) &&
 			artifact?.sandboxId === execution.sandboxId;
-		const completed =
+		const measurementVerified =
 			receiptsConfirmSuccess &&
 			evidence?.outcome === "completed" &&
 			evidence.completion === "known-success" &&
@@ -386,9 +428,15 @@ export function evaluateExperiment(
 			evidenceDigest(effectiveArtifact(artifact.provenance)) === cell.artifactIdentity &&
 			selected?.run?.replicateIndex === cell.replicate &&
 			provider?.suitesCovered.includes(cell.suite) &&
-			missingMetrics.length === 0 &&
 			!provider.gaps.some((gap) => {
 				if (gap.scope !== "suite" || gap.id !== cell.suite) return true;
+				return gap.cause?.kind !== "metrics-unrecorded";
+			});
+		const completed =
+			measurementVerified &&
+			provider !== undefined &&
+			missingMetrics.length === 0 &&
+			!provider.gaps.some((gap) => {
 				return (
 					gap.cause?.kind !== "metrics-unrecorded" ||
 					gap.cause.metricIds.some((id) => !excludedMetrics.includes(id))
@@ -401,7 +449,16 @@ export function evaluateExperiment(
 				: evidence?.outcome === "cancelled"
 					? "cancelled"
 					: "failed";
-		report.cells.push({ id: cell.id, status, missingMetrics, excludedMetrics });
+		report.cells.push({
+			id: cell.id,
+			status,
+			missingMetrics,
+			excludedMetrics,
+			...(evidence ? { attemptId: evidence.id } : {}),
+			retainedMetrics:
+				measurementVerified && validLineage ? eligible.filter((id) => measured.has(id)) : [],
+			...(passShortfalls.length ? { passShortfalls } : {}),
+		});
 		if (status === "complete" && evidence) report.selectedAttempts.push(evidence.id);
 	}
 	report.complete =
@@ -412,8 +469,22 @@ export function evaluateExperiment(
 
 export interface ExperimentAggregation {
 	coverage: CoverageReport;
-	/** Present only when coverage is complete: the one Run carrying verified experiment linkage. */
+	/** Verified complete publication, or explicitly requested partial publication with frozen coverage. */
 	run?: Run;
+}
+
+/** A stopped admission never enters the harness, so its terminal receipt has no shard Run. */
+function isUnallocatedFailureWithoutRun(attempt: AttemptWithRun): boolean {
+	return (
+		attempt.run === undefined &&
+		attempt.evidence.runDigest === undefined &&
+		attempt.evidence.outcome === "failed" &&
+		!attempt.evidence.measurementStarted &&
+		attempt.evidence.completion !== "known-success" &&
+		attempt.evidence.cleanup === "not-allocated" &&
+		attempt.execution === undefined &&
+		attempt.cleanup === undefined
+	);
 }
 
 /**
@@ -424,29 +495,107 @@ export interface ExperimentAggregation {
 export function aggregateExperiment(
 	plan: ExperimentPlan,
 	attempts: readonly AttemptWithRun[],
+	options: { allowPartial?: boolean } = {},
 ): ExperimentAggregation {
 	const coverage = evaluateExperiment(plan, attempts);
-	if (!coverage.complete) return { coverage };
-	const selected = new Set(coverage.selectedAttempts);
-	const runs = attempts
+	const partial = !coverage.complete && options.allowPartial === true;
+	if (!coverage.complete && !partial) return { coverage };
+	// Partial publication relaxes metric completeness only. Missing evidence, conflicting provenance
+	// and unresolved allocations still cannot be published.
+	if (
+		partial &&
+		(coverage.conflicts.length > 0 ||
+			coverage.cells.some((cell) => cell.status === "missing") ||
+			attempts.some(
+				(attempt) =>
+					(!attempt.run && !isUnallocatedFailureWithoutRun(attempt)) ||
+					!attempt.evidence.rawDigest ||
+					attempt.evidence.cleanup === "unresolved",
+			) ||
+			!coverage.cells.some((cell) => (cell.retainedMetrics?.length ?? 0) > 0))
+	)
+		return { coverage };
+	const selectedIds = partial
+		? coverage.cells.flatMap((cell) => (cell.attemptId ? [cell.attemptId] : []))
+		: coverage.selectedAttempts;
+	const selected = new Set(selectedIds);
+	const selectedAttempts = attempts
 		.filter(({ evidence }) => selected.has(evidence.id))
-		.toSorted((a, b) => a.evidence.cellId.localeCompare(b.evidence.cellId))
+		.toSorted((a, b) => a.evidence.cellId.localeCompare(b.evidence.cellId));
+	const runs = selectedAttempts
+		.filter((attempt) => !(partial && isUnallocatedFailureWithoutRun(attempt)))
 		.map(({ run, evidence }) => {
 			if (!run || Number(run.schemaVersion) < 6)
 				throw new Error("experiment publication requires artifact-attributed shards");
 			const cell = plan.cells.find((entry) => entry.id === evidence.cellId);
+			const retained =
+				coverage.cells.find((entry) => entry.id === evidence.cellId)?.retainedMetrics ?? [];
 			const eligible = new Set(
-				cell?.metrics.filter((id) => !cell.exclusions.some((entry) => entry.metricId === id)),
+				partial
+					? retained
+					: cell?.metrics.filter((id) => !cell.exclusions.some((entry) => entry.metricId === id)),
 			);
+			const omitted =
+				cell?.metrics.filter(
+					(id) => !eligible.has(id) && !cell.exclusions.some((entry) => entry.metricId === id),
+				) ?? [];
 			return {
 				...run,
 				providers: run.providers.map((provider) => ({
 					...provider,
-					metrics: provider.metrics.filter((metric) => eligible.has(metric.metricId)),
+					metrics:
+						provider.providerId === cell?.provider
+							? provider.metrics.filter((metric) => eligible.has(metric.metricId))
+							: [],
+					validationStatus:
+						provider.providerId === cell?.provider &&
+						provider.metrics.some((metric) => eligible.has(metric.metricId))
+							? ("validated" as const)
+							: ("pending" as const),
+					gaps:
+						partial && provider.providerId === cell?.provider && omitted.length > 0
+							? [
+									...provider.gaps,
+									{
+										scope: "suite" as const,
+										id: cell.suite,
+										outcome: "failed" as const,
+										reason: `Partial publication withheld unverified measurements: ${omitted.join(", ")}`,
+									},
+								]
+							: provider.gaps,
 				})),
 			};
 		});
 	const merged = aggregateRuns(runs);
+	// Preserve failures that never produced a Run in the published coverage and provider gaps,
+	// without fabricating a historical shard or contributing any numerical observations.
+	for (const attempt of selectedAttempts.filter(isUnallocatedFailureWithoutRun)) {
+		const cell = plan.cells.find((entry) => entry.id === attempt.evidence.cellId);
+		if (!cell) throw new Error(`attempt cell missing from plan: ${attempt.evidence.cellId}`);
+		let provider = merged.providers.find((entry) => entry.providerId === cell.provider);
+		if (!provider) {
+			provider = {
+				providerId: cell.provider,
+				validationStatus: "pending",
+				observedSpecs: {},
+				metrics: [],
+				suitesCovered: [],
+				gaps: [],
+				uncatalogued: [],
+				costEvidence: [],
+				artifactEvidence: [],
+			};
+			merged.providers.push(provider);
+		}
+		provider.gaps.push({
+			scope: "suite",
+			id: cell.suite,
+			outcome: "failed",
+			reason: `${cell.id}: ${attempt.evidence.diagnostic ?? "Admission failed before allocation; no measurements were produced."}`,
+		});
+	}
+	merged.providers.sort((a, b) => a.providerId.localeCompare(b.providerId));
 	const cohorts = [
 		...new Map(
 			plan.cells.map((cell) => [
@@ -466,11 +615,37 @@ export function aggregateExperiment(
 	].toSorted((a, b) => a.suite.localeCompare(b.suite));
 	const run = parseRun({
 		...merged,
-		schemaVersion: "7",
+		schemaVersion: partial ? "8" : "7",
 		experiment: {
 			planDigest: plan.digest,
 			cohortDigest: evidenceDigest(cohorts),
-			attemptIds: coverage.selectedAttempts,
+			attemptIds: selectedIds,
+			...(partial
+				? {
+						partial: {
+							status: "partial",
+							planned: plan.cells.length,
+							complete: coverage.cells.filter((cell) => cell.status === "complete").length,
+							incomplete: coverage.cells.filter(
+								(cell) => !["complete", "excluded"].includes(cell.status),
+							).length,
+							excluded: coverage.cells.filter((cell) => cell.status === "excluded").length,
+							cells: coverage.cells.map((cell) => {
+								const planned = plan.cells.find((entry) => entry.id === cell.id);
+								if (!planned) throw new Error(`coverage cell missing from plan: ${cell.id}`);
+								return {
+									...cell,
+									provider: planned.provider,
+									suite: planned.suite,
+									replicate: planned.replicate,
+									plannedMetrics: planned.metrics,
+									passes: planned.passes,
+									retainedMetrics: cell.retainedMetrics ?? [],
+								};
+							}),
+						},
+					}
+				: {}),
 		},
 	});
 	return { coverage, run };

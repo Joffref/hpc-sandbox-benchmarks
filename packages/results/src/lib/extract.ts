@@ -5,9 +5,14 @@
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { ObservedSpecs, ResultGap, UncataloguedResult } from "@sandbox-benchmarks/schema";
+import type {
+	MetricResult,
+	ObservedSpecs,
+	ResultGap,
+	UncataloguedResult,
+} from "@sandbox-benchmarks/schema";
 import { isGapMarkerFile, isPtsResultFile, parseGapMarker } from "@sandbox-benchmarks/schema";
-import { parsePtsComposite, ptsResultToMetric } from "./pts.ts";
+import { parsePtsComposite, ptsResultToMetric, resultMeasurement } from "./pts.ts";
 import { parseSystemHost } from "./system-specs.ts";
 
 /** One Metric's samples sourced from a single raw file — the provenance the normalizer preserves. */
@@ -19,6 +24,7 @@ export interface SampleContribution {
 	appVersion?: string;
 	/** The exact PTS option Arguments that produced these Samples, when non-empty. */
 	arguments?: string;
+	ptsSampleSource?: MetricResult["ptsSampleSource"];
 }
 
 /** A catalogued Metric that was attempted but produced no measurement (every pass errored). */
@@ -122,8 +128,9 @@ export function extractProviderDir(dir: string, providerId: string): ProviderExt
 				// but record a CATALOGUED skip as attempted-empty evidence first, so the normalizer's
 				// suite-shortfall gap can name the declared metrics that were attempted and lost. Inspect every
 				// Entry: PTS can preserve an empty entry before a later measured one.
-				const measuredEntry = result.Data.Entry.find((entry) => entry.Value !== undefined);
-				if (!measuredEntry || measuredEntry.Value === undefined) {
+				const measurement =
+					mapped.kind === "matched" ? mapped.measurement : resultMeasurement(result);
+				if (!measurement) {
 					if (mapped.kind === "matched") {
 						out.attemptedEmpty.push({ metricId: mapped.def.id, sourceFile: filename });
 					}
@@ -136,6 +143,7 @@ export function extractProviderDir(dir: string, providerId: string): ProviderExt
 						out.contributions.push({
 							metricId: mapped.def.id,
 							samples: mapped.samples,
+							ptsSampleSource: measurement.source,
 							sourceFile: filename,
 							...(result.AppVersion ? { appVersion: result.AppVersion } : {}),
 							...(result.Arguments ? { arguments: result.Arguments } : {}),
@@ -149,7 +157,7 @@ export function extractProviderDir(dir: string, providerId: string): ProviderExt
 							// (normalize-tree) silently drops the second measurement.
 							id: `${mapped.test}::${mapped.description || "default"}::${mapped.scale}`,
 							// Value is a guaranteed number — the schema parses it and we selected a measured Entry.
-							value: measuredEntry.Value,
+							value: measurement.entry.Value,
 							unit: result.Scale,
 							// The schema narrow makes a valued Result with an empty Proportion unrepresentable;
 							// this guard exists only to convince the type system and degrades to an omitted

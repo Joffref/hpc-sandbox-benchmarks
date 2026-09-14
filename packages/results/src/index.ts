@@ -72,6 +72,7 @@ export {
 	type LeaderboardMetric,
 	type LeaderboardMetricFigure,
 	type LeaderboardRow,
+	POOLED_BOARD_HEADING,
 	type ProviderRosterEntry,
 	REPO_URL,
 	renderLeaderboardMarkdown,

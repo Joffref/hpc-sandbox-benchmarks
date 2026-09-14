@@ -47,8 +47,8 @@ import {
 	METRIC_CATALOG,
 	mannWhitneyU,
 	providerReportedNothing,
+	reportedMedianOf,
 	SUITE_NAMES,
-	sandboxMedianOf,
 } from "@sandbox-benchmarks/schema";
 import type {
 	CombineDatasetsOptions,
@@ -111,6 +111,14 @@ export const LEADERBOARD_DIMENSION_ORDER: readonly Dimension[] = [
  * the renderer changes its mind.
  */
 export const FIGURE_DIMENSION: Dimension = "realworld";
+/**
+ * The phrase that marks a rendered board as POOLED rather than one published experiment.
+ *
+ * Exported because the artifact gate has to recognise it in a committed document, and reading the
+ * rendered prose is the only input that gate has. Rewording this heading without it would leave the
+ * gate matching a string nothing emits — silently passing the exact condition it exists to refuse.
+ */
+export const POOLED_BOARD_HEADING = "Combined dataset analysis";
 
 /**
  * One rendered suite chart the Markdown embeds — what the renderer needs in order to link a figure
@@ -540,8 +548,9 @@ function rankMetric(run: LeaderboardDataset, metric: MetricDef): LeaderboardRow[
 			// so the noisiest machine earned the most votes: on the committed data ρ(trials, within-sandbox
 			// CV) = 0.76, and one headline row published 20.99 from sandbox medians {18.87, 21.06, 18.95}
 			// because the 15-pass machine held 71% of the weight. The pooled Samples stay in the dataset as
-			// the raw evidence; they are no longer the ranking statistic.
-			value: replicates ? sandboxMedianOf(replicates) : result.aggregates.p50,
+			// the raw evidence; they are no longer the ranking statistic. `reportedMedianOf` owns this
+			// choice for every surface that prints a value.
+			value: reportedMedianOf(result),
 			rank: 0, // assigned after sort
 			// Seed from stable identity so a committed leaderboard is byte-identical on every regeneration —
 			// a Math.random() bootstrap would churn the diff on every run. The interval is the CLUSTER
@@ -1206,7 +1215,7 @@ export function renderLeaderboardMarkdown(
 		"",
 		...(board.sources
 			? [
-					"**Combined dataset analysis (not a new published experiment).**",
+					`**${POOLED_BOARD_HEADING} (not a new published experiment).**`,
 					...board.sources.map(
 						(source) =>
 							`Source ${runSourceLinks(source.runId)} · commit ${commitSourceLink(source.sha)} · dataset ${datasetSourceLink(source.runId)}${source.experiment?.partial ? ` · ${source.experiment.partial.complete}/${source.experiment.partial.planned} cells complete` : ""}`,

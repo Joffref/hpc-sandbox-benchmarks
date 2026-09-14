@@ -32,8 +32,12 @@ const ptsSampleSourceSchema = type("'raw-string' | 'aggregate-value'");
 /**
  * One replicate sandbox's contribution to a Metric: the raw per-pass Samples that one (provider, suite)
  * replicate produced, tagged with its {@link index}. Present only on a Metric merged from ≥2 replicate
- * shards ({@link MetricResult.replicates}); the pooled `samples`/`aggregates` above stay the ranking
- * value, this is the between-sandbox breakdown the hierarchical-bootstrap inference reads.
+ * shards ({@link MetricResult.replicates}).
+ *
+ * When these are present they ARE the reported value: `reportedMedianOf` takes the median of their
+ * per-sandbox medians, one machine one vote. The pooled `samples`/`aggregates` above remain the raw
+ * evidence — and the reported value where a result has no replicates — but they are no longer the
+ * ranking statistic.
  */
 export const metricReplicateSchema = type({
 	// The replicate sandbox this slice came from (the `--replicate` index the shard was run under).

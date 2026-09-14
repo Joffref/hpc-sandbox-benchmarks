@@ -32,7 +32,7 @@ import {
 	pipelineChartHtml,
 } from "@sandbox-benchmarks/figures";
 import type { Run } from "@sandbox-benchmarks/schema";
-import { METRIC_CATALOG, PROVIDERS, SUITES, sandboxMedianOf } from "@sandbox-benchmarks/schema";
+import { METRIC_CATALOG, PROVIDERS, SUITES } from "@sandbox-benchmarks/schema";
 import type { Leaderboard, LeaderboardFigure, LeaderboardMetricFigure } from "./leaderboard.ts";
 import { buildLeaderboard, FIGURE_DIMENSION } from "./leaderboard.ts";
 import type { LeaderboardDataset } from "./leaderboard-datasets.ts";
@@ -69,11 +69,15 @@ export const FIGURE_DEVICE_SCALE = 2;
 /**
  * The paragraph under a chart's title.
  *
- * It states the two things the picture cannot: that a bar is a SUM OF MEDIANS rather than a
- * measured single run, and how many trials each of those medians rests on. Both matter for
+ * It states the two things the picture cannot: that a bar is a SUM OF PER-SANDBOX MEDIANS rather
+ * than a measured single run, and how many trials each of those medians rests on. Both matter for
  * reading the chart honestly — the segments add up to the bar by construction (that is what a
  * stacked bar means), which is exactly why the total is not the median of any pipeline that ever
  * executed, and saying so is cheaper than letting a reader assume otherwise.
+ *
+ * It names the estimand the ranked tables print (schema `reportedMedianOf`) because it IS the same
+ * one. It used to read "that task's median over N retained trials" — the pooled percentile the
+ * charts once used and the tables never did.
  *
  * `n` is read off the segments rather than from the suite registry's `defaultReplicas`: the
  * registry says what was REQUESTED, and a lost replicate shard makes the retained count smaller
@@ -83,7 +87,7 @@ export const FIGURE_DEVICE_SCALE = 2;
  * run, and the caption claimed it; now that each scales to its own slowest pipeline, a reader
  * comparing two charts must be told to read the totals rather than the lengths.
  */
-export function suiteFigureNote(suite: PipelineSuite, combined = false): string {
+export function suiteFigureNote(suite: PipelineSuite): string {
 	const counts = suite.bars.flatMap((bar) => bar.segments.map((segment) => segment.n));
 	const low = Math.min(...counts);
 	const high = Math.max(...counts);
@@ -98,10 +102,9 @@ export function suiteFigureNote(suite: PipelineSuite, combined = false): string 
 			: ` Tasks without recorded measurements in this run are excluded from all bars: ` +
 				`**${suite.droppedTasks.join("**, **")}**.`;
 	return (
-		(combined
-			? `Each segment is the median of that task's per-sandbox medians, from ${trials} retained ${plural}; the bar is their sum, `
-			: `Each segment is that task's median over ${trials} retained ${plural}; the bar is their sum, `) +
-		`so it is the cost of the pipeline and not the timing of any single run.${dropped}${scale}`
+		`Each segment is the median of that task's per-sandbox medians, from ${trials} retained ${plural}; ` +
+		`the bar is their sum, so it is the cost of the pipeline and not the timing of any single ` +
+		`run.${dropped}${scale}`
 	);
 }
 
@@ -116,22 +119,7 @@ export function suiteFigureNote(suite: PipelineSuite, combined = false): string 
  */
 export function benchmarkDataOf(run: LeaderboardDataset): RealworldFigureModel {
 	return buildRealworldFigureModel({
-		run: run.sources
-			? {
-					providers: run.providers.map((provider) => ({
-						...provider,
-						metrics: provider.metrics.map((metric) => ({
-							...metric,
-							aggregates: {
-								...metric.aggregates,
-								p50: metric.replicates
-									? sandboxMedianOf(metric.replicates.map((r) => r.samples))
-									: metric.aggregates.p50,
-							},
-						})),
-					})),
-				}
-			: run,
+		run,
 		metrics: METRIC_CATALOG,
 		providers: PROVIDERS.map((provider) => ({
 			id: provider.id,
@@ -321,10 +309,8 @@ export function renderLeaderboardFigureHtml(
 			buildPipelineChartModel(
 				suite,
 				data,
-				suiteFigureNote(suite, !!run.sources) +
-					(run.sources
-						? " Combined datasets: task estimates give each sandbox one vote; source coverage remains separate."
-						: ""),
+				suiteFigureNote(suite) +
+					(run.sources ? " Combined datasets: source coverage remains separate." : ""),
 			),
 		),
 	}));

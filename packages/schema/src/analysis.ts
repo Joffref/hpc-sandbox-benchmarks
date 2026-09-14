@@ -1,6 +1,7 @@
 // Pure analysis over the Samples a Metric retains. Percentiles use linear interpolation between
 // order statistics (R-7, the numpy/Excel default) so Aggregates are stable across toolchains.
 import { type } from "arktype";
+import type { MetricResult } from "./run.ts";
 
 // Plain `"number"` accepts NaN/Infinity; the distribution fields must be finite, so a corrupt
 // Aggregates can't pass validation undetected. `n`'s `number.integer` already excludes both; `stdev`
@@ -421,6 +422,29 @@ function sandboxMedians(replicates: readonly (readonly number[])[]): number[] {
 export function sandboxMedianOf(replicates: readonly (readonly number[])[]): number {
 	assertReplicates("sandboxMedianOf", replicates);
 	return percentileOf(sandboxMedians(replicates), 0.5);
+}
+
+/**
+ * THE reported value for a measured Metric: {@link sandboxMedianOf} when the result carries replicate
+ * sandboxes, the pooled percentile when it is a single sandbox with no between-machine information.
+ *
+ * Every surface that prints a number for a result must call this. It exists because that choice used to
+ * be made twice — once for the ranked tables and once, under a different condition, for the pipeline
+ * charts — so one artifact could state a provider's value two ways. The two agreed only because the
+ * realworld suites are k=1 by declaration (`suites.ts`: the cold install/build IS the metric), which
+ * makes a pooled percentile and a median of per-sandbox medians arithmetically identical. On the
+ * synthetic suites, where PTS runs ≥2 trials per sandbox, they differ on most results.
+ *
+ * Takes a whole `MetricResult`, not the two fields it reads: TypeScript is structural, so a narrower
+ * parameter also admits the other `{ aggregates }` carriers in this repo — `LifecycleAggregate`, whose
+ * harness measurements have no replicates — and quietly hands them a pooled percentile under the name
+ * of the reported value. The type-only import is erased (`verbatimModuleSyntax`), so run.ts importing
+ * this module back is not a cycle.
+ */
+export function reportedMedianOf(result: MetricResult): number {
+	return result.replicates
+		? sandboxMedianOf(result.replicates.map((replicate) => replicate.samples))
+		: result.aggregates.p50;
 }
 
 /**

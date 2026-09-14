@@ -26,6 +26,7 @@ import {
 	leaderboardFigures,
 	leaderboardMetricFigures,
 	metricFigureModelOf,
+	POOLED_BOARD_HEADING,
 	REPO_URL,
 	renderLeaderboardFigureHtml,
 	renderLeaderboardMarkdown,
@@ -421,7 +422,9 @@ function runIdOf(markdown: string): string {
  * Run would take the determinism test below down with it — silencing the check precisely in the
  * scenario it exists to catch (an artifact rendered from the gitignored `data/runs/`).
  */
-function loadCommittedRun(): {
+let cachedCommittedRun: CommittedRun | undefined;
+
+interface CommittedRun {
 	committed: string;
 	runId: string;
 	run: ReturnType<typeof parseRun>;
@@ -432,8 +435,31 @@ function loadCommittedRun(): {
 	 *  not byte-stable across machines, so pixel identity is unassertable in a gate that must pass
 	 *  on every contributor's machine; the update workflow is where pixels are authored. */
 	figures: LeaderboardFigure[];
-} {
+}
+
+/**
+ * Memoized lazily, never at module scope, for the reason the docblock above gives: a throw must
+ * surface as the failure of the test that asked for it. Sixteen call sites each re-read the 130 KB
+ * artifact and re-parsed the ~4 MB Run through arktype — ~23 ms and 4 MB of JSON apiece, for a value
+ * that cannot change within a run of this file.
+ */
+function loadCommittedRun(): CommittedRun {
+	cachedCommittedRun ??= readCommittedRun();
+	return cachedCommittedRun;
+}
+
+function readCommittedRun(): CommittedRun {
 	const committed = readFileSync(ARTIFACT, "utf8");
+	// This gate audits ONE published experiment, and the audit below re-derives neither the pooled
+	// header nor the composite ranking seed. `leaderboard manifest.json LEADERBOARD.md` will happily
+	// write a pooled board here, which without this surfaces as an unexplained whole-document diff.
+	if (committed.includes(POOLED_BOARD_HEADING)) {
+		throw new Error(
+			`LEADERBOARD.md was rendered from a POOLED dataset (its header says "${POOLED_BOARD_HEADING}"). ` +
+				"The committed artifact must come from a single published Run; render exploratory " +
+				"combinations to a scratch directory instead.",
+		);
+	}
 	const runId = runIdOf(committed);
 	const source = runFile(runId);
 	try {

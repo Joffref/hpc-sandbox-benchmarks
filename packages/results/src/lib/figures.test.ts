@@ -227,7 +227,7 @@ describe("suiteFigureNote", () => {
 					[12, 12],
 				]),
 			),
-		).toContain("median over 12 retained trials");
+		).toContain("per-sandbox medians, from 12 retained trials");
 	});
 
 	it("prints a range when they do not, rather than one task's count as if it were the suite's", () => {
@@ -240,7 +240,7 @@ describe("suiteFigureNote", () => {
 					[12, 12],
 				]),
 			),
-		).toContain("median over 9–12 retained trials");
+		).toContain("per-sandbox medians, from 9–12 retained trials");
 	});
 
 	it("says the bar is a sum of medians, not a measured run", () => {

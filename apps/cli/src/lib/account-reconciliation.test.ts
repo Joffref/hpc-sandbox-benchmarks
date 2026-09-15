@@ -4,7 +4,7 @@ import { reconcileAccount } from "./account-reconciliation.ts";
 
 const ref: SandboxRef = { provider: "tama", id: "machine-owned" };
 
-for (const id of ["daytona-vm", "daytona-container", "novita"] as const) {
+for (const id of ["daytona-vm", "daytona-container", "novita", "blaxel"] as const) {
 	test(`${id} permits foreign churn but removes only benchmark-owned sandboxes`, async () => {
 		const owned: SandboxRef = { provider: id, id: "benchmark-owned" };
 		const deleted: SandboxRef[] = [];
@@ -57,7 +57,6 @@ test("foreign resources still block every account-scoped inventory before any de
 		"modal-gvisor",
 		"modal-vm",
 		"tama",
-		"blaxel",
 		"microsandbox-cloud",
 		"runloop",
 		"runcloud",

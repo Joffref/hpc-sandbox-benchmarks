@@ -15,3 +15,13 @@ here changes, supersede the ADR (leave it in place, note what replaced it) rathe
 | [0003](./0003-generated-pts-catalog-and-drift-gate.md) | Generated PTS catalog behind a drift gate |
 | [0004](./0004-consumption-layer-aggregation.md) | Raw-first history, consumption-layer candidate→promote |
 | [0005](./0005-host-vs-effective-spec-split.md) | Host-vs-effective spec split |
+| [0006](./0006-declarative-provider-onboarding.md) | Declarative provider onboarding |
+| [0007](./0007-sandbox-driver-port.md) | Sandbox driver kit: one port, one file per provider; ComputeSDK as one driver |
+| [0008](./0008-driver-conformance-gate.md) | Driver conformance: the behavioral drift gate |
+| [0009](./0009-harness-operations-and-gpu-allocation.md) | Separate harness operations and typed provider-specific GPU allocation |
+| [0010](./0010-experiment-completeness.md) | Frozen experiments, immutable attempts and strict completeness |
+| [0011](./0011-inventory-admission-scope.md) | Inventory admission scope and ownership-safe recovery |
+| [0012](./0012-explicit-partial-publication.md) | Explicit partial publication with frozen coverage and verified measurements |
+| [0013](./0013-cpu-partial-publication-default.md) | CPU workflow defaults to verified partial publication |
+| [0014](./0014-post-run-cleanup-recovery.md) | Append-only cleanup recovery for partial publication |
+| [0015](./0015-synthetic-headline-pair.md) | Synthetic headline selection and paired WAN directions |

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { PROVIDERS } from "@sandbox-benchmarks/schema";
 import type { CandidateRefs } from "./validate.ts";
-import { baseImageUse, candidateCreateOptions } from "./validate.ts";
+import { baseImageUse, candidateCreateOptions, candidateResolvedArtifact } from "./validate.ts";
 
 const refs: CandidateRefs = {
 	e2bTemplateCandidate: "tc-v1-candidate",
@@ -17,6 +17,16 @@ const refs: CandidateRefs = {
 };
 
 describe("candidateCreateOptions", () => {
+	it("keeps every candidate's recorded artifact adjacent to its actual boot override", () => {
+		for (const provider of PROVIDERS) {
+			const artifact = candidateResolvedArtifact(provider.id, refs);
+			expect(artifact.kind).toBe(provider.artifact.kind);
+			if (artifact.kind !== "none") {
+				expect(JSON.stringify(candidateCreateOptions(provider.id, refs))).toContain(artifact.ref);
+			}
+		}
+	});
+
 	it("points e2b at the candidate template via snapshotId", () => {
 		expect(candidateCreateOptions("e2b", refs)).toEqual({ snapshotId: "tc-v1-candidate" });
 	});
@@ -86,10 +96,7 @@ describe("candidateCreateOptions", () => {
 		});
 	});
 
-	it("points both Microsandbox backends at the same candidate OCI image", () => {
-		expect(candidateCreateOptions("microsandbox-local", refs)).toEqual({
-			templateId: "ghcr.io/o/tc:v1-candidate",
-		});
+	it("points Microsandbox Cloud at the candidate OCI image", () => {
 		expect(candidateCreateOptions("microsandbox-cloud", refs)).toEqual({
 			templateId: "ghcr.io/o/tc:v1-candidate",
 		});
@@ -100,29 +107,6 @@ describe("candidateCreateOptions", () => {
 // resolves the candidate base only when some in-scope provider reads it, and a partial promote demands
 // candidate/published identity only when some in-scope provider BAKES its artifact from the base.
 describe("baseImageUse", () => {
-	it("marks the providers that bake their own artifact from the base", () => {
-		const bakes = PROVIDERS.map((p) => p.id).filter((id) => baseImageUse(id) === "bakes");
-		expect(bakes).toEqual(["e2b", "daytona-vm", "daytona-container", "novita", "runloop"]);
-	});
-
-	it("marks the providers that boot the base image directly", () => {
-		const boots = PROVIDERS.map((p) => p.id).filter((id) => baseImageUse(id) === "boots");
-		expect(boots).toEqual([
-			"microsandbox-local",
-			"microsandbox-cloud",
-			"modal-gvisor",
-			"modal-vm",
-			"namespace",
-			"runcloud",
-		]);
-	});
-
-	// Providers that can validate without the candidate base existing at all.
-	it("marks the providers that never reference the toolchain base", () => {
-		const none = PROVIDERS.map((p) => p.id).filter((id) => baseImageUse(id) === "none");
-		expect(none).toEqual(["blaxel", "vercel"]);
-	});
-
 	// Anything that reads the base ref in candidateCreateOptions must not be classified "none", or the
 	// bake cell would skip resolving a digest that provider then boots.
 	it("agrees with candidateCreateOptions about who reads the base image ref", () => {

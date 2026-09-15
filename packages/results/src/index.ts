@@ -6,16 +6,45 @@
 // are implementation detail. This surface exposes only the entry points consumers (the CLI) need:
 // normalize a raw tree, write the Run, and summarize it.
 export { aggregateRuns } from "./lib/aggregate.ts";
+export {
+	type DatasetImpact,
+	datasetImpact,
+	type ImpactEstimate,
+	type MetricImpact,
+	renderDatasetImpact,
+} from "./lib/dataset-impact.ts";
+export type {
+	AttemptWithRun,
+	CoverageReport,
+	ExperimentAggregation,
+} from "./lib/experiment.ts";
+export {
+	aggregateExperiment,
+	describeCoverageShortfall,
+	evaluateExperiment,
+	evidenceDigest,
+	verifyCleanupRecovery,
+	verifyExperimentPlan,
+} from "./lib/experiment.ts";
 // The dataset↔figures seam: the registries the figure model is built from, the figure list the
 // Markdown links, where the charts land, the caption under each one — and the chart HTML itself. All of it pure and browser-free: `renderLeaderboardFigureHtml` builds
 // strings, and rasterising them is the CLI's job (`@sandbox-benchmarks/figures/screenshot`).
 // Public because the CLI renders through these and the artifact gate re-derives through them.
 export {
 	benchmarkDataOf,
+	comparisonFigureFile,
+	comparisonFigureNote,
+	comparisonRunLabels,
 	FIGURE_DEVICE_SCALE,
 	LEADERBOARD_FIGURE_DIR,
 	leaderboardFigures,
+	leaderboardMetricFigures,
+	metricFigureFile,
+	metricFigureModelOf,
+	metricFigureNote,
+	type RenderedComparisonFigureHtml,
 	type RenderedLeaderboardFigureHtml,
+	renderComparisonFigureHtml,
 	renderLeaderboardFigureHtml,
 	suiteFigureFile,
 	suiteFigureNote,
@@ -41,12 +70,20 @@ export {
 	// cannot write the function that builds it.
 	type LeaderboardFigure,
 	type LeaderboardMetric,
+	type LeaderboardMetricFigure,
 	type LeaderboardRow,
+	POOLED_BOARD_HEADING,
 	type ProviderRosterEntry,
 	REPO_URL,
 	renderLeaderboardMarkdown,
 	SYNTHETIC_DIMENSIONS,
 } from "./lib/leaderboard.ts";
+export {
+	type CombineDatasetsOptions,
+	combineLeaderboardDatasets,
+	type DatasetCell,
+	type LeaderboardDataset,
+} from "./lib/leaderboard-datasets.ts";
 export { type NormalizeInput, normalizeResultsTree } from "./lib/normalize-tree.ts";
 export {
 	buildObservedMixtures,
@@ -56,6 +93,12 @@ export {
 	observedMixtureIds,
 	representativeSpecs,
 } from "./lib/observed-mixtures.ts";
+// Raw PTS access for specialized reports (for example GPU profiles that intentionally sit outside the
+// cross-provider Metric Catalog). Normal benchmark normalization should keep using normalizeResultsTree.
+export { parsePtsComposite, resultSamples } from "./lib/pts.ts";
+export type { PtsComposite, PtsResult } from "./lib/pts-schema.ts";
+export { type PtsTrialEvidence, readPtsTrialEvidence } from "./lib/pts-trial-evidence.ts";
+export { rederiveRunEconomics } from "./lib/reprice.ts";
 export {
 	type CompareRunsOptions,
 	compareRuns,

@@ -1,3 +1,4 @@
+import { type } from "arktype";
 import type { Dimension } from "./metrics.ts";
 
 /**
@@ -80,6 +81,26 @@ export interface Suite {
 	/** Commands run sequentially in the repo checkout. Sandboxes run as root, so no `sudo` prefix. */
 	commands: string[];
 }
+
+/** Supported fio scenario identities, including historical direct-mode observations. */
+export const FIO_SCENARIO_METRICS: readonly string[] = [
+	"fio_type_sequential_read_engine_linux_aio_direct_yes_block_size_1mb_job_count_1_disk_target_default_test_directory_mb_per_s",
+	"fio_type_sequential_read_engine_linux_aio_direct_yes_block_size_1mb_job_count_1_disk_target_default_test_directory_iops",
+	"fio_type_sequential_write_engine_linux_aio_direct_yes_block_size_1mb_job_count_1_disk_target_default_test_directory_mb_per_s",
+	"fio_type_sequential_write_engine_linux_aio_direct_yes_block_size_1mb_job_count_1_disk_target_default_test_directory_iops",
+	"fio_type_random_read_engine_linux_aio_direct_yes_block_size_4kb_job_count_1_disk_target_default_test_directory_mb_per_s",
+	"fio_type_random_read_engine_linux_aio_direct_yes_block_size_4kb_job_count_1_disk_target_default_test_directory_iops",
+	"fio_type_random_write_engine_linux_aio_direct_yes_block_size_4kb_job_count_1_disk_target_default_test_directory_mb_per_s",
+	"fio_type_random_write_engine_linux_aio_direct_yes_block_size_4kb_job_count_1_disk_target_default_test_directory_iops",
+	"fio_type_sequential_read_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_mb_per_s",
+	"fio_type_sequential_read_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_iops",
+	"fio_type_sequential_write_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_mb_per_s",
+	"fio_type_sequential_write_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_iops",
+	"fio_type_random_read_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_mb_per_s",
+	"fio_type_random_read_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_iops",
+	"fio_type_random_write_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_mb_per_s",
+	"fio_type_random_write_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_iops",
+];
 
 /**
  * The suite registry. Suite names fan out into the in-sandbox mise tasks under
@@ -188,24 +209,10 @@ export const SUITES = {
 		dimensions: ["disk"],
 		metrics: [
 			"hardlink_bogo_ops_per_s",
-			"fio_type_sequential_read_engine_linux_aio_direct_yes_block_size_1mb_job_count_1_disk_target_default_test_directory_mb_per_s",
-			"fio_type_sequential_read_engine_linux_aio_direct_yes_block_size_1mb_job_count_1_disk_target_default_test_directory_iops",
-			"fio_type_sequential_write_engine_linux_aio_direct_yes_block_size_1mb_job_count_1_disk_target_default_test_directory_mb_per_s",
-			"fio_type_sequential_write_engine_linux_aio_direct_yes_block_size_1mb_job_count_1_disk_target_default_test_directory_iops",
-			"fio_type_random_read_engine_linux_aio_direct_yes_block_size_4kb_job_count_1_disk_target_default_test_directory_mb_per_s",
-			"fio_type_random_read_engine_linux_aio_direct_yes_block_size_4kb_job_count_1_disk_target_default_test_directory_iops",
-			"fio_type_random_write_engine_linux_aio_direct_yes_block_size_4kb_job_count_1_disk_target_default_test_directory_mb_per_s",
-			"fio_type_random_write_engine_linux_aio_direct_yes_block_size_4kb_job_count_1_disk_target_default_test_directory_iops",
-			"fio_type_sequential_read_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_mb_per_s",
-			"fio_type_sequential_read_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_iops",
-			"fio_type_sequential_write_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_mb_per_s",
-			"fio_type_sequential_write_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_iops",
-			"fio_type_random_read_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_mb_per_s",
-			"fio_type_random_read_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_iops",
-			"fio_type_random_write_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_mb_per_s",
-			"fio_type_random_write_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_iops",
+			...FIO_SCENARIO_METRICS.filter((id) => id.includes("_direct_no_")),
 		],
-		commands: ["mise run benchmark:disk:all"],
+		// One fixed mode across providers; the command and eligible metrics share a workload revision.
+		commands: ["BENCH_FIO_DIRECT=No mise run benchmark:disk:all"],
 	},
 	// The network dimension, iperf composition (benchmark:network:suite): iperf3 over localhost
 	// isolates the sandbox's network stack/virtualization overhead (virtio/KVM vs gVisor netstack vs
@@ -265,7 +272,9 @@ export const SUITES = {
 			"realworld_mastra_task_build_core",
 			"realworld_mastra_task_test_core",
 		],
-		commands: ["mise run benchmark:realworld:pts:mastra"],
+		// Test Core exceeded 1200s on Vercel, E2B and Runloop; a 2400s deadline passed
+		// the unchanged workload on all three. Set this in the guest command, not the host env.
+		commands: ["REALWORLD_TASK_TIMEOUT_SECONDS=2400 mise run benchmark:realworld:pts:mastra"],
 	},
 	// At k=1 each task case runs once (including the per-run git-clean/install resets); the command
 	// budget covers slower virtualized filesystems while the sandbox lifetime leaves setup and
@@ -303,14 +312,14 @@ export const SUITES = {
 		ptsTimesToRun: 1,
 		defaultReplicas: 12,
 		dimensions: ["realworld"],
+		// Type-aware lint preserves upstream's file sets in bounded sequential batches. The
+		// all-extension task has a new identity: its predecessor selected no channel files.
 		metrics: [
 			"realworld_openclaw_task_git_clone",
 			"realworld_openclaw_task_cold_install",
 			"realworld_openclaw_task_lint_oxlint",
-			"realworld_openclaw_task_lint_extensions",
+			"realworld_openclaw_task_lint_extensions_all",
 			"realworld_openclaw_task_typecheck",
-			"realworld_openclaw_task_shrinkwrap_check",
-			"realworld_openclaw_task_test_unit_fast",
 			"realworld_openclaw_task_test_types",
 		],
 		commands: ["mise run benchmark:realworld:pts:openclaw"],
@@ -318,10 +327,21 @@ export const SUITES = {
 } as const satisfies Record<string, Suite>;
 
 /** A registered suite name. */
+
+/** CPU matrix waves: synthetic suites finish before realworld suites start. */
+export type BenchmarkWave = "synthetic" | "realworld";
+
+export function benchmarkWave(suite: string): BenchmarkWave {
+	return suite.startsWith("realworld-") ? "realworld" : "synthetic";
+}
+
 export type SuiteName = keyof typeof SUITES;
 
 /** The known suite names. */
 export const SUITE_NAMES = Object.keys(SUITES) as SuiteName[];
+
+/** Runtime form of the canonical suite-name vocabulary. */
+export const suiteNameSchema = type.enumerated(...SUITE_NAMES);
 
 /**
  * Host-side checkout/teardown/normalization/upload allowance beyond the sandbox lifetime — what a
@@ -336,6 +356,14 @@ export const SUITE_NAMES = Object.keys(SUITES) as SuiteName[];
  * prevent.
  */
 export const WORKFLOW_TIMEOUT_MARGIN_MINUTES = 15;
+
+/**
+ * Hard ceiling for one experiment batch job: every planned batch's `budgetMinutes` and the workflow
+ * job `timeout-minutes` / `BENCH_CELL_BUDGET_MINUTES` must stay at or under this value. Owned next to
+ * {@link WORKFLOW_TIMEOUT_MARGIN_MINUTES} so planner chunking, plan verification, and the workflow
+ * drift gate share one number.
+ */
+export const BENCH_JOB_CEILING_MINUTES = 330;
 
 /**
  * The comma-padded token for one suite, e.g. `cpu-node` → `,cpu-node,`. GitHub Actions `if:`

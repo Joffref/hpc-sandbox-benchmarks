@@ -31,6 +31,31 @@ export const dimensionSchema = type.enumerated(...DIMENSIONS);
 export type Dimension = typeof dimensionSchema.infer;
 
 /**
+ * Dimensions that lead with more than one headline Metric — the editorial rule of ADR-0015. Network
+ * presents both WAN directions, because a single direction cannot represent both inbound and
+ * outbound WAN throughput. Partial on purpose: a dimension declared here before its Metrics are
+ * ported has no expectation to meet yet, and data rather than a predicate so a second multi-headline
+ * dimension is an edit to this object and not to a condition.
+ */
+const HEADLINE_COUNTS: Partial<Record<Dimension, number>> = { network: 2 };
+
+/**
+ * How many headline Metrics a Dimension is expected to carry, declared ONCE for the catalog's load
+ * check and the curation tests that all have to agree on it.
+ *
+ * It lives here, beside the Dimension vocabulary it is a property of, rather than in `catalog.ts`:
+ * the curation tests check the merged override map *without* wiring it into `METRIC_CATALOG`, and
+ * importing `catalog.ts` would run that module's construction and load checks as a side effect.
+ *
+ * It says how MANY, never which. Identity stays with the `headline: true` flags in the override map
+ * and the harness/economics registries, and the per-dimension id assertions in the catalog tests are
+ * what pin the actual counts and catch a swap WITHIN a dimension — a count never can.
+ */
+export function expectedHeadlines(dimension: Dimension): number {
+	return HEADLINE_COUNTS[dimension] ?? 1;
+}
+
+/**
  * The PTS provenance pin on a catalogued Metric. `onUndeclaredKey("reject")` because arktype keeps
  * undeclared keys by default: a typo'd pin (`scael: "MB/s"`) would otherwise validate, keep the junk
  * key, and silently degrade the entry to UNPINNED — which the matcher then resolves by description

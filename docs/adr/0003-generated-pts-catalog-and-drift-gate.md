@@ -4,6 +4,8 @@ status: accepted
 
 # Generated PTS catalog behind a drift gate
 
+The single-headline restriction for network is superseded by [ADR-0015](./0015-synthetic-headline-pair.md).
+
 ## Context
 
 Most catalogued Metrics come from the Phoronix Test Suite: their id, unit, direction, and the

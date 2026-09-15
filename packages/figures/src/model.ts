@@ -4,9 +4,11 @@
  *
  * The input is typed by `@sandbox-benchmarks/schema` — the workspace's one Run contract and
  * its metric/suite registries — so there is no parallel hand-written copy of either to drift
- * (the type-only imports cost nothing at runtime). The registries still arrive as ARGUMENTS
- * rather than being imported as values: that is what lets every test below run against a
- * synthetic run and a synthetic catalog instead of whatever the committed dataset contains.
+ * (the schema imports are type-only but for `reportedMedianOf`, which is imported as a value on
+ * purpose: passing the estimand in as an argument is what let the charts and the tables disagree).
+ * The REGISTRIES still arrive as arguments rather than being imported as values: that is what lets
+ * every test below run against a synthetic run and a synthetic catalog instead of whatever the
+ * committed dataset contains.
  *
  * This replaced a vendored copy of an upstream site's whole data layer (a hand-written
  * RunDoc shadow, a 449-line parse boundary for a document that never crosses a process
@@ -15,6 +17,7 @@
  * charts actually read; `packages/results` owns every other derivation over a Run.
  */
 import type { MetricDef, ProviderRun, Run, Suite } from "@sandbox-benchmarks/schema";
+import { reportedMedianOf } from "@sandbox-benchmarks/schema";
 import type { PhaseId } from "./phases.ts";
 import { phaseOfTask } from "./phases.ts";
 
@@ -84,7 +87,7 @@ export interface RealworldFigureModel {
  *  exactly the fields read, so the real registries satisfy it and a synthetic test registry
  *  needs no cast. */
 export interface FigureModelInput {
-	readonly run: Run;
+	readonly run: Pick<Run, "providers">;
 	/** The metric catalog — task labels come from here. */
 	readonly metrics: readonly Pick<MetricDef, "id" | "label">[];
 	/** Provider display names. String-keyed on purpose: the run side carries provider ids as
@@ -212,8 +215,7 @@ export function buildRealworldFigureModel(input: FigureModelInput): RealworldFig
 	const metricsByProvider = new Map(
 		rendered.map((p) => [p.providerId, new Map(p.metrics.map((m) => [m.metricId, m]))]),
 	);
-	const aggregatesOf = (p: ProviderRun, id: string) =>
-		metricsByProvider.get(p.providerId)?.get(id)?.aggregates;
+	const resultOf = (p: ProviderRun, id: string) => metricsByProvider.get(p.providerId)?.get(id);
 
 	const requireLabel = (id: string): string => {
 		const label = labelOf.get(id);
@@ -231,7 +233,7 @@ export function buildRealworldFigureModel(input: FigureModelInput): RealworldFig
 			// The run's own exercised task set for this suite, in the suite's canonical
 			// (execution) order — a task nobody emitted is not a column.
 			const exercised = suite.metrics.filter((id) =>
-				rendered.some((p) => aggregatesOf(p, id) !== undefined),
+				rendered.some((p) => resultOf(p, id) !== undefined),
 			);
 			const firstTask = exercised[0];
 			if (firstTask === undefined) return null;
@@ -246,9 +248,17 @@ export function buildRealworldFigureModel(input: FigureModelInput): RealworldFig
 				// understated total as if it were comparable.
 				const segments: BarSegment[] = [];
 				for (const id of exercised) {
-					const a = aggregatesOf(p, id);
-					if (a === undefined) return [];
-					segments.push({ id, phase: phaseOfTask(id), p50: a.p50, n: a.n });
+					const result = resultOf(p, id);
+					if (result === undefined) return [];
+					// Read from the result rather than patched onto a copy of its aggregates by a caller: a
+					// patched `aggregates` carries a `p50` that no longer agrees with the `mean`/`stdev`/`n`
+					// beside it, and `n` is printed in the caption.
+					segments.push({
+						id,
+						phase: phaseOfTask(id),
+						p50: reportedMedianOf(result),
+						n: result.aggregates.n,
+					});
 				}
 				return [
 					{

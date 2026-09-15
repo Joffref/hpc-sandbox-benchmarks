@@ -9,23 +9,42 @@
  */
 import { type } from "arktype";
 import { aggregatesSchema } from "./analysis.ts";
+import { effectiveArtifact, providerArtifactEvidenceSchema } from "./artifact-evidence.ts";
+import { cleanupRecoverySchema } from "./cleanup-recovery.ts";
+import { providerCostCellKey, providerCostEvidenceSchema } from "./cost-evidence.ts";
+import { runIdSchema } from "./identifiers.ts";
 import { directionSchema } from "./metrics.ts";
+import type { TargetSpec } from "./target-spec.ts";
+import { targetSpecSchema } from "./target-spec-schema.ts";
+
+export type { TargetSpec } from "./target-spec.ts";
+export { targetSpecSchema } from "./target-spec-schema.ts";
 
 /** Whether a ProviderRun carries at least one catalogued Metric (validated) or none yet (pending). */
 export const validationStatusSchema = type("'validated' | 'pending'");
 export type ValidationStatus = typeof validationStatusSchema.infer;
 
+/** PTS sample storage provenance. Value alone does not establish trial count; original execution
+ * metadata may independently prove a single trial when PTS omits RawString because raw equals final.
+ * Omitted on historical results and on measurements produced outside PTS. */
+const ptsSampleSourceSchema = type("'raw-string' | 'aggregate-value'");
+
 /**
  * One replicate sandbox's contribution to a Metric: the raw per-pass Samples that one (provider, suite)
  * replicate produced, tagged with its {@link index}. Present only on a Metric merged from ≥2 replicate
- * shards ({@link MetricResult.replicates}); the pooled `samples`/`aggregates` above stay the ranking
- * value, this is the between-sandbox breakdown the hierarchical-bootstrap inference reads.
+ * shards ({@link MetricResult.replicates}).
+ *
+ * When these are present they ARE the reported value: `reportedMedianOf` takes the median of their
+ * per-sandbox medians, one machine one vote. The pooled `samples`/`aggregates` above remain the raw
+ * evidence — and the reported value where a result has no replicates — but they are no longer the
+ * ranking statistic.
  */
 export const metricReplicateSchema = type({
 	// The replicate sandbox this slice came from (the `--replicate` index the shard was run under).
 	index: "number.integer >= 0",
 	// This replicate's retained per-pass Samples (>= 1, all finite — enforced by the parent narrow).
 	samples: "number[] >= 1",
+	"ptsSampleSource?": ptsSampleSourceSchema,
 	/**
 	 * WHICH machine and network these Samples were measured on: keys into the provider's
 	 * {@link ObservedMixtures}. Absent when that sandbox's probes disclosed nothing for the category.
@@ -59,6 +78,9 @@ export const metricResultSchema = type({
 	// was measured under, so a profile/option bump can't silently shift numbers across Runs.
 	"appVersion?": "string",
 	"arguments?": "string",
+	// Sample origin is evidence, never inferred from array length or an attempt's requested passes.
+	// With multiple sandboxes it moves to each replicate, because origins can differ between shards.
+	"ptsSampleSource?": ptsSampleSourceSchema,
 	// The per-replicate breakdown, set only when the aggregate merged ≥2 replicate sandboxes for this
 	// Metric. `samples` above is the pooled union (the ranking median is unchanged); `replicates` keeps
 	// the clusters distinct so render-time inference can resample the between-sandbox level. Absent at
@@ -103,6 +125,12 @@ export const metricResultSchema = type({
 	if (metric.aggregates.n !== metric.samples.length) {
 		return ctx.mustBe("a MetricResult whose aggregates.n equals samples.length");
 	}
+	if (metric.ptsSampleSource === "aggregate-value" && metric.samples.length !== 1) {
+		return ctx.mustBe("one aggregate Value sample when PTS trial samples are unavailable");
+	}
+	if (metric.ptsSampleSource !== undefined && (metric.derived || metric.replicates)) {
+		return ctx.mustBe("PTS sample origin on a measured metric or on its individual replicates");
+	}
 	// A derived Metric is computed from the merged measured set as a single value, so it has no
 	// per-sandbox clusters to break out — a replicate breakdown on one would claim a between-machine
 	// spread that was never measured.
@@ -136,6 +164,9 @@ export const metricResultSchema = type({
 			indices.add(replicate.index);
 			if (!replicate.samples.every((s) => Number.isFinite(s))) {
 				return ctx.mustBe("a MetricResult whose replicate samples are all finite");
+			}
+			if (replicate.ptsSampleSource === "aggregate-value" && replicate.samples.length !== 1) {
+				return ctx.mustBe("one aggregate Value sample per PTS aggregate-only replicate");
 			}
 			pooled.push(...replicate.samples);
 		}
@@ -418,13 +449,68 @@ export const observedMixturesSchema = type({
 });
 export type ObservedMixtures = typeof observedMixturesSchema.infer;
 
-/** The pinned size every provider is asked to match; compared against each provider's {@link ObservedSpecs}. */
-export const targetSpecSchema = type({
-	vcpus: "number > 0",
-	memoryGb: "number > 0",
-	"diskGb?": "number > 0",
+/**
+ * Where a Run document of this identity is written, relative to the ROOT of the tree that holds it —
+ * the CANONICAL name. It and {@link runDocumentPaths} are the one derivation both the RunIndex
+ * invariant below and the index writer read, so the two cannot drift into the disagreement that made
+ * a whole lane unwritable (a writer computing the path from the filesystem while the schema demanded
+ * a derivation).
+ *
+ * "Relative to the root", not to the index file: an index sits at the root of a tree whose Runs are
+ * under `runs/` (`data/index.json` + `data/runs/…`, `data/dataset/index.json` +
+ * `data/dataset/runs/…`), which is what makes one rule describe every index this repo writes.
+ *
+ * A per-replicate SHARD is named by the same identity its Run carries — shards of one cell share a
+ * runId and are told apart by `replicateIndex`, so the index can list all R of them instead of
+ * letting the last one to normalize overwrite its peers' entry.
+ */
+export function runDocumentPath(runId: string, replicateIndex?: number): string {
+	return `runs/${runId}${replicateIndex === undefined ? "" : `-r${replicateIndex}`}.json`;
+}
+
+/**
+ * Every name a Run document of this identity may legally carry, canonical first.
+ *
+ * A replicate-stamped Run has TWO legal names, because the harness has two lanes and they disagree
+ * on the filename by design:
+ *
+ *  - `runs/<runId>-r<idx>.json` — the fan-out lane (`bench-suite --replicates`), where R shards share
+ *    one runId inside one cell and only the suffix tells the sandboxes apart.
+ *  - `runs/<runId>.json` — the single-sandbox lane (`bench-suite --replicate <idx>`), which stamps
+ *    the index onto the Run but deliberately keeps the UN-suffixed name. That name is a downstream
+ *    contract, not an oversight: commit-dataset.yml reads it as the legacy shard shape when
+ *    re-aggregating a run whose artifacts predate the fan-out.
+ *
+ * So the filename is not a function of the identity alone, and a derivation that pretends otherwise
+ * rejects one of the two lanes outright — which is exactly how the single lane started failing after
+ * its benchmark had already succeeded. Membership in this set is the check; the ENTRY still records
+ * the name the file actually has, so an index never points at a document that isn't there.
+ *
+ * An entry with no `replicateIndex` (every promoted dataset entry) keeps exactly one legal name, so
+ * the dataset invariant — and the path guard update-leaderboard.yml re-applies to it — is unchanged.
+ */
+export function runDocumentPaths(runId: string, replicateIndex?: number): readonly string[] {
+	const canonical = runDocumentPath(runId, replicateIndex);
+	return replicateIndex === undefined ? [canonical] : [canonical, runDocumentPath(runId)];
+}
+
+/** A RunIndex entry whose path is one of the names its Run's identity allows (its id, plus the
+ *  replicate index when the entry describes one shard of a fan-out) — never a free-form path. */
+export const runIndexEntrySchema = type({
+	runId: runIdSchema,
+	generatedAt: "string.date.iso",
+	path: "string >= 1",
+	// Present only for a per-replicate shard entry, mirroring `Run.replicateIndex`. A promoted dataset
+	// Run spans every replicate and carries none, so dataset index entries are unchanged by this field.
+	"replicateIndex?": "number.integer >= 0",
+}).narrow((entry, ctx) => {
+	// Derived, never free-form: `runIdSchema` already rejects path syntax in an id and the replicate
+	// index is a non-negative integer, so no accepted name can escape `runs/` or traverse upward.
+	const allowed = runDocumentPaths(entry.runId, entry.replicateIndex);
+	if (allowed.includes(entry.path)) return true;
+	return ctx.mustBe(`a RunIndex entry whose path is ${allowed.map((p) => `"${p}"`).join(" or ")}`);
 });
-export type TargetSpec = typeof targetSpecSchema.infer;
+export type RunIndexEntry = typeof runIndexEntrySchema.infer;
 
 /**
  * What a benchmark that produced no result was: a whole suite, or one harness lifecycle operation.
@@ -594,6 +680,18 @@ export type ResultGap = typeof resultGapSchema.infer;
  */
 export const providerRunSchema = type({
 	providerId: "string",
+	/** Sandbox-scoped provider cost evidence (required by the Run v5 gate below). */
+	"costEvidence?": providerCostEvidenceSchema.array(),
+	/**
+	 * Sandbox-scoped artifact attribution — which toolchain each sandbox actually booted, and what
+	 * established that (required by the Run v6 gate below).
+	 *
+	 * An array, like `costEvidence`, because a ProviderRun can span replicate sandboxes and each
+	 * boots its own artifact. Empty means the provider never booted anything (a skip), which is a
+	 * different fact from a provider that booted something nobody observed — that one records a
+	 * `request-fallback` entry.
+	 */
+	"artifactEvidence?": providerArtifactEvidenceSchema.array(),
 	validationStatus: validationStatusSchema,
 	// Whether observed specs honored the pinned target spec; absent when probes saw too little to judge.
 	"specMatched?": "boolean",
@@ -709,7 +807,8 @@ export type ProviderRun = typeof providerRunSchema.infer;
  * gap, no uncatalogued straggler, no observed-spec reading, no host-metadata record. This is exactly
  * the shape the normalizer emits for an absent raw directory — a registered provider the run never
  * dispatched (or whose every cell was lost before reporting anything). It is deliberately stricter
- * than "no metrics": a straggler, a spec probe, or a host record IS participation evidence, and a
+ * than "no metrics": a straggler, a spec probe, a host record, or an artifact attribution IS
+ * participation evidence, and a
  * provider that reported any of them belongs in the coverage derivation, not in the absent list.
  * Consumers (the leaderboard's coverage derivation, the CLI status logs) use it to keep the pending
  * dataset row first-class while not accusing a never-dispatched provider of per-suite holes.
@@ -723,7 +822,11 @@ export function providerReportedNothing(p: ProviderRun): boolean {
 		p.gaps.length === 0 &&
 		p.uncatalogued.length === 0 &&
 		Object.keys(p.observedSpecs).length === 0 &&
-		(p.hostMetadata?.length ?? 0) === 0
+		(p.hostMetadata?.length ?? 0) === 0 &&
+		(p.costEvidence?.length ?? 0) === 0 &&
+		// A booted sandbox leaves an attribution even when it produced nothing else; counting it here
+		// keeps a provider that booted and then failed out of the never-dispatched list.
+		(p.artifactEvidence?.length ?? 0) === 0
 	);
 }
 
@@ -740,7 +843,8 @@ export function providerStatusText(p: ProviderRun): string {
 /**
  * A full benchmark Run: every provider measured against one pinned target spec at one SHA.
  *
- * `schemaVersion` accepts `"2"` through `"4"`. v1's `skips: { suite, reason }[]` could not say
+ * `schemaVersion` accepts `"2"` through `"8"`. Version 8 labels explicit partial publication and retains frozen coverage. Version 7 adds experiment plan/attempt linkage;
+ * older documents do not establish experiment completeness. v1's `skips: { suite, reason }[]` could not say
  * whether a benchmark was deliberately not run or had crashed, and carried no positive record of what
  * DID run — so a suite that vanished (job died, artifact never uploaded) left no trace anywhere in the
  * document. v2 replaced it with {@link resultGapSchema} + {@link ProviderRun.suitesCovered}. v3 adds
@@ -761,12 +865,23 @@ export function providerStatusText(p: ProviderRun): string {
  *  - Host records are folded and attributed to their machine.
  *  - Each host-hardware mixture carries its own spec verdict.
  *
+ * v5 adds the sandbox-scoped provider cost-evidence transport. Every provider row carries an array;
+ * historical versions cannot carry one, so absence in an older Run remains absence rather than a
+ * fabricated zero or backfill.
+ *
+ * v6 adds the sandbox-scoped ARTIFACT attribution beside it. The benchmark's headline claim names a
+ * toolchain, but until v6 the document retained no cell-bound artifact evidence at all. Each entry
+ * records the exact request and how the effective artifact was established
+ * ({@link ProviderArtifactEvidence}), so a reader can tell a control-plane confirmation or an in-guest
+ * fingerprint from an unobserved request fallback. Historical Runs cannot carry it, so their silence
+ * stays silence rather than being backfilled into a claim nobody made.
+ *
  * Every version validates here — already-published Runs are read unchanged, and the parser never
  * migrates them in place.
  */
 export const runSchema = type({
-	schemaVersion: "'2' | '3' | '4'",
-	runId: "string",
+	schemaVersion: "'2' | '3' | '4' | '5' | '6' | '7' | '8'",
+	runId: runIdSchema,
 	sha: "string",
 	// ISO-8601 timestamp the Run was generated at — validated so the RunIndex sort key can't be a
 	// free-form string ("tomorrow") that silently breaks newest-first ordering.
@@ -776,6 +891,39 @@ export const runSchema = type({
 	// a per-replicate shard; the aggregate reads it to key {@link MetricResult.replicates} and drops it
 	// from the merged Run (which spans every replicate). Absent on legacy shards and aggregated Runs.
 	"replicateIndex?": "number.integer >= 0",
+	"experiment?": {
+		planDigest: /^sha256:[a-f0-9]{64}$/,
+		"cohortDigest?": /^sha256:[a-f0-9]{64}$/,
+		attemptIds: "string[] >= 1",
+		"cleanupRecoveries?": cleanupRecoverySchema.array().atLeastLength(1),
+		"partial?": {
+			status: "'partial'",
+			planned: "number.integer >= 1",
+			complete: "number.integer >= 0",
+			incomplete: "number.integer >= 1",
+			excluded: "number.integer >= 0",
+			cells: type({
+				id: "string >= 1",
+				provider: "string >= 1",
+				suite: "string >= 1",
+				replicate: "number.integer >= 0",
+				"attemptId?": "string >= 1",
+				status: "'complete' | 'missing' | 'failed' | 'cancelled' | 'excluded'",
+				plannedMetrics: "string[] >= 1",
+				passes: "number.integer >= 1",
+				missingMetrics: "string[]",
+				excludedMetrics: "string[]",
+				retainedMetrics: "string[]",
+				"passShortfalls?": type({
+					providerId: "string",
+					metricId: "string",
+					source: "'raw-string' | 'single-trial-value' | 'aggregate-value' | 'unverified'",
+					"observed?": "number.integer >= 0",
+					expected: "number.integer >= 1",
+				}).array(),
+			}).array(),
+		},
+	},
 	targetSpec: targetSpecSchema,
 	providers: providerRunSchema.array(),
 }).narrow((run, ctx) => {
@@ -783,6 +931,79 @@ export const runSchema = type({
 	// v4 and beyond, so "=== '3'" would have made every version bump retroactively reject the previous
 	// version's own fields (the v4 aggregate below carries folded `replicates`).
 	const version = Number(run.schemaVersion);
+	if (version >= 7 !== (run.experiment !== undefined)) {
+		return ctx.mustBe("experiment linkage exactly on Run v7 or newer");
+	}
+	const partial = run.experiment?.partial;
+	const recoveries = run.experiment?.cleanupRecoveries;
+	if (recoveries) {
+		if (
+			!partial ||
+			new Set(recoveries.map((r) => r.attemptId)).size !== recoveries.length ||
+			recoveries.some((r) => {
+				const cell = partial.cells.find((c) => c.attemptId === r.attemptId);
+				return (
+					r.planDigest !== run.experiment?.planDigest ||
+					r.workflowRun !== run.runId ||
+					r.sourceSha !== run.sha ||
+					cell?.id !== r.cellId ||
+					cell.status !== "failed" ||
+					cell.retainedMetrics.length !== 0
+				);
+			})
+		)
+			return ctx.mustBe("cleanup recoveries linked to failed partial cells without measurements");
+	}
+	if ((version === 8) !== (partial !== undefined)) {
+		return ctx.mustBe("explicit partial coverage exactly on Run v8");
+	}
+	if (
+		run.experiment &&
+		new Set(run.experiment.attemptIds).size !== run.experiment.attemptIds.length
+	)
+		return ctx.mustBe("unique experiment attempt IDs");
+	if (partial) {
+		const cells = partial.cells;
+		if (
+			cells.length !== partial.planned ||
+			new Set(cells.map((cell) => cell.id)).size !== cells.length ||
+			cells.filter((cell) => cell.status === "complete").length !== partial.complete ||
+			cells.filter((cell) => cell.status === "excluded").length !== partial.excluded ||
+			partial.complete + partial.incomplete + partial.excluded !== partial.planned
+		)
+			return ctx.mustBe("partial coverage counts matching unique planned cells");
+		const attemptIds = cells.flatMap((cell) => (cell.attemptId ? [cell.attemptId] : []));
+		if (
+			new Set(attemptIds).size !== attemptIds.length ||
+			attemptIds.length !== run.experiment?.attemptIds.length ||
+			attemptIds.some((id) => !run.experiment?.attemptIds.includes(id))
+		)
+			return ctx.mustBe("partial coverage linked to exactly its selected attempts");
+		for (const cell of cells) {
+			const sets = [
+				cell.plannedMetrics,
+				cell.missingMetrics,
+				cell.excludedMetrics,
+				cell.retainedMetrics,
+			];
+			if (
+				sets.some((ids) => new Set(ids).size !== ids.length) ||
+				sets
+					.slice(1)
+					.flat()
+					.some((id) => !cell.plannedMetrics.includes(id)) ||
+				cell.retainedMetrics.some(
+					(id) => cell.missingMetrics.includes(id) || cell.excludedMetrics.includes(id),
+				) ||
+				(cell.retainedMetrics.length > 0 && cell.attemptId === undefined) ||
+				(cell.status === "complete" &&
+					(cell.missingMetrics.length > 0 ||
+						cell.retainedMetrics.length + cell.excludedMetrics.length !==
+							cell.plannedMetrics.length))
+			)
+				return ctx.mustBe("consistent partial metric coverage within each frozen cell");
+		}
+	}
 	// The replicate fields (`replicateIndex`, `MetricResult.replicates`) are v3-or-later, so "v2 == the
 	// pre-replicate schema" stays a real guarantee: a producer that writes a replicate field but forgets
 	// to bump schemaVersion is rejected here rather than silently read by a v3-gated consumer that then
@@ -831,6 +1052,75 @@ export const runSchema = type({
 			}
 		}
 	}
+	for (const provider of run.providers) {
+		if (version < 5 && provider.costEvidence !== undefined) {
+			return ctx.mustBe("a v5 Run when a ProviderRun carries costEvidence");
+		}
+		if (version >= 5 && provider.costEvidence === undefined) {
+			return ctx.mustBe("a v5 ProviderRun with a costEvidence array");
+		}
+		// v6 gates artifactEvidence exactly as v5 gates costEvidence: forbidden below its floor so a
+		// producer that writes the field without bumping the version is rejected here rather than read
+		// by a v6-gated consumer, and required at the floor so a v6 Run cannot omit the attribution
+		// that is the whole point of the version.
+		if (version < 6 && provider.artifactEvidence !== undefined) {
+			return ctx.mustBe("a v6 Run when a ProviderRun carries artifactEvidence");
+		}
+		if (version >= 6 && provider.artifactEvidence === undefined) {
+			return ctx.mustBe("a v6 ProviderRun with an artifactEvidence array");
+		}
+		// Presence alone was not enough: the array's own doc says empty means "never booted", and
+		// nothing held a producer to it. A Metric is a measurement taken inside a sandbox, so a v6 row
+		// carrying metrics and no attribution is exactly the unattributed measurement this version
+		// exists to make impossible — the empty array stays legal only for a row that measured nothing.
+		if (
+			version >= 6 &&
+			provider.metrics.length > 0 &&
+			(provider.artifactEvidence?.length ?? 0) === 0
+		) {
+			return ctx.mustBe(
+				"a v6 ProviderRun whose metrics carry artifact attribution (an empty artifactEvidence array claims the provider never booted)",
+			);
+		}
+		for (const evidence of provider.costEvidence ?? []) {
+			if (evidence.cell.runId !== run.runId || evidence.cell.providerId !== provider.providerId) {
+				return ctx.mustBe("cost evidence whose runId and providerId match its parent Run");
+			}
+			if (run.replicateIndex !== undefined && evidence.cell.replicateIndex !== run.replicateIndex) {
+				return ctx.mustBe("shard cost evidence whose replicateIndex matches the Run");
+			}
+		}
+		const artifactCells = new Set<string>();
+		const artifactSandboxes = new Set<string>();
+		let effectiveArtifactKey: string | undefined;
+		for (const evidence of provider.artifactEvidence ?? []) {
+			if (evidence.cell.runId !== run.runId || evidence.cell.providerId !== provider.providerId) {
+				return ctx.mustBe("artifact evidence whose runId and providerId match its parent Run");
+			}
+			if (run.replicateIndex !== undefined && evidence.cell.replicateIndex !== run.replicateIndex) {
+				return ctx.mustBe("shard artifact evidence whose replicateIndex matches the Run");
+			}
+			const cellKey = providerCostCellKey(evidence);
+			if (artifactCells.has(cellKey)) {
+				return ctx.mustBe("at most one artifact attribution for each benchmark cell");
+			}
+			artifactCells.add(cellKey);
+			if (artifactSandboxes.has(evidence.sandboxId)) {
+				return ctx.mustBe("an artifact sandbox id used by exactly one benchmark cell");
+			}
+			artifactSandboxes.add(evidence.sandboxId);
+			const artifact = effectiveArtifact(evidence.provenance);
+			// A tuple fixes comparison order even when an input JSON object listed `ref` before `kind`.
+			const currentArtifactKey = JSON.stringify([
+				artifact.kind,
+				"ref" in artifact ? artifact.ref : null,
+			]);
+			if (effectiveArtifactKey !== undefined && currentArtifactKey !== effectiveArtifactKey) {
+				return ctx.mustBe("one effective artifact across every sandbox of a provider Run");
+			}
+			effectiveArtifactKey = currentArtifactKey;
+		}
+	}
 	// `replicateIndex` marks a per-replicate SHARD (one sandbox, not yet folded); `MetricResult.replicates`
 	// marks the AGGREGATE (the fold across shards, which drops `replicateIndex`). A Run carrying both is
 	// neither — reject it here rather than leave a consumer to guess which level it is looking at.
@@ -853,13 +1143,7 @@ export type Run = typeof runSchema.infer;
  */
 export const runIndexSchema = type({
 	schemaVersion: "'1'",
-	runs: type({
-		runId: "string",
-		// ISO-8601 — the sort key for the newest-first time series, validated like runSchema's.
-		generatedAt: "string.date.iso",
-		// Path to the Run document, relative to the index file.
-		path: "string",
-	}).array(),
+	runs: runIndexEntrySchema.array(),
 }).narrow((index, ctx) => {
 	for (let i = 1; i < index.runs.length; i++) {
 		const prev = index.runs[i - 1];

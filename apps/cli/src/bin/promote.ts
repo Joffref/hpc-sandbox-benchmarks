@@ -1,14 +1,13 @@
 #!/usr/bin/env bun
 // `promote` — validate a candidate Run and publish it into the committed dataset. The promote half of
-// candidate→promote: it gates on at least one validated provider (so a partial collection with no real
-// metrics can't publish an empty run), then writes the Run into the published dataset + its index. With
-// no publish target it stays a pure validation gate (the original behavior).
+// candidate→promote: dataset writes require the original plan and attempt artifacts, and recompute
+// complete coverage independently. Without a publish target this retains legacy validation behavior.
 // Uses @actions/core for groups, annotations, and a job summary in CI.
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import * as core from "@actions/core";
-import { writeRunDocument } from "@sandbox-benchmarks/results";
+import { aggregateExperiment, evidenceDigest, writeRunDocument } from "@sandbox-benchmarks/results";
 import { parseRun } from "@sandbox-benchmarks/schema";
 import {
 	fail,
@@ -19,14 +18,22 @@ import {
 	withGroup,
 	writeJobSummary,
 } from "../lib/actions-log.ts";
+import { readExperimentAttempts, readExperimentPlan } from "../lib/experiment-artifacts.ts";
 
 if (import.meta.main) {
-	const [runFile, datasetDir] = process.argv.slice(2);
+	const args = process.argv.slice(2);
+	const allowPartial = args.includes("--allow-partial");
+	const [runFile, datasetDir, planFile, attemptsRoot] = args.filter(
+		(arg) => arg !== "--allow-partial",
+	);
 	if (!runFile) {
-		fail("usage: promote <candidateRun.json> [datasetDir]", {
-			properties: { title: "promote usage" },
-			exitCode: 2,
-		});
+		fail(
+			"usage: promote <candidateRun.json> [datasetDir plan.json attemptsRoot] [--allow-partial]",
+			{
+				properties: { title: "promote usage" },
+				exitCode: 2,
+			},
+		);
 	}
 
 	logInfo(`Promoting candidate ${runFile}`);
@@ -70,6 +77,22 @@ if (import.meta.main) {
 	let outFile = "";
 	// Publish into the committed dataset (data/dataset/runs/<id>.json + index.json), newest-first index.
 	if (datasetDir) {
+		if (!planFile || !attemptsRoot) {
+			fail(
+				"publication requires an immutable experiment plan and original attempt artifacts; historical completeness is unverified",
+			);
+		}
+		const verified = aggregateExperiment(
+			readExperimentPlan(planFile),
+			readExperimentAttempts(attemptsRoot),
+			{ allowPartial },
+		);
+		if (!verified.run) {
+			fail(`experiment is incomplete: ${JSON.stringify(verified.coverage)}`);
+		}
+		if (evidenceDigest(run) !== evidenceDigest(verified.run)) {
+			fail("candidate does not match the verified experiment attempts");
+		}
 		outFile = join(datasetDir, "runs", `${run.runId}.json`);
 		const indexFile = join(datasetDir, "index.json");
 		await withGroup(`Publish ${outFile}`, async () => {

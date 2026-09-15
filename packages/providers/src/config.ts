@@ -5,10 +5,10 @@
 // The two LEAF modules, not the `@sandbox-benchmarks/schema` barrel. Every consumer of this gatekeeper
 // pays its module init, and the barrel arktype-compiles every Run/suite/catalog schema at load — 474 ms
 // against 17 ms for these two, which carry no arktype at all. The constants are identical either way.
-import { TARGET_SPEC } from "@sandbox-benchmarks/schema/providers";
+import { bakedArtifactName, TARGET_SPEC } from "@sandbox-benchmarks/schema/providers";
 import {
-	TOOLCHAIN_IMAGE_NAME,
 	TOOLCHAIN_VERSION,
+	toolchainImageRef,
 	VERCEL_PROJECT_NAME_DEFAULT,
 	VERCEL_TEAM_SLUG_DEFAULT,
 	validateVercelVcrImageRef,
@@ -33,6 +33,7 @@ const envSchema = type({
 	"NOVITA_API_KEY?": "string >= 1",
 	"NOVITA_TEMPLATE?": "string >= 1",
 	"RUNLOOP_BLUEPRINT?": "string >= 1",
+	"TAMA_CLI?": "string >= 1",
 	"MSB_API_URL?": "string >= 1",
 	"MSB_API_KEY?": "string >= 1",
 	"VERCEL_CANDIDATE_IMAGE?": "string >= 1",
@@ -43,7 +44,17 @@ const envSchema = type({
 	"VERCEL_PROJECT_NAME?": "string >= 1",
 });
 
-const ENV_KEYS = [
+/**
+ * The keys forwarded into {@link envSchema}, and — for every OPTIONAL provider VARIABLE — the list
+ * that decides whether CI's empty-string export is absorbed here or reaches business logic raw.
+ *
+ * Exported for the drift test in index.test.ts, which is the guard this list has to earn: `TAMA_CLI`
+ * was declared in the schema registry but missing from here, so the adapter read it straight off
+ * process.env, `??` accepted CI's `""`, and every tama cell of matrix run 33712242440 died in
+ * spawn(""). The registry is the source of truth for which variables exist; this list only has to
+ * cover them.
+ */
+export const ENV_KEYS = [
 	"BENCH_TOOLCHAIN_IMAGE",
 	"E2B_TEMPLATE",
 	"DAYTONA_API_KEY",
@@ -54,6 +65,7 @@ const ENV_KEYS = [
 	"NOVITA_API_KEY",
 	"NOVITA_TEMPLATE",
 	"RUNLOOP_BLUEPRINT",
+	"TAMA_CLI",
 	"MSB_API_URL",
 	"MSB_API_KEY",
 	"VERCEL_CANDIDATE_IMAGE",
@@ -110,31 +122,23 @@ export interface MicrosandboxCloudCredentials {
 // `promote`; iteration happens against a mutable candidate (`:v1-candidate`, `…-v1-candidate`),
 // reused every build so the public registry never accumulates versions. Bumping TOOLCHAIN_VERSION
 // then yields exactly one new public version per deliberate promote.
-const imageRepo = `ghcr.io/starslingdev/${TOOLCHAIN_IMAGE_NAME}`;
-const CANDIDATE_SUFFIX = "-candidate";
-
-const toolchainImageVersion = `${imageRepo}:${TOOLCHAIN_VERSION}`;
-const toolchainImageCandidate = `${toolchainImageVersion}${CANDIDATE_SUFFIX}`;
-// Version-scope the e2b template + daytona snapshot (parity with each other): a v2 makes a new
-// named artifact instead of overwriting v1.
-const e2bTemplateVersion = `${TOOLCHAIN_IMAGE_NAME}-${TOOLCHAIN_VERSION}`;
-const e2bTemplateCandidate = `${e2bTemplateVersion}${CANDIDATE_SUFFIX}`;
-const daytonaSnapshotDefault = `${TOOLCHAIN_IMAGE_NAME}-${TOOLCHAIN_VERSION}`;
-const daytonaSnapshotCandidate = `${daytonaSnapshotDefault}${CANDIDATE_SUFFIX}`;
-// The container variant needs its OWN snapshot (a Daytona snapshot's sandbox class is fixed at bake
-// time), so it gets a distinct `-container`-suffixed name in the same version namespace.
-const daytonaContainerSnapshotDefault = `${daytonaSnapshotDefault}-container`;
-const daytonaContainerSnapshotCandidate = `${daytonaContainerSnapshotDefault}${CANDIDATE_SUFFIX}`;
-// The novita template lives on Novita's E2B-compatible control plane (a separate namespace from
-// e2b.dev), so it reuses the same version-scoped artifact name as the e2b template — aliased, not
-// recomputed, so a change to the e2b naming formula can't silently break the shared-name invariant.
-const novitaTemplateVersion = e2bTemplateVersion;
-const novitaTemplateCandidate = e2bTemplateCandidate;
-// Runloop Blueprints live in their own provider namespace, so they can share the canonical
-// version-scoped toolchain name while remaining independent from e2b/Novita templates. Reusing the
-// same candidate suffix means every provider artifact advances together when TOOLCHAIN_VERSION bumps.
-const runloopBlueprintVersion = e2bTemplateVersion;
-const runloopBlueprintCandidate = e2bTemplateCandidate;
+// The refs themselves are a toolchain-leaf projection, so the driver composition root and this
+// gatekeeper cannot disagree about where the image lives.
+const toolchainImageVersion = toolchainImageRef("version");
+const toolchainImageCandidate = toolchainImageRef("candidate");
+// Provider-side names are the artifact metadata projection from ADR-0006. Providers live in distinct
+// control-plane namespaces, so the shared canonical name is sufficient; only isolation variants that
+// share a namespace declare a suffix (daytona-container). A new baked provider gets naming for free.
+const e2bTemplateVersion = bakedArtifactName("e2b", "version");
+const e2bTemplateCandidate = bakedArtifactName("e2b", "candidate");
+const daytonaSnapshotDefault = bakedArtifactName("daytona-vm", "version");
+const daytonaSnapshotCandidate = bakedArtifactName("daytona-vm", "candidate");
+const daytonaContainerSnapshotDefault = bakedArtifactName("daytona-container", "version");
+const daytonaContainerSnapshotCandidate = bakedArtifactName("daytona-container", "candidate");
+const novitaTemplateVersion = bakedArtifactName("novita", "version");
+const novitaTemplateCandidate = bakedArtifactName("novita", "candidate");
+const runloopBlueprintVersion = bakedArtifactName("runloop", "version");
+const runloopBlueprintCandidate = bakedArtifactName("runloop", "candidate");
 // VCR refs are rooted at a human-readable Vercel namespace resolved from the environment, defaulting
 // to this repository's own team/project (schema-owned, so the build pins and the runtime agree). The
 // workflow overrides the candidate tag with the immutable fully-qualified digest after mirroring the
@@ -211,6 +215,12 @@ export const config = {
 	runloopBlueprintVersion,
 	/** Mutable candidate Runloop Blueprint name the bake creates while iterating. */
 	runloopBlueprintCandidate,
+	/** The `tama` binary the CLI-driven adapter spawns for every control-plane call; `TAMA_CLI`
+	 *  override, else the name resolved from PATH (what `.github/actions/setup-tama` installs).
+	 *  Resolved HERE rather than at the spawn site so the empty-is-unset rule above covers it — CI
+	 *  materializes the unconfigured override as `TAMA_CLI=""`, and spawning that is a TypeError, not
+	 *  a fallback to the default. */
+	tamaCli: env.TAMA_CLI ?? "tama",
 	/** Microsandbox Cloud connection. The provider gate requires the key before construction, while
 	 * the URL stays optional so the SDK can use its production default. */
 	microsandboxCloud: {

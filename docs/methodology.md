@@ -21,7 +21,7 @@ a source of truth.
 
 ## Target spec
 
-Every provider is created at one pinned [`TARGET_SPEC`](../packages/schema/src/providers.ts): **4 vCPU,
+Every provider is created at one pinned [`TARGET_SPEC`](../packages/schema/src/target-spec.ts): **4 vCPU,
 8 GiB RAM, 40 GB disk**. 8 GiB RAM fits inside every provider's reproducible envelope (E2B caps sandbox
 RAM at 8 GiB); vCPU is pinned at 4 because Blaxel couples CPU to RAM (8 GiB forces 4 vCPU there), so
 targeting 4 lets every provider — Blaxel included — match on the same shape. A provider that can't express a dimension
@@ -38,8 +38,8 @@ disk is measured in the guest and disk-gated suites skip honestly when the obser
 Results land on a closed, ordered set of [`DIMENSIONS`](../packages/schema/src/metrics.ts): `lifecycle`,
 `control-plane`, `cpu`, `disk`, `memory`, `network`, `system`, `realworld`, `economics`. Each catalogued
 [`MetricDef`](../packages/schema/src/metrics.ts) declares its `dimension`, `unit`, `direction` (HIB =
-higher-is-better, LIB = lower-is-better), and whether it `headline`s its dimension. A dimension has at
-most one headline metric (enforced at catalog load); the leaderboard ranks *every* emitted metric and
+higher-is-better, LIB = lower-is-better), and whether it `headline`s its dimension. A dimension has one headline metric, except network which has both WAN directions
+(enforced at catalog load; see ADR-0015); the leaderboard ranks *every* emitted metric and
 leads each dimension with its headline.
 
 ### How the leaderboard is laid out
@@ -51,9 +51,12 @@ order and the emphasis are editorial, and they follow this document's argument:
   *can* do; the real-world suites say what a developer or a CI job actually waits on, which is the
   question the benchmark exists to answer. That section opens with one stacked chart per repo — see
   [The realworld charts](#the-realworld-charts) — and folds its per-task tables behind a `<details>`.
-- **The synthetic microbenchmarks collapse.** `cpu`, `disk`, `memory`, `network` and `system` each load
-  one hardware axis in isolation, so their tables render inside a collapsed `<details>`. The `##`
-  heading stays outside it: a measured axis must never look like one that never ran.
+- **The synthetic microbenchmarks collapse — but each is charted too.** `cpu`, `disk`, `memory`,
+  `network` and `system` each load one hardware axis in isolation, so their tables render inside a
+  collapsed `<details>`. The `##` heading stays outside it: a measured axis must never look like one
+  that never ran. Above the collapse sits the dimension's headline metrics as ranked bar charts, and
+  every other ranked metric's chart sits beside its table inside — see
+  [The metric charts](#the-metric-charts).
 - **Everything else stays expanded.** `lifecycle` and `control-plane` are harness-measured timings of
   the provider's own API — a spawn a user waits on, not a synthetic load — and `economics` is the
   provider's published price. None is a microbenchmark, so none is hidden.
@@ -78,9 +81,13 @@ Four properties are load-bearing, and each one is a claim the picture would othe
   bar the segments must add up to the bar — that is what stacking means — so the total is arithmetic
   over the same p50s the tables below print, and no single execution ever took exactly that long. The
   caption under every chart says so.
-- **All charts share one time scale.** A second is the same length in every one of them, so the
-  repos can be read against each other. Scaling each chart to its own maximum would make unrelated
-  pictures out of one comparison.
+- **Each chart scales to its own slowest pipeline.** The slowest environment fills the track and
+  every other bar is read against it, so a fast suite is never a cluster of slivers at the left of
+  an empty track because a slower suite set the scale. The cost is that a second is NOT the same
+  length in two charts — so compare bar lengths within a chart and the printed totals across
+  charts, and the caption under every chart says so. (The charts once shared one run-wide time
+  scale; Better-Auth at a quarter of Mastra's width was unreadable, and the comparison a chart
+  exists to draw is between its own environments.)
 - **An environment is charted only if it completed EVERY task the suite exercised.** Summing the tasks a
   provider did run and drawing it beside providers that ran them all would show a fast bar for an
   environment that skipped the work — the same "a gap is not a zero" rule the tables follow.
@@ -105,6 +112,45 @@ maintainer can use for a pinned local render), rasterises every chart twice, and
 mismatch. A raster cannot be reviewed as a diff —
 which is exactly why the per-task tables stay one click below the charts as the auditable receipts.
 
+### Comparing two runs
+
+Two leaderboard renders of the same suite cannot show that everything got faster: when the
+order is unchanged and the whole distribution shifted, the two pictures look alike with different
+numbers on them. `bun apps/cli/src/bin/compare-figures.ts <runA.json> <runB.json> <out-dir>`
+draws both runs in one chart per realworld suite: each environment is a pair of stacked bars — the
+older run's faded above the newer run's, each chipped with its month — on one scale, with the
+signed change in the summed medians beside the newer total. Two rules keep it honest: the bars
+sum only the tasks **both** runs exercised (a task only one run ran is excluded from both bars
+and named in the caption, so a longer pipeline never reads as a slowdown), and an environment
+charted in only one run keeps its row with the other side disclosed. The output directory is
+the caller's — `docs/figures/` is the leaderboard's and gated to exactly what it links.
+
+### The metric charts
+
+Every synthetic metric the board ranks for at least two environments is also drawn, in the same
+style as the realworld charts, as one ranked bar chart per metric:
+
+- **The bars are the table's numbers.** Each bar is the metric's median across sandboxes — the
+  value in the table beneath it — and the whisker over it is the table's 95% cluster-bootstrap
+  interval. The chart is built from the board's rows, not from a second derivation, so chart and
+  table cannot disagree.
+- **Best first, and every environment ranked first wears the badge.** The board shares a rank
+  between environments its test could not separate; a statistical tie at the top is two badges,
+  because the chart must not invent a winner the statistics did not find.
+- **Each chart scales to its own maximum.** The units differ from metric to metric, so unlike the
+  realworld charts there is no shared scale to keep, and the caption says so. The scale is the
+  widest interval bound, capped at 15% past the largest value: one very wide interval (a bound 93×
+  its median has been published) would otherwise shrink every bar to a sliver. A whisker past the
+  cap is cut at the chart edge, and the legend discloses the cut.
+- **Environments with no result are listed under the bars** with the outcome and reason the run
+  recorded, exactly as the realworld charts disclose an incomplete pipeline. A derived metric
+  (a published price) lists none: an environment without a price is not a coverage gap.
+
+The metric charts go through the same document → Chrome → WebP pipeline as the realworld charts,
+are written to the same directory, and are gated by the same artifact test: the figure list is
+re-derived from the Run and the board, the document must link exactly that set, and every committed
+WebP must have the promised geometry.
+
 Metrics come from three sources:
 
 - **PTS-derived** — generated from vendored Phoronix Test Suite profiles (see the
@@ -119,16 +165,52 @@ Metrics come from three sources:
 
 ## Economics ($/run)
 
-The `economics` dimension is the price/performance axis. It's `derived` — computed at normalization
-from each provider's published, vetted pricing
-([`hourlyCostAtTargetSpec`](../packages/schema/src/providers.ts)) plus the runtime already on the Run:
+The `economics` dimension is exact-only. The cited registry in
+[`providers.ts`](../packages/schema/src/providers.ts) retains each official component rate, original
+vendor unit, billing basis, intrinsic quantity rule, allowances/fees, source URL, and verification
+date. A component does not store a quantity for the current benchmark shape: its vendor billing-unit
+quantity is derived from each Run's `TargetSpec` when pricing is applied. `usd_per_hour` is emitted
+only when those components form a **complete deterministic CPU-plus-memory charge** for that Run's
+requested allocation. Runtime-prorated `usd_per_lifecycle` and `usd_per_compute_run` require that same
+exact hourly denominator; a null hourly total emits none of the three metrics and never reads as zero.
 
-- `usd_per_hour` (headline) — hourly cost at the target spec; the comparison denominator.
-- `usd_per_lifecycle` — hourly cost × the summed measured lifecycle timings; emitted only when a Run
-  carries lifecycle metrics.
+This distinction keeps published-but-dynamic providers visible and auditable without ranking an
+assumption:
 
-A provider with no vetted rate emits no economics (a null rate must never read as free). Economics
-enriches a provider that already produced ≥1 measured metric — it never promotes a `pending` provider.
+- **Modal is usage-dependent.** Modal bills `max(request, usage)`. Request-equals-limit does not prove
+  the quantities Modal ultimately billed, so catalog rates remain metadata but produce no exact
+  economics rows without sandbox-scoped provider-observed usage.
+- **Blaxel and Vercel are unranked** because CPU is active-use billed. Their cited 100%-active values
+  (`$0.3312/hr` and `$0.6816/hr`) are useful references, not observed totals for I/O-heavy Runs.
+- **run.cloud is unranked** because `$0.0593784/hr` is only its reserved CPU floor plus provisioned
+  memory; CPU burst above that floor is separately metered and the historical Runs do not retain it.
+- **Microsandbox Cloud and Namespace are unranked** because the applicable total depends on plan fees,
+  included monthly pools, and prepaid/overage consumption.
+
+Provider-observed `costEvidence` is separate from catalog-derived economics. Run v5 retains one
+record per benchmark sandbox cell. `observed` means the provider hook returned a structurally valid,
+sandbox-attributed public API result after confirmed teardown; schema validation does not independently
+authenticate that external response. `missing` records why a usable result is unavailable and never
+means zero. `providerCostTotal(records, expectedCells)` produces an exact total only relative to the
+authoritative expected cells supplied by its caller: the record cells must equal that set exactly and
+all records must be observed, cell-unique, sandbox-unique, and use one currency. Modal currently records `unsupported_public_api`: its generated
+resource-usage RPC is private and is not called. run.cloud records `not_sandbox_scoped`: its public
+usage API is organization-wide cumulative usage and is not called or delta-attributed to one sandbox.
+
+Run v6 separately retains `artifactEvidence` for every benchmark sandbox cell. The host writes the
+requested provider artifact before probing the sandbox. Canonical release refs are upgraded to
+`guest-fingerprint` only after the running guest reports the expected toolchain manifest; the schema,
+not the producer, derives that expectation from the provider/artifact mapping and release constants.
+Thus matching producer-supplied claims cannot manufacture verification, a stale manifest fails before
+benchmarking, and a noncanonical override remains visible as `request-fallback` rather than being
+silently treated as verified. The record carries run, provider, suite, replicate, and sandbox identity
+through normalization and aggregation.
+
+Allowances remain metadata, never headline discounts: Daytona's first 5 GiB is a **per-sandbox disk
+allowance**, not free memory, and monthly pools cannot establish the intrinsic cost of one sandbox
+hour. Disk rates and allowances are retained where published but excluded from economics because disk
+is not a benchmark comparison axis and rates are not uniformly available. Economics enriches a
+provider only after it produced at least one measured metric, so it never promotes a pending row.
 
 ## Host vs. effective specs (the host-fingerprint caveat)
 

@@ -2,6 +2,9 @@
 // bake can validate exactly what it just built (not the public version). Kept pure + injectable so
 // it's unit-testable without the env-backed config.
 import type { ProviderId } from "@sandbox-benchmarks/schema";
+import type { DriverResolvedArtifact } from "@sandbox-benchmarks/schema/driver-schemas";
+
+export { baseImageUse } from "@sandbox-benchmarks/schema/provider-artifacts";
 
 export interface CandidateRefs {
 	e2bTemplateCandidate: string;
@@ -22,38 +25,77 @@ export interface CandidateRefs {
 	daytonaContainerTarget?: string;
 }
 
-/**
- * How a provider relates to the shared toolchain BASE image — the classification the scoped release
- * needs, kept beside {@link candidateCreateOptions} because it is the same per-provider knowledge and
- * must stay exhaustive over `ProviderId` in the same way.
- *
- *   • `bakes` — builds its own artifact FROM the base (a template, snapshot, or Runloop Blueprint), so
- *     the artifact's bytes are decided at bake time by whichever base it was handed.
- *   • `boots` — no artifact of its own; it boots the base image by ref at create time.
- *   • `none`  — never references the base at all: blaxel boots a vendor stock image, and
- *     vercel boots its own VCR mirror (staged from the base by the build phase, not by this ref).
- */
-export type BaseImageUse = "bakes" | "boots" | "none";
+interface CandidateLaunch {
+	artifact: DriverResolvedArtifact;
+	createOptions: Record<string, unknown>;
+}
 
-/** {@link BaseImageUse} for one provider. */
-export function baseImageUse(id: ProviderId): BaseImageUse {
+/** One authoritative candidate projection: the boot override and the identity it selects. */
+function candidateLaunch(id: ProviderId, refs: CandidateRefs): CandidateLaunch {
 	switch (id) {
 		case "e2b":
+			// computesdk maps snapshotId → the e2b template id/name.
+			return {
+				artifact: { kind: "baked", ref: refs.e2bTemplateCandidate },
+				createOptions: { snapshotId: refs.e2bTemplateCandidate },
+			};
 		case "daytona-vm":
+			return {
+				artifact: { kind: "baked", ref: refs.daytonaSnapshotCandidate },
+				createOptions: {
+					snapshotId: refs.daytonaSnapshotCandidate,
+					...(refs.daytonaVmTarget ? { target: refs.daytonaVmTarget } : {}),
+				},
+			};
 		case "daytona-container":
-		case "novita":
-		case "runloop":
-			return "bakes";
+			return {
+				artifact: { kind: "baked", ref: refs.daytonaContainerSnapshotCandidate },
+				createOptions: {
+					snapshotId: refs.daytonaContainerSnapshotCandidate,
+					...(refs.daytonaContainerTarget ? { target: refs.daytonaContainerTarget } : {}),
+				},
+			};
 		case "modal-gvisor":
 		case "modal-vm":
-		case "microsandbox-local":
+		// Same candidate image as modal-gvisor; the VM runtime is selected by the adapter's base
+		// createOptions (experimentalOptions:{vm_runtime:true}), which validate-run.ts preserves
+		// through the spread — so this candidate override, like modal-gvisor's, is only the templateId.
 		case "microsandbox-cloud":
-		case "namespace":
-		case "runcloud":
-			return "boots";
+			// Microsandbox Cloud consumes the shared OCI image.
+			return {
+				artifact: { kind: "image", ref: refs.toolchainImageCandidate },
+				createOptions: { templateId: refs.toolchainImageCandidate },
+			};
 		case "blaxel":
+			// Stock base image — no candidate artifact to point at.
+			return { artifact: { kind: "none" }, createOptions: {} };
+		case "novita":
+			// Same mapping as e2b (snapshotId → template name), against Novita's control plane.
+			return {
+				artifact: { kind: "baked", ref: refs.novitaTemplateCandidate },
+				createOptions: { snapshotId: refs.novitaTemplateCandidate },
+			};
+		case "runloop":
+			return {
+				artifact: { kind: "baked", ref: refs.runloopBlueprintCandidate },
+				createOptions: { blueprint_name: refs.runloopBlueprintCandidate },
+			};
+		case "namespace":
+		// No template/snapshot system — points create() at the candidate image directly, same as modal.
+		case "runcloud":
+		// The native SDK boots an arbitrary OCI image directly; there is no template to bake.
+		case "tama":
+			// `tama new --image` pulls an arbitrary OCI ref at create time, so the candidate boots the same
+			// way the published version does; there is no provider-side artifact.
+			return {
+				artifact: { kind: "image", ref: refs.toolchainImageCandidate },
+				createOptions: { image: refs.toolchainImageCandidate },
+			};
 		case "vercel":
-			return "none";
+			return {
+				artifact: { kind: "mirror", ref: refs.vercelImageCandidate },
+				createOptions: { templateId: refs.vercelImageCandidate },
+			};
 	}
 }
 
@@ -62,46 +104,13 @@ export function candidateCreateOptions(
 	id: ProviderId,
 	refs: CandidateRefs,
 ): Record<string, unknown> {
-	switch (id) {
-		case "e2b":
-			// computesdk maps snapshotId → the e2b template id/name.
-			return { snapshotId: refs.e2bTemplateCandidate };
-		case "daytona-vm":
-			return {
-				snapshotId: refs.daytonaSnapshotCandidate,
-				...(refs.daytonaVmTarget ? { target: refs.daytonaVmTarget } : {}),
-			};
-		case "daytona-container":
-			return {
-				snapshotId: refs.daytonaContainerSnapshotCandidate,
-				...(refs.daytonaContainerTarget ? { target: refs.daytonaContainerTarget } : {}),
-			};
-		case "modal-gvisor":
-			return { templateId: refs.toolchainImageCandidate };
-		case "modal-vm":
-			// Same candidate image as modal-gvisor; the VM runtime is selected by the adapter's base
-			// createOptions (experimentalOptions:{vm_runtime:true}), which validate-run.ts preserves
-			// through the spread — so this candidate override, like modal-gvisor's, is only the templateId.
-			return { templateId: refs.toolchainImageCandidate };
-		case "microsandbox-local":
-		case "microsandbox-cloud":
-			// Both backends consume the same OCI image reference; only their SDK backend differs.
-			return { templateId: refs.toolchainImageCandidate };
-		case "blaxel":
-			// Stock base image — no candidate artifact to point at.
-			return {};
-		case "novita":
-			// Same mapping as e2b (snapshotId → template name), against Novita's control plane.
-			return { snapshotId: refs.novitaTemplateCandidate };
-		case "runloop":
-			return { blueprint_name: refs.runloopBlueprintCandidate };
-		case "namespace":
-			// No template/snapshot system — points create() at the candidate image directly, same as modal.
-			return { image: refs.toolchainImageCandidate };
-		case "runcloud":
-			// The native SDK boots an arbitrary OCI image directly; there is no template to bake.
-			return { image: refs.toolchainImageCandidate };
-		case "vercel":
-			return { templateId: refs.vercelImageCandidate };
-	}
+	return candidateLaunch(id, refs).createOptions;
+}
+
+/** The exact artifact selected by {@link candidateCreateOptions}, from the same projection. */
+export function candidateResolvedArtifact(
+	id: ProviderId,
+	refs: CandidateRefs,
+): DriverResolvedArtifact {
+	return candidateLaunch(id, refs).artifact;
 }

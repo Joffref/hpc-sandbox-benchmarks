@@ -12,7 +12,12 @@
  * SDK-free: the Run model + the Catalog (for each metric's Direction) only.
  */
 import type { Direction, Run } from "@sandbox-benchmarks/schema";
-import { getMetric, isDerivedMetric, LEGACY_PROVIDER_ALIASES } from "@sandbox-benchmarks/schema";
+import {
+	getMetric,
+	isDerivedMetric,
+	LEGACY_PROVIDER_ALIASES,
+	reportedMedianOf,
+} from "@sandbox-benchmarks/schema";
 import { type } from "arktype";
 
 /** The default noise threshold (relative): movements within ±10% are treated as stable. */
@@ -55,7 +60,7 @@ export interface MetricShift {
 	providerId: string;
 	metricId: string;
 	direction: Direction;
-	/** Representative (p50) values in the previous and current Run. */
+	/** The reported value (`reportedMedianOf`) in the previous and current Run. */
 	previous: number;
 	current: number;
 	/** Signed relative change `(current - previous) / previous`; `NaN` when the pair is incomparable. */
@@ -113,8 +118,12 @@ export function compareRuns(
 				providerId: cur.providerId,
 				metricId: curMetric.metricId,
 				direction,
-				previous: prevMetric.aggregates.p50,
-				current: curMetric.aggregates.p50,
+				// The same estimand every other surface reports (`reportedMedianOf`), not the pooled
+				// percentile. Watching `aggregates.p50` here meant the drift gate compared — and
+				// thresholded on — a statistic no published surface prints: on a replicated synthetic
+				// metric the board ranks the per-sandbox median while this gate saw the pooled one.
+				previous: reportedMedianOf(prevMetric),
+				current: reportedMedianOf(curMetric),
 			};
 
 			// Apples-to-apples only when the profile version AND option arguments are unchanged.

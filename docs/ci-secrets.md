@@ -87,13 +87,23 @@ Ungated: `ci.yml`, `ci-lint.yml`, and the toolchain `pr-gate` (Docker smoke, no 
    when a matrix run's dataset commit fails (or was never reached) a maintainer can re-run it standalone:
    **Actions → Commit dataset → Run workflow**, passing the original run's id — or, from a
    gh-authenticated clone, `scripts/backfill-dataset.sh <run-id>` (a thin `gh workflow run` wrapper that
-   also warns if the run's shard artifacts have already expired). It re-downloads that run's `bench-*`
-   shard artifacts by run-id (needs `actions: read`), re-aggregates, and opens the same lint-gated
-   dataset PR — no re-benching. This only works while that run's shard artifacts are still within the
-   repo's artifact-retention window. Dispatch is still gated by Environment `privileged` (main-only,
-   required reviewer), so it is effectively maintainer-only. (`workflow_dispatch` is only offered for the
-   copy of the workflow on the default branch, so `commit-dataset.yml` must be merged to `main` before
-   it can be dispatched.)
+   also warns if the run's experiment artifacts have already expired). It re-downloads that run's
+   frozen experiment plan and attempt artifacts by run-id (needs `actions: read`), re-aggregates, and
+   opens the same lint-gated dataset PR — no re-benching. This only works while that run's artifacts
+   are still within the repo's artifact-retention window. Dispatch is still gated by Environment
+   `privileged` (main-only, required reviewer), so it is effectively maintainer-only.
+   (`workflow_dispatch` is only offered for the copy of the workflow on the default branch, so
+   `commit-dataset.yml` must be merged to `main` before it can be dispatched.)
+
+   **A run whose cells failed** fails at the Aggregate step by design (strict completeness,
+   ADR-0010) — the matrix's own publish job and a plain backfill both refuse it, and its
+   `experiment-coverage-<run-id>-attempt-<n>` artifact names every incomplete cell. To publish the
+   verified measurements anyway, backfill with the `allow_partial` input checked (or
+   `scripts/backfill-dataset.sh <run-id> --allow-partial`): the job passes the CLI's
+   `--allow-partial` to both aggregate and promote and commits a Run v8 marked
+   `experiment.partial` with every planned cell and its shortfall retained (ADR-0012). The PR and
+   squash commit are titled `(partial)`. A partial dataset is evidence, not a readiness
+   certification — re-run the matrix at the corrected revision for a complete comparison.
 
 7. **Updating the public leaderboard (github-actions bot, path-fenced).** `LEADERBOARD.md` is regenerated
    separately from the dataset commit, on a deliberate maintainer action: **Actions → Update
@@ -152,9 +162,10 @@ Ungated: `ci.yml`, `ci-lint.yml`, and the toolchain `pr-gate` (Docker smoke, no 
    public base moves:
 
    - **`providers: blaxel` is refused.** It still boots a vendor stock image, so the release lane has
-     no artifact to publish and carries no `BL_API_KEY`/`BL_WORKSPACE`. An *unscoped* release simply
-     skips it. Runloop is scopable: its protected `RUNLOOP_API_KEY` builds and validates a candidate
-     Blueprint, and a scoped Runloop dispatch is required/fail-closed.
+     no artifact a scoped backfill can publish. Generated credentials let an *unscoped* release
+     validate it best-effort, but validation alone cannot turn the stock image into a release output.
+     Runloop is scopable: its protected `RUNLOOP_API_KEY` builds and validates a candidate Blueprint,
+     and a scoped Runloop dispatch is required/fail-closed.
    - **A drifted candidate base is refused** when the scope contains a provider that bakes its artifact
      *from* the base (e2b, daytona, novita, runloop). Those providers' candidates are verified but their version
      artifacts are rebuilt, so the two are the same bytes only while `:vN-candidate` still is `:vN` —
@@ -178,14 +189,17 @@ Ungated: `ci.yml`, `ci-lint.yml`, and the toolchain `pr-gate` (Docker smoke, no 
    provider's first release. The plan's visibility guard still checks the package and warns if it is
    ever not public.
 
-> **Two approval gates per bench-matrix run.** The suite-matrix fan-out (each cell calling
-> `bench-suite.yml` with `environment: privileged`) and the `publish` job both carry the environment
-> and run sequentially. Every suite × provider cell becomes pending together the moment `plan`
-> finishes, so they surface as one batch in "Review pending deployments" and a single approval of the
-> `privileged` environment releases the whole matrix; `publish` becomes pending only after the long
-> matrix (~150 min), raising a **second** gate before the dataset is committed. A reviewer who
-> approves only the matrix and walks away leaves the run parked at `publish` until the second approval
-> lands or the protection rule times out.
+> **Approval gates per bench-matrix run: one per collection round, plus `publish`.** Every batch
+> job (each calling `bench-suite.yml` with `environment: privileged`) and the `publish` job carry the
+> environment. GitHub approves only the jobs that are pending at that moment, so the workflows are
+> shaped to make jobs pend together: a round's batch jobs are created at once (no `max-parallel`;
+> the `benchmark-account-<domain>` concurrency queue serialises them), and every account's first
+> round starts as soon as `plan` finishes, so one approval of `privileged` releases the whole first
+> wave. An account with more batches than one round holds (64, see `ROUND_BATCH_LIMIT`) raises a
+> further gate when its next round starts; `publish` becomes pending only after the last account
+> finishes, raising the final gate before the dataset is committed. A reviewer who approves only the
+> first wave and walks away leaves the run parked at the next gate until an approval lands or the
+> protection rule times out.
 
 ## Operator setup (before flipping the repo public)
 
@@ -203,26 +217,37 @@ Do this in the GitHub UI (Settings → Environments / Rules / Actions), then del
    branch dispatch still fails at the environment with *"Branch is not allowed to deploy to
    privileged"* until this list admits the branch. To use `allow_branch`, add the branch patterns you
    want to reach it — e.g. `claude/*`, or a dedicated `bench/*` prefix maintainers push validation
-   branches to. Prefer a narrow pattern over `All branches`: anyone who can push a matching branch can
+   branches to. Patterns use branch-protection syntax, where `*` does not match `/`: a bare `*` admits
+   `main`-style names only, so a `codex/…` branch needs its own entry or a `codex/*` pattern (a smoke
+   dispatch on such a branch otherwise fails in 2 s with *"not allowed to deploy to privileged"*).
+   Prefer a narrow pattern over `All branches`: anyone who can push a matching branch can
    then request a `privileged` run (a reviewer still has to approve it, and the workflows' own
    same-repo guard still excludes forks, so this widens *who can ask*, not *what runs unattended*).
    Leave the list at `main` alone if you do not want branch dispatches at all — the input is inert
    without it.
 4. Add these **environment** secrets (then delete repository-level copies if present):
 
+   <!-- >>> generated: provider-secrets — bun run generate-provider-wiring -->
    | Secret | Used by |
    | --- | --- |
-   | `E2B_API_KEY` | toolchain bake, bench matrix/smoke |
-   | `DAYTONA_API_KEY` | toolchain bake, bench matrix/smoke |
-   | `DAYTONA_TARGET` | optional; workflows default to `us-west-2` |
-   | `MODAL_TOKEN_ID` | toolchain bake, bench matrix/smoke |
-   | `MODAL_TOKEN_SECRET` | toolchain bake, bench matrix/smoke |
-   | `NOVITA_API_KEY` | optional for toolchain; bench matrix/smoke |
-   | `RUNLOOP_API_KEY` | protected toolchain Blueprint bake/promote, bench matrix/smoke |
-   | `BL_API_KEY` | bench matrix/smoke only |
-   | `BL_WORKSPACE` | bench matrix/smoke only |
-   | `MSB_API_KEY` | Microsandbox Cloud toolchain validation and bench matrix/smoke |
-   | `RUN_CLOUD_API_KEY` | optional for toolchain validation; bench matrix/smoke |
+   | `E2B_API_KEY` | E2B provider runtime and validation |
+   | `DAYTONA_API_KEY` | Daytona (VM), Daytona (container) provider runtime and validation |
+   | `BL_API_KEY` | Blaxel provider runtime and validation |
+   | `BL_WORKSPACE` | Blaxel provider runtime and validation |
+   | `MSB_API_KEY` | Microsandbox Cloud provider runtime and validation |
+   | `MODAL_TOKEN_ID` | Modal (gVisor), Modal (VM) provider runtime and validation |
+   | `MODAL_TOKEN_SECRET` | Modal (gVisor), Modal (VM) provider runtime and validation |
+   | `NOVITA_API_KEY` | Novita provider runtime and validation |
+   | `RUNLOOP_API_KEY` | Runloop provider runtime and validation |
+   | `RUN_CLOUD_API_KEY` | run.cloud provider runtime and validation |
+   | `TAMA_TOKEN` | tama provider runtime and validation |
+   <!-- <<< end generated: provider-secrets -->
+
+   Vercel bootstrap credentials are workflow infrastructure, not provider runtime inputs, so they
+   remain an explicit list:
+
+   | Secret | Used by |
+   | --- | --- |
    | `VERCEL_TOKEN` | Bootstrap only: Vercel CLI pulls a short-lived project OIDC token |
    | `VERCEL_ORG_ID` | Links the Vercel CLI to the repository's organization (`team_*`) |
    | `VERCEL_PROJECT_ID` | Links the Vercel CLI to the repository's project (`prj_*`) |
@@ -236,16 +261,28 @@ Do this in the GitHub UI (Settings → Environments / Rules / Actions), then del
    file. Toolchain jobs additionally run `vercel vcr login docker`, use `vercel vcr push docker` for
    publication, and always run `docker logout vcr.vercel.com`.
 
-   GitHub Actions **variables** (Settings → Secrets and variables → Actions → Variables), *not*
-   secrets — a team slug and a project name are not credentials, and leaving them readable in job logs
-   is what makes a mirror into the wrong namespace diagnosable:
+   Put ordinary, non-credential provider configuration in GitHub Actions **variables** (Settings →
+   Secrets and variables → Actions → Variables), *not* secrets. The generated workflow accepts the
+   legacy secret location as a migration fallback, but new configuration should use variables:
 
-   | Variable | Purpose |
-   | --- | --- |
-   | `VERCEL_TEAM_SLUG` | Vercel team slug (org) the VCR namespace is rooted at |
-   | `VERCEL_PROJECT_NAME` | Vercel project name the VCR namespace is scoped to |
+   <!-- >>> generated: provider-variables — bun run generate-provider-wiring -->
+   | Variable | Used by | Default |
+   | --- | --- | --- |
+   | `E2B_TEMPLATE` | E2B | — |
+   | `DAYTONA_TARGET` | Daytona (VM) | <code>us-west-2</code> |
+   | `DAYTONA_SNAPSHOT` | Daytona (VM) | — |
+   | `DAYTONA_CONTAINER_TARGET` | Daytona (container) | <code>us-west-2</code> |
+   | `DAYTONA_CONTAINER_SNAPSHOT` | Daytona (container) | — |
+   | `MSB_API_URL` | Microsandbox Cloud | — |
+   | `NOVITA_TEMPLATE` | Novita | — |
+   | `RUNLOOP_BLUEPRINT` | Runloop | — |
+   | `VERCEL_TEAM_SLUG` | Vercel Sandbox | — |
+   | `VERCEL_PROJECT_NAME` | Vercel Sandbox | — |
+   | `TAMA_CLI` | tama | — |
+   <!-- <<< end generated: provider-variables -->
 
-   Both are optional: unset, they fall back to `VERCEL_TEAM_SLUG_DEFAULT` /
+   Optional values with a declared provider default use it when unset. The two Vercel namespace
+   values fall back to `VERCEL_TEAM_SLUG_DEFAULT` /
    `VERCEL_PROJECT_NAME_DEFAULT` in `packages/schema/src/toolchain.ts`, which is the single place the
    default namespace is defined. Set them only to publish into a different team or project.
 
@@ -314,7 +351,7 @@ Copy [`.env.example`](../.env.example) to a gitignored `.env` and fill in the pr
 (Bun auto-loads `.env` when you run a bin). A missing credential is a skip, not a failure. Never
 commit them; never paste them into issues or pull requests. See [SECURITY.md](../SECURITY.md).
 
-`microsandbox-local` uses `MICROSANDBOX_LOCAL_BENCH=1` as an explicit capability opt-in rather than a credential. The runner must provide KVM on Linux or Hypervisor.framework on macOS. `microsandbox-cloud` needs `MSB_API_KEY`; `MSB_API_URL` is an optional endpoint override. The cloud adapter keeps the key in the SDK control-plane backend and never adds it to sandbox metadata, create-time environment variables, or guest commands.
+`microsandbox-cloud` needs `MSB_API_KEY`; `MSB_API_URL` is an optional endpoint override. The cloud adapter keeps the key in the SDK control-plane backend and never adds it to sandbox metadata, create-time environment variables, or guest commands.
 
 Runloop needs `RUNLOOP_API_KEY`. The release lane keeps it in the SDK control-plane client while
 building versioned Blueprints from digest-pinned public toolchain images; the runtime adapter boots the
@@ -324,6 +361,14 @@ the canonical version-scoped Blueprint. Runloop disk snapshots remain temporary 
 measurements; they are not release artifacts and are never selected for ordinary benchmark startup.
 
 run.cloud needs `RUN_CLOUD_API_KEY`. Its SDK reads the key directly from the benchmark process; the adapter never adds it to sandbox metadata, create-time environment variables, or guest commands.
+
+tama needs `TAMA_TOKEN`, minted with `tama tokens create`. It publishes no SDK, so the bench cell
+installs the checksum-pinned CLI (`.github/actions/setup-tama`) and the adapter drives that binary as a
+subprocess. The token is adopted into the CLI's own profile on the first control-plane call and never
+reaches sandbox metadata, create-time environment variables, or guest commands; every diagnostic that
+quotes an argument vector redacts it. A fresh runner has no profile, so the secret is what authenticates
+it — locally the adapter probes an existing `tama login` profile first and only falls back to the token,
+because `tama login --token` REPLACES the stored credential.
 
 The `tooling/repo-checks` secret-hygiene gate enforces this: it fails CI if any tracked file is a
 credential file (`.env`, `*.pem`, `id_rsa`, …) or contains a high-signal secret token.

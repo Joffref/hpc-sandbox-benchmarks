@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "bin": {
+    "bench-gpu": "./src/bin/bench-gpu.ts",
     "bench-lifecycle": "./src/bin/bench-lifecycle.ts",
     "bench-suite": "./src/bin/bench-suite.ts",
     "bench-smoke": "./src/bin/bench-smoke.ts",
@@ -17,7 +18,19 @@
     "aggregate": "./src/bin/aggregate.ts",
     "promote": "./src/bin/promote.ts",
     "stability": "./src/bin/stability.ts",
-    "leaderboard": "./src/bin/leaderboard.ts"
+    "leaderboard": "./src/bin/leaderboard.ts",
+    "compare-figures": "./src/bin/compare-figures.ts",
+    "reprice-dataset": "./src/bin/reprice-dataset.ts",
+    "driver-check": "./src/bin/driver-check.ts",
+    "plan-experiment": "./src/bin/plan-experiment.ts",
+    "evaluate-experiment": "./src/bin/evaluate-experiment.ts",
+    "aggregate-experiment": "./src/bin/aggregate-experiment.ts",
+    "workflow-experiment": "./src/bin/workflow-experiment.ts",
+    "recover-completed-create": "./src/bin/recover-completed-create.ts",
+    "recover-allocated-intent": "./src/bin/recover-allocated-intent.ts",
+    "recover-experiment-cleanup": "./src/bin/recover-experiment-cleanup.ts",
+    "audit-account-journals": "./src/bin/audit-account-journals.ts",
+    "dataset-impact": "./src/bin/dataset-impact.ts"
   },
   "scripts": {
     "test": "bun test",
@@ -26,8 +39,11 @@
     "bake": "bun src/bin/bake.ts"
   },
   "dependencies": {
+    "@actions/artifact": "6.2.1",
     "@actions/core": "1.11.1",
     "@sandbox-benchmarks/schema": "workspace:*",
+    "@sandbox-benchmarks/driver": "workspace:*",
+    "@sandbox-benchmarks/drivers": "workspace:*",
     "@sandbox-benchmarks/providers": "workspace:*",
     "@sandbox-benchmarks/templates": "workspace:*",
     "@sandbox-benchmarks/harness": "workspace:*",
@@ -36,12 +52,16 @@
     "@daytona/api-client": "catalog:computesdk",
     "@daytona/sdk": "catalog:computesdk",
     "@runloop/api-client": "catalog:computesdk",
+    "modal": "catalog:computesdk",
     "novita-sandbox": "catalog:computesdk",
-    "dotenv": "catalog:"
+    "dotenv": "catalog:",
+    "@sandbox-benchmarks/modal": "workspace:*",
+    "arktype": "catalog:"
   },
   "devDependencies": {
     "@repo/tsconfig": "workspace:*",
     "typescript": "catalog:",
-    "@types/bun": "catalog:"
+    "@types/bun": "catalog:",
+    "@sandbox-benchmarks/e2b": "workspace:*"
   }
 }

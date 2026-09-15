@@ -20096,7 +20096,7 @@ const chunk5: MetricDef[] = [
 		headline: false,
 		label: "iPerf WAN - Direction: Download",
 		description:
-			"Measures sustained WAN TCP throughput with iperf3 against the closest reachable server from a curated public list (servers.json, committed with this profile). The runner probes TCP-connect RTT to every listed server at run time, picks the lowest-RTT reachable non-backup server, retries across its port range on single-client busy collisions, and records the chosen server per trial as provenance. Eight parallel streams so high bandwidth-delay-product paths are not understated by a single TCP congestion window; the reported figure is receiver-side goodput.",
+			"This test measures sustained WAN TCP throughput with iperf3 against an RTT-ranked reachable server from a curated public list, chosen per run by RTT probe. It uses eight parallel streams so that high bandwidth-delay-product paths are not understated, and reports receiver-side goodput.",
 		pts: { test: "local/iperf-wan", description: "Direction: Download" },
 		sourceUrl: "https://software.es.net/iperf/",
 	},
@@ -20108,7 +20108,7 @@ const chunk5: MetricDef[] = [
 		headline: false,
 		label: "iPerf WAN - Direction: Upload",
 		description:
-			"Measures sustained WAN TCP throughput with iperf3 against the closest reachable server from a curated public list (servers.json, committed with this profile). The runner probes TCP-connect RTT to every listed server at run time, picks the lowest-RTT reachable non-backup server, retries across its port range on single-client busy collisions, and records the chosen server per trial as provenance. Eight parallel streams so high bandwidth-delay-product paths are not understated by a single TCP congestion window; the reported figure is receiver-side goodput.",
+			"This test measures sustained WAN TCP throughput with iperf3 against an RTT-ranked reachable server from a curated public list, chosen per run by RTT probe. It uses eight parallel streams so that high bandwidth-delay-product paths are not understated, and reports receiver-side goodput.",
 		pts: { test: "local/iperf-wan", description: "Direction: Upload" },
 		sourceUrl: "https://software.es.net/iperf/",
 	},
@@ -22716,7 +22716,7 @@ const chunk6: MetricDef[] = [
 		headline: false,
 		label: "OpenClaw CI Tasks - Task: Cold Install",
 		description:
-			"Runs the CI tasks openclaw/openclaw's own pipeline runs -- clone, cold install (its exact CI invocation), lint (Oxlint), extension-channel lint (type-aware Oxlint), typecheck (tsgo), shrinkwrap check, fast unit tests, test-tree typecheck (tsgo) -- against a pinned main-HEAD checkout, timing each phase per sandbox provider.",
+			"Runs pinned OpenClaw developer workloads -- clone, cold install (its exact CI invocation), full and all-extension type-aware Oxlint in bounded batches preserving upstream file selection and rules, typecheck (tsgo), and test-tree typecheck (tsgo) -- timing each phase per sandbox provider.",
 		pts: { test: "local/realworld-openclaw", description: "Task: Cold Install" },
 		sourceUrl: "https://github.com/openclaw/openclaw",
 	},
@@ -22728,20 +22728,20 @@ const chunk6: MetricDef[] = [
 		headline: false,
 		label: "OpenClaw CI Tasks - Task: Git Clone",
 		description:
-			"Runs the CI tasks openclaw/openclaw's own pipeline runs -- clone, cold install (its exact CI invocation), lint (Oxlint), extension-channel lint (type-aware Oxlint), typecheck (tsgo), shrinkwrap check, fast unit tests, test-tree typecheck (tsgo) -- against a pinned main-HEAD checkout, timing each phase per sandbox provider.",
+			"Runs pinned OpenClaw developer workloads -- clone, cold install (its exact CI invocation), full and all-extension type-aware Oxlint in bounded batches preserving upstream file selection and rules, typecheck (tsgo), and test-tree typecheck (tsgo) -- timing each phase per sandbox provider.",
 		pts: { test: "local/realworld-openclaw", description: "Task: Git Clone" },
 		sourceUrl: "https://github.com/openclaw/openclaw",
 	},
 	{
-		id: "realworld_openclaw_task_lint_extensions",
+		id: "realworld_openclaw_task_lint_extensions_all",
 		dimension: "system",
 		unit: "Seconds",
 		direction: "LIB",
 		headline: false,
-		label: "OpenClaw CI Tasks - Task: Lint Extensions",
+		label: "OpenClaw CI Tasks - Task: Lint Extensions All",
 		description:
-			"Runs the CI tasks openclaw/openclaw's own pipeline runs -- clone, cold install (its exact CI invocation), lint (Oxlint), extension-channel lint (type-aware Oxlint), typecheck (tsgo), shrinkwrap check, fast unit tests, test-tree typecheck (tsgo) -- against a pinned main-HEAD checkout, timing each phase per sandbox provider.",
-		pts: { test: "local/realworld-openclaw", description: "Task: Lint Extensions" },
+			"Runs pinned OpenClaw developer workloads -- clone, cold install (its exact CI invocation), full and all-extension type-aware Oxlint in bounded batches preserving upstream file selection and rules, typecheck (tsgo), and test-tree typecheck (tsgo) -- timing each phase per sandbox provider.",
+		pts: { test: "local/realworld-openclaw", description: "Task: Lint Extensions All" },
 		sourceUrl: "https://github.com/openclaw/openclaw",
 	},
 	{
@@ -22752,20 +22752,8 @@ const chunk6: MetricDef[] = [
 		headline: false,
 		label: "OpenClaw CI Tasks - Task: Lint Oxlint",
 		description:
-			"Runs the CI tasks openclaw/openclaw's own pipeline runs -- clone, cold install (its exact CI invocation), lint (Oxlint), extension-channel lint (type-aware Oxlint), typecheck (tsgo), shrinkwrap check, fast unit tests, test-tree typecheck (tsgo) -- against a pinned main-HEAD checkout, timing each phase per sandbox provider.",
+			"Runs pinned OpenClaw developer workloads -- clone, cold install (its exact CI invocation), full and all-extension type-aware Oxlint in bounded batches preserving upstream file selection and rules, typecheck (tsgo), and test-tree typecheck (tsgo) -- timing each phase per sandbox provider.",
 		pts: { test: "local/realworld-openclaw", description: "Task: Lint Oxlint" },
-		sourceUrl: "https://github.com/openclaw/openclaw",
-	},
-	{
-		id: "realworld_openclaw_task_shrinkwrap_check",
-		dimension: "system",
-		unit: "Seconds",
-		direction: "LIB",
-		headline: false,
-		label: "OpenClaw CI Tasks - Task: Shrinkwrap Check",
-		description:
-			"Runs the CI tasks openclaw/openclaw's own pipeline runs -- clone, cold install (its exact CI invocation), lint (Oxlint), extension-channel lint (type-aware Oxlint), typecheck (tsgo), shrinkwrap check, fast unit tests, test-tree typecheck (tsgo) -- against a pinned main-HEAD checkout, timing each phase per sandbox provider.",
-		pts: { test: "local/realworld-openclaw", description: "Task: Shrinkwrap Check" },
 		sourceUrl: "https://github.com/openclaw/openclaw",
 	},
 	{
@@ -22776,20 +22764,8 @@ const chunk6: MetricDef[] = [
 		headline: false,
 		label: "OpenClaw CI Tasks - Task: Test Types",
 		description:
-			"Runs the CI tasks openclaw/openclaw's own pipeline runs -- clone, cold install (its exact CI invocation), lint (Oxlint), extension-channel lint (type-aware Oxlint), typecheck (tsgo), shrinkwrap check, fast unit tests, test-tree typecheck (tsgo) -- against a pinned main-HEAD checkout, timing each phase per sandbox provider.",
+			"Runs pinned OpenClaw developer workloads -- clone, cold install (its exact CI invocation), full and all-extension type-aware Oxlint in bounded batches preserving upstream file selection and rules, typecheck (tsgo), and test-tree typecheck (tsgo) -- timing each phase per sandbox provider.",
 		pts: { test: "local/realworld-openclaw", description: "Task: Test Types" },
-		sourceUrl: "https://github.com/openclaw/openclaw",
-	},
-	{
-		id: "realworld_openclaw_task_test_unit_fast",
-		dimension: "system",
-		unit: "Seconds",
-		direction: "LIB",
-		headline: false,
-		label: "OpenClaw CI Tasks - Task: Test Unit Fast",
-		description:
-			"Runs the CI tasks openclaw/openclaw's own pipeline runs -- clone, cold install (its exact CI invocation), lint (Oxlint), extension-channel lint (type-aware Oxlint), typecheck (tsgo), shrinkwrap check, fast unit tests, test-tree typecheck (tsgo) -- against a pinned main-HEAD checkout, timing each phase per sandbox provider.",
-		pts: { test: "local/realworld-openclaw", description: "Task: Test Unit Fast" },
 		sourceUrl: "https://github.com/openclaw/openclaw",
 	},
 	{
@@ -22800,7 +22776,7 @@ const chunk6: MetricDef[] = [
 		headline: false,
 		label: "OpenClaw CI Tasks - Task: Typecheck",
 		description:
-			"Runs the CI tasks openclaw/openclaw's own pipeline runs -- clone, cold install (its exact CI invocation), lint (Oxlint), extension-channel lint (type-aware Oxlint), typecheck (tsgo), shrinkwrap check, fast unit tests, test-tree typecheck (tsgo) -- against a pinned main-HEAD checkout, timing each phase per sandbox provider.",
+			"Runs pinned OpenClaw developer workloads -- clone, cold install (its exact CI invocation), full and all-extension type-aware Oxlint in bounded batches preserving upstream file selection and rules, typecheck (tsgo), and test-tree typecheck (tsgo) -- timing each phase per sandbox provider.",
 		pts: { test: "local/realworld-openclaw", description: "Task: Typecheck" },
 		sourceUrl: "https://github.com/openclaw/openclaw",
 	},

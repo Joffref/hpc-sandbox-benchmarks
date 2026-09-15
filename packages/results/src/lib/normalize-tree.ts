@@ -4,7 +4,16 @@
  * validated against the shared schema before it leaves this module — validation happens at the
  * producer boundary, so no malformed Run can reach a consumer. SDK-free — filesystem + schema only.
  */
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import {
+	closeSync,
+	constants,
+	fstatSync,
+	openSync,
+	readdirSync,
+	readFileSync,
+	readSync,
+	statSync,
+} from "node:fs";
 import { join } from "node:path";
 import type {
 	GapCause,
@@ -12,6 +21,8 @@ import type {
 	MetricResult,
 	ObservedSpecs,
 	OffDimensionEmission,
+	ProviderArtifactEvidence,
+	ProviderCostEvidence,
 	ProviderRun,
 	ResultGap,
 	Run,
@@ -19,13 +30,22 @@ import type {
 } from "@sandbox-benchmarks/schema";
 import {
 	aggregate,
+	canonicalJsonEqual,
 	deriveEconomics,
 	describeOffDimensionEmission,
+	FIO_SCENARIO_METRICS,
 	getProvider,
+	MAX_PROVIDER_ARTIFACT_EVIDENCE_FILE_BYTES,
+	MAX_PROVIDER_COST_EVIDENCE_FILE_BYTES,
 	METRIC_CATALOG,
 	offDimensionEmissions,
 	PROVIDERS,
+	parseProviderArtifactEvidence,
+	parseProviderCostEvidence,
 	parseRun,
+	providerArtifactEvidenceFile,
+	providerCostCellKey,
+	providerCostEvidenceFile,
 	SUITE_NAMES,
 	SUITES,
 	TARGET_SPEC,
@@ -34,6 +54,32 @@ import type { AttemptedEmptyResult, SampleContribution } from "./extract.ts";
 import { extractProviderDir } from "./extract.ts";
 import { readHostMetadata } from "./host-metadata.ts";
 import { computeSpecMatched, readObservedSpecs } from "./specs.ts";
+
+/** Read max+1 bytes from one descriptor, avoiding both unbounded allocation and stat/read races. */
+function readEvidenceFile(path: string, maximumBytes: number): string {
+	const descriptor = openSync(
+		path,
+		constants.O_RDONLY | constants.O_NONBLOCK | (constants.O_NOFOLLOW ?? 0),
+	);
+	try {
+		if (!fstatSync(descriptor).isFile()) {
+			throw new Error("evidence path is not a regular file");
+		}
+		const buffer = new Uint8Array(maximumBytes + 1);
+		let length = 0;
+		while (length < buffer.byteLength) {
+			const count = readSync(descriptor, buffer, length, buffer.byteLength - length, null);
+			if (count === 0) break;
+			length += count;
+		}
+		if (length > maximumBytes) {
+			throw new Error(`evidence file exceeds ${maximumBytes / 1024} KiB`);
+		}
+		return new TextDecoder().decode(buffer.subarray(0, length));
+	} finally {
+		closeSync(descriptor);
+	}
+}
 
 export interface NormalizeInput {
 	rawRoot: string;
@@ -54,11 +100,12 @@ export function normalizeResultsTree(input: NormalizeInput): Run {
 		.map((meta) => normalizeProviderDir(input.rawRoot, meta.id));
 
 	const candidate = {
-		// Pinned at 4 because this function stamps a structured `cause` on suite gaps
-		// (`shortfallCause`/`twinDropCause`), which `runSchema` gates at v4-or-later — lowering this while
+		// Run v6 carries cost and artifact evidence on every provider row. This function also stamps
+		// structured suite-gap causes (`shortfallCause`/`twinDropCause`), which `runSchema` gates at
+		// v4-or-later — lowering this while
 		// still emitting causes fails `parseRun`. A shard may also carry a replicateIndex (v3+) the
 		// aggregate folds into MetricResult.replicates.
-		schemaVersion: "4" as const,
+		schemaVersion: "6" as const,
 		runId: input.runId,
 		sha: input.sha,
 		generatedAt: input.generatedAt,
@@ -236,6 +283,8 @@ export function normalizeProviderDir(rawRoot: string, providerId: string): Provi
 		// slice; `buildLeaderboard` derives the missing-suite gaps across providers.
 		return {
 			providerId,
+			costEvidence: [],
+			artifactEvidence: [],
 			validationStatus: "pending",
 			observedSpecs: {},
 			metrics: [],
@@ -277,6 +326,8 @@ export function normalizeProviderDir(rawRoot: string, providerId: string): Provi
 	const suitesCovered = new Set<string>();
 	const offDimension: OffDimensionEmission[] = [];
 	const hostMetadata: HostMetadataRecord[] = [];
+	const costEvidence: ProviderCostEvidence[] = [];
+	const artifactEvidence: ProviderArtifactEvidence[] = [];
 	// Host fingerprint from a composite's <System>, first non-empty across the read order (all suites of
 	// one provider ran on the same machine). Merged UNDER the spec probe below so the probe always wins.
 	let systemHost: ObservedSpecs | undefined;
@@ -295,6 +346,51 @@ export function normalizeProviderDir(rawRoot: string, providerId: string): Provi
 	const suiteTwinDrops = new Map<string, DroppedTwinResult[]>();
 
 	for (const suite of suiteDirs) {
+		const artifactPath = join(dir, suite, providerArtifactEvidenceFile());
+		try {
+			const evidence = parseProviderArtifactEvidence(
+				readEvidenceFile(artifactPath, MAX_PROVIDER_ARTIFACT_EVIDENCE_FILE_BYTES),
+			);
+			if (evidence.cell.providerId !== providerId || evidence.cell.suite !== suite) {
+				throw new Error(
+					`artifact evidence identity mismatch: expected ${providerId}/${suite}, got ${evidence.cell.providerId}/${evidence.cell.suite}`,
+				);
+			}
+			const duplicate = artifactEvidence.find(
+				(record) => providerCostCellKey(record) === providerCostCellKey(evidence),
+			);
+			if (duplicate !== undefined) {
+				if (!canonicalJsonEqual(duplicate, evidence)) {
+					throw new Error(`conflicting artifact evidence for ${providerId}/${suite}`);
+				}
+			} else {
+				artifactEvidence.push(evidence);
+			}
+		} catch (err) {
+			if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
+				throw new Error(
+					`invalid ${providerId}/${suite}/${providerArtifactEvidenceFile()}: ${err instanceof Error ? err.message : String(err)}`,
+				);
+			}
+		}
+		const evidencePath = join(dir, suite, providerCostEvidenceFile());
+		try {
+			const evidence = parseProviderCostEvidence(
+				readEvidenceFile(evidencePath, MAX_PROVIDER_COST_EVIDENCE_FILE_BYTES),
+			);
+			if (evidence.cell.providerId !== providerId || evidence.cell.suite !== suite) {
+				throw new Error(
+					`cost evidence identity mismatch: expected ${providerId}/${suite}, got ${evidence.cell.providerId}/${evidence.cell.suite}`,
+				);
+			}
+			costEvidence.push(evidence);
+		} catch (err) {
+			if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
+				throw new Error(
+					`invalid ${providerId}/${suite}/${providerCostEvidenceFile()}: ${err instanceof Error ? err.message : String(err)}`,
+				);
+			}
+		}
 		const ext = extractProviderDir(join(dir, suite), providerId);
 		for (const record of readHostMetadata(join(dir, suite))) {
 			hostMetadata.push({ ...record, sourceFile: `${suite}/${record.sourceFile}` });
@@ -341,7 +437,10 @@ export function normalizeProviderDir(rawRoot: string, providerId: string): Provi
 		// the gap reason is byte-stable.
 		const produced = new Set(ext.contributions.map((c) => c.metricId));
 		const declared = new Set<string>(
-			(SUITES as Partial<Record<string, { metrics: readonly string[] }>>)[suite]?.metrics ?? [],
+			suite === "disk"
+				? [...SUITES.disk.metrics, ...FIO_SCENARIO_METRICS]
+				: ((SUITES as Partial<Record<string, { metrics: readonly string[] }>>)[suite]?.metrics ??
+						[]),
 		);
 		const missingById = new Map<string, AttemptedEmptyResult>();
 		for (const e of ext.attemptedEmpty) {
@@ -505,10 +604,7 @@ export function normalizeProviderDir(rawRoot: string, providerId: string): Provi
 	// landed in both pts_git.xml and pts_compress_zstd.xml). Pooling the samples would inflate n and
 	// distort the stddev, so drop the later copy and warn — louder when the samples diverge, which
 	// signals genuine result-name contamination rather than a benign rewrite.
-	const merged = new Map<
-		string,
-		{ samples: number[]; sourceFile: string; appVersion?: string; arguments?: string }
-	>();
+	const merged = new Map<string, SampleContribution>();
 	for (const contribution of contributions) {
 		const existing = merged.get(contribution.metricId);
 		if (existing) {
@@ -523,10 +619,8 @@ export function normalizeProviderDir(rawRoot: string, providerId: string): Provi
 			continue;
 		}
 		merged.set(contribution.metricId, {
+			...contribution,
 			samples: [...contribution.samples],
-			sourceFile: contribution.sourceFile,
-			appVersion: contribution.appVersion,
-			arguments: contribution.arguments,
 		});
 	}
 	const metrics: MetricResult[] = [...merged.entries()]
@@ -534,11 +628,12 @@ export function normalizeProviderDir(rawRoot: string, providerId: string): Provi
 		// longer emits empty-sample contributions, but guard here too so a zero-sample metric is
 		// dropped rather than throwing out of aggregate() before parseRun's try/catch can frame it.
 		.filter(([, { samples }]) => samples.length > 0)
-		.map(([metricId, { samples, sourceFile, appVersion, arguments: args }]) => ({
+		.map(([metricId, { samples, sourceFile, appVersion, arguments: args, ptsSampleSource }]) => ({
 			metricId,
 			samples,
 			aggregates: aggregate(samples),
 			sourceFile,
+			...(ptsSampleSource !== undefined ? { ptsSampleSource } : {}),
 			...(appVersion !== undefined ? { appVersion } : {}),
 			...(args !== undefined ? { arguments: args } : {}),
 		}))
@@ -592,6 +687,8 @@ export function normalizeProviderDir(rawRoot: string, providerId: string): Provi
 
 	return {
 		providerId,
+		costEvidence,
+		artifactEvidence,
 		// A provider is validated exactly when it produced ≥1 catalogued Metric.
 		validationStatus: metrics.length > 0 ? "validated" : "pending",
 		...(specMatched !== undefined ? { specMatched } : {}),

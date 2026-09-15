@@ -233,12 +233,27 @@ describe("Vercel CLI authentication", () => {
 });
 
 describe("Namespace token authentication", () => {
+	test("all managed lanes share one producer id and output contract", () => {
+		const root = findRepoRoot();
+		const workflowText = ["bench-suite.yml", "toolchain-image.yml"]
+			.map((file) => readFileSync(join(root, WORKFLOWS_DIR, file), "utf8"))
+			.join("\n");
+		expect(workflowText.match(/uses: \.\/\.github\/actions\/namespace-token/g)).toHaveLength(3);
+		expect(workflowText.match(/id: namespace/g)).toHaveLength(3);
+		expect(
+			workflowText.match(/NSC_TOKEN_FILE: \$\{\{ steps\.namespace\.outputs\.token-file \}\}/g),
+		).toHaveLength(4);
+		expect(workflowText).not.toContain("id: nsc-token");
+		expect(workflowText).not.toContain("id: nsc-setup");
+		expect(workflowText).not.toMatch(/run: \|\s*\n\s*nsc token create/);
+	});
+
 	test("the composite explicitly bounds each minted token to the benchmark cell window", () => {
 		const action = readFileSync(
 			join(findRepoRoot(), ".github/actions/namespace-token/action.yml"),
 			"utf8",
 		);
-		expect(action).toContain("--expires_in 4h");
+		expect(action).toContain("--expires_in 6h");
 		expect(action).not.toContain("--no_expiry");
 	});
 });
@@ -594,14 +609,17 @@ describe("checkToolchainPrScope", () => {
 		paths = TOOLCHAIN_ACTION_SMOKE_PR_PATHS,
 		buildx = "true",
 		summaryIf = "always()",
-		run = `test "$(bun --version)" = "1.3.14"
+		run = `test "$(bun --version)" = "1.4.0"
+test "$(tama --version | awk '{print $2}')" = "0.1.17"
 bun packages/templates/src/pins.ts >/dev/null
 docker buildx inspect --bootstrap`,
+		tama = true,
 	}: {
 		paths?: readonly string[];
 		buildx?: string;
 		summaryIf?: string;
 		run?: string;
+		tama?: boolean;
 	} = {}) => ({
 		on: { pull_request: { paths: [...paths] } },
 		jobs: {
@@ -611,6 +629,7 @@ docker buildx inspect --bootstrap`,
 				"timeout-minutes": 5,
 				steps: [
 					{ uses: "./.github/actions/setup-toolchain", with: { buildx } },
+					...(tama ? [{ uses: "./.github/actions/setup-tama" }] : []),
 					{ run },
 					{ uses: "./.github/actions/release-summary", if: summaryIf },
 				],
@@ -642,11 +661,19 @@ docker buildx inspect --bootstrap`,
 		);
 		const errors = checkToolchainPrScope(
 			imageDoc(),
-			actionSmokeDoc({ paths, buildx: "false", summaryIf: "success()", run: "bun --version" }),
+			actionSmokeDoc({
+				paths,
+				buildx: "false",
+				summaryIf: "success()",
+				run: "bun --version",
+				tama: false,
+			}),
 		);
 		expect(errors.some((error) => error.includes("setup-workspace/**"))).toBe(true);
 		expect(errors.some((error) => error.includes('buildx: "true"'))).toBe(true);
 		expect(errors.some((error) => error.includes("if: always()"))).toBe(true);
+		expect(errors.some((error) => error.includes("setup-tama"))).toBe(true);
+		expect(errors.some((error) => error.includes("tama --version"))).toBe(true);
 		expect(errors.some((error) => error.includes("packages/templates/src/pins.ts"))).toBe(true);
 		expect(errors.some((error) => error.includes("docker buildx inspect --bootstrap"))).toBe(true);
 	});

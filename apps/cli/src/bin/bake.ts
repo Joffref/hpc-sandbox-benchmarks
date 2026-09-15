@@ -9,61 +9,27 @@
 // The provider loop + skip-vs-fail contract is shared with bench-smoke/promote (providers-run.ts);
 // the boot+smoke lifecycle (probe results captured before teardown) is shared too (smoke-run.ts).
 import { writeFileSync } from "node:fs";
-import { requiredProviders, unmetRequirements } from "@sandbox-benchmarks/harness";
-import type { ProviderConfig } from "@sandbox-benchmarks/providers";
+import {
+	exitAfterSandboxCleanup,
+	requiredProviders,
+	unmetRequirements,
+} from "@sandbox-benchmarks/harness";
 import { config } from "@sandbox-benchmarks/providers";
 import type { ProviderId } from "@sandbox-benchmarks/schema";
 import { PROVIDERS } from "@sandbox-benchmarks/schema";
-import { bakeDaytonaContainerSnapshot, bakeDaytonaVmSnapshot } from "../lib/bake/daytona.ts";
-import { bakeE2bTemplate } from "../lib/bake/e2b.ts";
 import { buildAndPushCandidate, resolveImageDigestRef } from "../lib/bake/image.ts";
-import { bakeModalImage } from "../lib/bake/modal.ts";
-import { bakeNovitaTemplate } from "../lib/bake/novita.ts";
 import { promoteAll } from "../lib/bake/promote.ts";
-import { bakeRunloopBlueprint } from "../lib/bake/runloop.ts";
+import {
+	buildBakedProviderArtifact,
+	isBakedProviderId,
+	nonBakedArtifactAction,
+} from "../lib/bake/provider-artifacts.ts";
 import type { BakeReport, Log } from "../lib/bake/types.ts";
-import { baseImageUse, candidateCreateOptions } from "../lib/bake/validate.ts";
+import { baseImageUse } from "../lib/bake/validate.ts";
+import { bootAndSmokeCandidate } from "../lib/bake/validate-run.ts";
 import { isPartialScope, selectProviders } from "../lib/matrix.ts";
 import { anyFailed, forEachProviderWithCreds } from "../lib/providers-run.ts";
-import { bootAndSmoke, logChecks, smokeFailureReason, smokeOk } from "../lib/smoke-run.ts";
-
-// Each provider's candidate bake, bound to the candidate artifact name but NOT the mutable image
-// tag. The caller resolves that tag once and passes the same immutable digest to every baker.
-const bakers: Record<ProviderId, (image: string, log: Log) => Promise<void>> = {
-	e2b: (image, log) => bakeE2bTemplate(config.e2bTemplateCandidate, image, log),
-	"daytona-vm": (image, log) => bakeDaytonaVmSnapshot(config.daytonaSnapshotCandidate, image, log),
-	"daytona-container": (image, log) =>
-		bakeDaytonaContainerSnapshot(config.daytonaContainerSnapshotCandidate, image, log),
-	// Both Modal variants boot the same pushed image via Image.fromRegistry — no per-variant artifact.
-	"modal-gvisor": bakeModalImage,
-	"modal-vm": bakeModalImage,
-	// Both Microsandbox variants boot the candidate OCI image directly. Local and cloud remain separate
-	// validation cells because they exercise different control planes and virtualization hosts.
-	"microsandbox-local": async (_image, log) => {
-		log("microsandbox-local boots the candidate image directly — no candidate artifact to bake");
-	},
-	"microsandbox-cloud": async (_image, log) => {
-		log("microsandbox-cloud boots the candidate image directly — no candidate artifact to bake");
-	},
-	blaxel: async (_image, log) => {
-		log("blaxel boots the stock base image — no candidate artifact to bake");
-	},
-	novita: (image, log) => bakeNovitaTemplate(config.novitaTemplateCandidate, image, log),
-	runloop: (image, log) => bakeRunloopBlueprint(config.runloopBlueprintCandidate, image, log),
-	// Same shape as blaxel: namespace pulls the toolchain image straight into a container instance at
-	// create time (no template/snapshot system), so there's no candidate artifact to bake — the
-	// validate boot right after this proves reachability. Takes the pinned candidate image like the
-	// others but doesn't need it (nothing to bake), so `_image`.
-	namespace: async (_image, log) => {
-		log("namespace boots the candidate image directly — no candidate artifact to bake");
-	},
-	vercel: async (_image, log) => {
-		log("vercel boots the candidate image mirrored to VCR — no separate sandbox artifact to bake");
-	},
-	runcloud: async (_image, log) => {
-		log("runcloud boots the candidate image directly — no candidate artifact to bake");
-	},
-};
+import { logChecks, smokeFailureReason, smokeOk } from "../lib/smoke-run.ts";
 
 /**
  * Emit the bake/promote report JSON. To `$BAKE_REPORT_FILE` when set — the provider CLIs (e2b) and
@@ -147,13 +113,13 @@ if (import.meta.main) {
 	// provider); on the promote path it scopes the transaction to a backfill. Parsed before any build
 	// or registry call so a typo'd id fails fast (clean message, no stack) before anything is touched.
 	let only: ProviderId[] | undefined;
-	let baseImageRef: string;
+	let baseImageRef: string = config.toolchainImageCandidate;
 	try {
 		only = requestedProviders(process.argv);
 		baseImageRef = requestedBaseImage(process.argv) ?? config.toolchainImageCandidate;
 	} catch (err) {
 		log(`error: ${err instanceof Error ? err.message : String(err)}`);
-		process.exit(2);
+		await exitAfterSandboxCleanup(2);
 	}
 
 	// Promote is the release step: publish the already-validated candidate as the public version.
@@ -170,7 +136,7 @@ if (import.meta.main) {
 					"backfills providers onto an already-published version, while --force regenerates the " +
 					"whole version in place. Pick one.",
 			);
-			process.exit(2);
+			await exitAfterSandboxCleanup(2);
 		}
 		const promoted = await promoteAll(log, { force, only });
 		writeReport({
@@ -191,7 +157,7 @@ if (import.meta.main) {
 		});
 		// The transaction outcome is separate from its diagnostics: an optional provider can fail and stay
 		// visible in the report without turning a successfully published shared version red after commit.
-		process.exit(promoted.ok ? 0 : 1);
+		await exitAfterSandboxCleanup(promoted.ok ? 0 : 1);
 	}
 
 	if (only) log(`>>> restricting bake+validate to: ${only.join(", ")}`);
@@ -202,7 +168,7 @@ if (import.meta.main) {
 			await buildAndPushCandidate(log);
 		} catch (err) {
 			log(`<<< build/push failed — ${err instanceof Error ? err.message : String(err)}`);
-			process.exit(1);
+			await exitAfterSandboxCleanup(1);
 		}
 	}
 
@@ -224,7 +190,7 @@ if (import.meta.main) {
 			log(
 				`<<< could not resolve base image digest for ${baseImageRef} — ${err instanceof Error ? err.message : String(err)}`,
 			);
-			process.exit(1);
+			await exitAfterSandboxCleanup(1);
 		}
 	} else {
 		log(`>>> no provider in scope reads ${baseImageRef} — not resolving it`);
@@ -242,20 +208,18 @@ if (import.meta.main) {
 	};
 
 	const runs = await forEachProviderWithCreds(
-		async (provider) => {
-			log(`>>> ${provider.name}: baking candidate…`);
-			await bakers[provider.name](pinnedBaseImage, (m) => log(`    ${m}`));
+		async (target) => {
+			if (isBakedProviderId(target.id)) {
+				log(`>>> ${target.id}: baking candidate…`);
+				await buildBakedProviderArtifact(target.id, "candidate", pinnedBaseImage, (m) =>
+					log(`    ${m}`),
+				);
+			} else {
+				log(`>>> ${target.id}: ${nonBakedArtifactAction(target.id, "candidate")}`);
+			}
 
-			log(`>>> ${provider.name}: validating (boot + smoke)…`);
-			// Boot the just-baked candidate (override the registry adapter's version create-options).
-			const validateConfig: ProviderConfig = {
-				...provider,
-				createOptions: {
-					...provider.createOptions,
-					...candidateCreateOptions(provider.name, candidateRefs),
-				},
-			};
-			return bootAndSmoke(validateConfig);
+			log(`>>> ${target.id}: validating (boot + smoke)…`);
+			return bootAndSmokeCandidate(target, candidateRefs);
 		},
 		{
 			log,
@@ -296,7 +260,7 @@ if (import.meta.main) {
 		reports,
 	});
 
-	if (anyFailed(runs)) process.exit(1);
+	if (anyFailed(runs)) await exitAfterSandboxCleanup(1);
 
 	// D1: at the publish boundary (CI passes `--require e2b,daytona-vm,modal-gvisor`) a required provider that was
 	// skipped for a missing/misnamed secret — or failed to validate — must fail the bake loudly, so a
@@ -307,6 +271,7 @@ if (import.meta.main) {
 		log(
 			`error: required providers did not pass: ${unmet.join(", ")} (--require / REQUIRE_PROVIDERS)`,
 		);
-		process.exit(1);
+		await exitAfterSandboxCleanup(1);
 	}
+	await exitAfterSandboxCleanup(0);
 }

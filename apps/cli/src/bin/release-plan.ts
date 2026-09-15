@@ -16,7 +16,17 @@
 // a best-effort EARLY skip — the authoritative immutable-version guard lives in `promote` (which
 // REFUSES on an uncertain check), so an inconclusive probe here proceeds rather than blocks.
 import { config } from "@sandbox-benchmarks/providers/config";
-import type { ProviderId } from "@sandbox-benchmarks/schema";
+import type {
+	MirroredProviderId,
+	ProviderArtifact,
+	ProviderId,
+} from "@sandbox-benchmarks/schema/providers";
+import {
+	bakedArtifactName,
+	isBakedProviderId,
+	isMirroredProviderId,
+	REGISTRY,
+} from "@sandbox-benchmarks/schema/providers";
 import { validatedPins } from "@sandbox-benchmarks/templates/pins";
 import { imageExistsInRegistry, imageName, imageRepo, releaseBaseTag } from "../lib/bake/image.ts";
 import { emitStepOutputs } from "../lib/gha-output.ts";
@@ -48,43 +58,38 @@ export const RELEASE_REQUIRED_PROVIDERS: readonly ProviderId[] = [
  * fail-fast with an explanation.
  *
  * Keyed by provider so the reason travels with the refusal. Blaxel still boots a stock vendor image,
- * so its bake/promote publishes nothing. Adding a toolchain artifact and release credential wiring is
- * what would remove the remaining entry here.
+ * so its bake/promote publishes nothing even though generated wiring now allows an unscoped release
+ * to validate it best-effort. Giving it a toolchain artifact is what would remove this entry.
  */
 export const RELEASE_UNSCOPABLE_PROVIDERS: Readonly<Partial<Record<ProviderId, string>>> = {
 	blaxel:
-		"it boots the vendor's stock image rather than the toolchain, so the release lane carries no " +
-		"BL_API_KEY/BL_WORKSPACE and has no artifact to publish for it",
+		"it boots the vendor's stock image rather than the toolchain and has no artifact to publish; " +
+		"credentialed validation alone cannot produce a scoped backfill",
 };
 
-/** Per-provider baked artifact name (what a cell produces), or a note for the providers that bake none. */
+const MIRRORED_CANDIDATE_REFS = {
+	vercel: config.vercelImageCandidate,
+} as const satisfies Record<MirroredProviderId, string>;
+
+/** Per-provider artifact name (what a cell produces), or a lifecycle-derived note. */
 function providerArtifact(id: ProviderId): string {
-	switch (id) {
-		case "e2b":
-			return config.e2bTemplateCandidate;
-		case "daytona-vm":
-			return config.daytonaSnapshotCandidate;
-		case "daytona-container":
-			return config.daytonaContainerSnapshotCandidate;
-		case "novita":
-			return config.novitaTemplateCandidate;
-		case "modal-gvisor":
-		case "modal-vm":
-		case "microsandbox-local":
-		case "microsandbox-cloud":
+	if (isBakedProviderId(id)) return bakedArtifactName(id, "candidate");
+	return nonBakedProviderArtifact(id, REGISTRY[id].artifact);
+}
+
+function nonBakedProviderArtifact(id: ProviderId, artifact: ProviderArtifact): string {
+	switch (artifact.kind) {
+		case "image":
 			return "boots the candidate image directly (no baked artifact)";
-		case "blaxel":
+		case "none":
 			return "boots the stock base image (no baked artifact)";
-		case "runloop":
-			return config.runloopBlueprintCandidate;
-		case "namespace":
-			// No template/snapshot system — pulls the candidate image straight into an instance at
-			// create time (same as modal), so there is no baked artifact to name.
-			return "boots the candidate image directly (no baked artifact)";
-		case "runcloud":
-			return "boots the candidate image directly (no baked artifact)";
-		case "vercel":
-			return config.vercelImageCandidate;
+		case "mirror":
+			if (isMirroredProviderId(id)) return MIRRORED_CANDIDATE_REFS[id];
+			throw new Error(`provider ${id} has inconsistent mirror metadata`);
+		case "built":
+			return `builds ${artifact.recipe} at runtime (no release artifact)`;
+		case "baked":
+			throw new Error(`provider ${id} has inconsistent baked metadata`);
 	}
 }
 

@@ -373,6 +373,12 @@ jobs:
   # per-cell `if:` to keep in sync with the scope, and an out-of-scope provider's job never exists.
   bake:
     name: Bake + verify (${{ matrix.provider }})
+    concurrency:
+      # >>> generated: provider-account-group-bake — bun run generate-provider-wiring
+      group: benchmark-account-${{ (matrix.provider == 'daytona-vm' || matrix.provider == 'daytona-container') && 'daytona' || (matrix.provider == 'modal-gvisor' || matrix.provider == 'modal-vm') && 'modal' || matrix.provider }}
+      # <<< end generated: provider-account-group-bake
+      cancel-in-progress: false
+      queue: max
     needs: [plan, build]
     # `build` is skippable (`build: skip`), and a skipped `needs` would normally skip this job too — so
     # the condition is spelled out rather than left to the default. `!cancelled()` re-enables the job
@@ -407,40 +413,23 @@ jobs:
           persist-credentials: false
       - name: Set up toolchain
         uses: ./.github/actions/setup-toolchain
-      # Namespace has no stored secret: it federates via GitHub's OIDC identity (id-token: write on this
-      # job), logging the `nsc` CLI into the workspace via `nsc auth exchange-github-token` under the
-      # hood. That login lives in the CLI's own local session store, not a discoverable file — so the
-      # next step mints a portable token file from that session for @computesdk/namespace to read.
-      # Only the namespace cell runs it (the job's `if:` already skips the whole bake when the release is
-      # skipped, so no extra guard is needed). Requires a trust relationship (this repo -> the Namespace
-      # tenant) registered once on the Namespace side — continue-on-error so a not-yet-registered trust
-      # relationship (or any transient failure) degrades to the same "missing credentials" skip that a
-      # namespace validate boot with no token already gets (namespace is best-effort, not in --require).
-      - name: Set up Namespace CLI
+      # Namespace has no stored secret: the shared action federates through GitHub OIDC and exposes
+      # the same `namespace.outputs.token-file` contract in every managed lane. Keeping the producer
+      # id/output identical is what lets provider metadata describe this input without lane-specific
+      # generator exceptions. A failed federation still degrades to the normal missing-input skip.
+      - name: Set up Namespace credentials
+        # >>> generated: preauth-namespace-token-bake — bun run generate-provider-wiring
         if: matrix.provider == 'namespace'
+        # <<< end generated: preauth-namespace-token-bake
         continue-on-error: true
-        id: nsc-setup
-        uses: namespacelabs/nscloud-setup@df198f982fcecfb8264bea3f1274b56a61b6dfdc # v0
-      # `nsc token create` mints a scoped, revocable token from the CLI session above and writes it as a
-      # {"bearer_token": "..."} JSON file @computesdk/namespace reads via NSC_TOKEN_FILE. The grant is
-      # the minimal permission set the harness needs against the Compute API's instance resource: create
-      # (CreateInstance), list (ListInstances), get (DescribeInstance), destroy (DestroyInstance), and
-      # exec (RunCommandSync) — found by live trial: a wildcard action is rejected outright ("not allowed
-      # in revokable tokens"), and each wrong verb name is named individually in the CLI's error.
-      # run_attempt is part of the name because run_id is PRESERVED across re-runs: without it a retry
-      # collides with the first attempt's token, and continue-on-error would turn that name clash into a
-      # silent namespace skip — on exactly the re-run where you wanted the re-validation.
-      - name: Mint a portable Namespace token
-        if: matrix.provider == 'namespace' && steps.nsc-setup.outcome == 'success'
-        continue-on-error: true
-        id: nsc-token
-        run: |
-          nsc token create \
-            --name "sandbox-benchmarks-toolchain-bake-${{ github.run_id }}-${{ github.run_attempt }}" \
-            --grant '{"resource_type":"instance","resource_id":"*","actions":["create","list","get","destroy","exec"]}' \
-            --token_file "${{ runner.temp }}/nsc-token.json"
+        id: namespace
+        uses: ./.github/actions/namespace-token
+        with:
+          token-name: sandbox-benchmarks-toolchain-bake-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Authenticate with Vercel and VCR
+        # >>> generated: preauth-vercel-auth-bake — bun run generate-provider-wiring
         if: matrix.provider == 'vercel'
+        # <<< end generated: preauth-vercel-auth-bake
         continue-on-error: true
         id: vercel-auth
         uses: ./.github/actions/vercel-auth
@@ -508,39 +497,32 @@ jobs:
           # immutable output digest; a build-skipped scoped backfill supplies the published version,
           # never the mutable candidate that may already contain the next release's bytes.
           BASE_IMAGE_REF: ${{ needs.build.outputs.base-digest-ref || needs.plan.outputs.image-source }}
+          # >>> generated: provider-inputs-bake — bun run generate-provider-wiring
           E2B_API_KEY: ${{ matrix.provider == 'e2b' && secrets.E2B_API_KEY || '' }}
-          # Both Daytona isolation variants share the account key and bake in their own region.
+          E2B_TEMPLATE: ${{ matrix.provider == 'e2b' && (env.E2B_TEMPLATE || vars.E2B_TEMPLATE || secrets.E2B_TEMPLATE) || '' }}
           DAYTONA_API_KEY: ${{ (matrix.provider == 'daytona-vm' || matrix.provider == 'daytona-container') && secrets.DAYTONA_API_KEY || '' }}
-          # Both Daytona variants bake in us-west-2, pinned by a variant-specific secret so
-          # operators can retarget without editing the workflow: daytona-vm reads DAYTONA_TARGET
-          # (LINUX_VM snapshot, us-west-2 default), daytona-container reads DAYTONA_CONTAINER_TARGET
-          # (us-west-2 default). Both default so an unsynced secret can't leave a snapshot in the account's
-          # default region and fail the bake at snapshot creation.
-          DAYTONA_TARGET: ${{ matrix.provider == 'daytona-vm' && (secrets.DAYTONA_TARGET || 'us-west-2') || '' }}
-          DAYTONA_CONTAINER_TARGET: ${{ matrix.provider == 'daytona-container' && (secrets.DAYTONA_CONTAINER_TARGET || 'us-west-2') || '' }}
-          # Both Modal variants share the account tokens; the bake is a no-op for each (the image is
-          # pushed once and booted directly), but validate still boots each to prove reachability.
+          DAYTONA_TARGET: ${{ matrix.provider == 'daytona-vm' && (env.DAYTONA_TARGET || vars.DAYTONA_TARGET || secrets.DAYTONA_TARGET || 'us-west-2') || '' }}
+          DAYTONA_SNAPSHOT: ${{ matrix.provider == 'daytona-vm' && (env.DAYTONA_SNAPSHOT || vars.DAYTONA_SNAPSHOT || secrets.DAYTONA_SNAPSHOT) || '' }}
+          DAYTONA_CONTAINER_TARGET: ${{ matrix.provider == 'daytona-container' && (env.DAYTONA_CONTAINER_TARGET || vars.DAYTONA_CONTAINER_TARGET || secrets.DAYTONA_CONTAINER_TARGET || 'us-west-2') || '' }}
+          DAYTONA_CONTAINER_SNAPSHOT: ${{ matrix.provider == 'daytona-container' && (env.DAYTONA_CONTAINER_SNAPSHOT || vars.DAYTONA_CONTAINER_SNAPSHOT || secrets.DAYTONA_CONTAINER_SNAPSHOT) || '' }}
+          BL_API_KEY: ${{ matrix.provider == 'blaxel' && secrets.BL_API_KEY || '' }}
+          BL_WORKSPACE: ${{ matrix.provider == 'blaxel' && secrets.BL_WORKSPACE || '' }}
+          MSB_API_KEY: ${{ matrix.provider == 'microsandbox-cloud' && secrets.MSB_API_KEY || '' }}
+          MSB_API_URL: ${{ matrix.provider == 'microsandbox-cloud' && (env.MSB_API_URL || vars.MSB_API_URL || secrets.MSB_API_URL) || '' }}
           MODAL_TOKEN_ID: ${{ (matrix.provider == 'modal-gvisor' || matrix.provider == 'modal-vm') && secrets.MODAL_TOKEN_ID || '' }}
           MODAL_TOKEN_SECRET: ${{ (matrix.provider == 'modal-gvisor' || matrix.provider == 'modal-vm') && secrets.MODAL_TOKEN_SECRET || '' }}
-          # Optional: a missing NOVITA_API_KEY skips the novita bake without failing the release.
           NOVITA_API_KEY: ${{ matrix.provider == 'novita' && secrets.NOVITA_API_KEY || '' }}
-          # Runloop builds and validates a candidate Blueprint. Best-effort in an unscoped release;
-          # required (and therefore fail-closed on a missing key/build failure) when explicitly scoped.
+          NOVITA_TEMPLATE: ${{ matrix.provider == 'novita' && (env.NOVITA_TEMPLATE || vars.NOVITA_TEMPLATE || secrets.NOVITA_TEMPLATE) || '' }}
           RUNLOOP_API_KEY: ${{ matrix.provider == 'runloop' && secrets.RUNLOOP_API_KEY || '' }}
-          # run.cloud boots the candidate OCI image directly; the key is needed only for its validate boot.
-          RUN_CLOUD_API_KEY: ${{ matrix.provider == 'runcloud' && secrets.RUN_CLOUD_API_KEY || '' }}
-          # Namespace pulls the candidate image directly (no bake artifact) — its validate boot reads
-          # this OIDC-federated token file (see the Namespace CLI steps above). Not a stored secret:
-          # empty unless THIS is the namespace cell AND the mint succeeded, which the harness reads as
-          # the standard missing-credentials skip on every other cell. Best-effort like novita: namespace
-          # is not in --require, so a skipped/failed mint skips its validate boot without failing publish.
-          NSC_TOKEN_FILE: ${{ steps.nsc-token.outcome == 'success' && format('{0}/nsc-token.json', runner.temp) || '' }}
-          # Microsandbox backends boot the candidate OCI image directly. Local is an explicit runner
-          # capability opt-in. Cloud needs only its key; the URL is an optional deployment override.
-          MICROSANDBOX_LOCAL_BENCH: ${{ matrix.provider == 'microsandbox-local' && '1' || '' }}
-          MSB_API_URL: ${{ matrix.provider == 'microsandbox-cloud' && secrets.MSB_API_URL || '' }}
-          MSB_API_KEY: ${{ matrix.provider == 'microsandbox-cloud' && secrets.MSB_API_KEY || '' }}
+          RUNLOOP_BLUEPRINT: ${{ matrix.provider == 'runloop' && (env.RUNLOOP_BLUEPRINT || vars.RUNLOOP_BLUEPRINT || secrets.RUNLOOP_BLUEPRINT) || '' }}
+          NSC_TOKEN_FILE: ${{ steps.namespace.outputs.token-file }}
           VERCEL_OIDC_TOKEN: ${{ matrix.provider == 'vercel' && steps.vercel-auth.outcome == 'success' && env.VERCEL_OIDC_TOKEN || '' }}
+          VERCEL_TEAM_SLUG: ${{ matrix.provider == 'vercel' && (env.VERCEL_TEAM_SLUG || vars.VERCEL_TEAM_SLUG || secrets.VERCEL_TEAM_SLUG) || '' }}
+          VERCEL_PROJECT_NAME: ${{ matrix.provider == 'vercel' && (env.VERCEL_PROJECT_NAME || vars.VERCEL_PROJECT_NAME || secrets.VERCEL_PROJECT_NAME) || '' }}
+          RUN_CLOUD_API_KEY: ${{ matrix.provider == 'runcloud' && secrets.RUN_CLOUD_API_KEY || '' }}
+          TAMA_TOKEN: ${{ matrix.provider == 'tama' && secrets.TAMA_TOKEN || '' }}
+          TAMA_CLI: ${{ matrix.provider == 'tama' && (env.TAMA_CLI || vars.TAMA_CLI || secrets.TAMA_CLI) || '' }}
+          # <<< end generated: provider-inputs-bake
           VERCEL_CANDIDATE_IMAGE: ${{ steps.vercel-vcr.outcome == 'success' && steps.vercel-vcr.outputs.digest-ref || '' }}
         run: |
           set -euo pipefail
@@ -651,42 +633,26 @@ jobs:
         uses: ./.github/actions/ghcr-login
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-      # Namespace federates via GitHub's OIDC identity (id-token: write on this job), so promote's
-      # re-validation boot can reach the Compute API with no stored secret. Unlike the bake matrix there
-      # is no per-provider cell here (promote is a serial transaction over its providers), so the mint
-      # runs for the whole job — gated only on namespace actually being in scope, so a scoped release
-      # doesn't mint a token it will never use. continue-on-error keeps a not-yet-registered trust
-      # relationship (or any transient failure) from failing the release: namespace is best-effort (not
-      # in --require), so its re-validation simply skips when the token is absent, exactly like a
-      # missing optional secret — and a skipped step leaves `outcome` != 'success', the same path.
-      #
-      # The scope test reads the plan's matrix rather than its `providers` CSV: `contains(array, item)`
-      # is element EQUALITY, while `contains(string, substring)` would also match a future id that
-      # merely contains this one (this registry already splits providers into `-vm`/`-container`/
-      # `-local`/`-cloud` variants, so that is not hypothetical).
-      - name: Set up Namespace CLI
+      # Namespace federates through GitHub OIDC with no stored secret. Promote is a serial transaction,
+      # so the shared action runs once when Namespace is in scope and gives this lane the same
+      # `namespace.outputs.token-file` contract as validation and benchmarks. continue-on-error keeps
+      # Namespace best-effort; the scope test uses matrix element equality because string contains
+      # would also match a future provider id that merely contains `namespace`.
+      - name: Set up Namespace credentials
+        # >>> generated: preauth-namespace-token-promote — bun run generate-provider-wiring
         if: contains(fromJSON(needs.plan.outputs.matrix).include.*.provider, 'namespace')
+        # <<< end generated: preauth-namespace-token-promote
         continue-on-error: true
-        id: nsc-setup
-        uses: namespacelabs/nscloud-setup@df198f982fcecfb8264bea3f1274b56a61b6dfdc # v0
-      # Mint a scoped, revocable token file (grant: the minimal instance verbs the harness needs —
-      # create/list/get/destroy/exec; a wildcard action is rejected in revokable tokens). Named apart
-      # from the bake cell's token so both can coexist within one workflow run, and carrying
-      # run_attempt for the same reason it does there — run_id survives a re-run, so without it the
-      # retry's mint collides and continue-on-error degrades it to a silent skip.
-      - name: Mint a portable Namespace token
-        if: steps.nsc-setup.outcome == 'success'
-        continue-on-error: true
-        id: nsc-token
-        run: |
-          nsc token create \
-            --name "sandbox-benchmarks-toolchain-promote-${{ github.run_id }}-${{ github.run_attempt }}" \
-            --grant '{"resource_type":"instance","resource_id":"*","actions":["create","list","get","destroy","exec"]}' \
-            --token_file "${{ runner.temp }}/nsc-token.json"
+        id: namespace
+        uses: ./.github/actions/namespace-token
+        with:
+          token-name: sandbox-benchmarks-toolchain-promote-${{ github.run_id }}-${{ github.run_attempt }}
       # Same scope gate as the Namespace mint above: a release that isn't promoting vercel has no reason
       # to pull a project OIDC token or log docker into VCR.
       - name: Authenticate with Vercel and VCR
+        # >>> generated: preauth-vercel-auth-promote — bun run generate-provider-wiring
         if: contains(fromJSON(needs.plan.outputs.matrix).include.*.provider, 'vercel')
+        # <<< end generated: preauth-vercel-auth-promote
         continue-on-error: true
         id: vercel-auth
         uses: ./.github/actions/vercel-auth
@@ -717,37 +683,32 @@ jobs:
           # CLIs inherit stdout, so a redirect would splice their chatter into the payload. bake.ts
           # writes the file even when promote aborts (it records the structured reports before exiting).
           BAKE_REPORT_FILE: promote-payload.json
-          E2B_API_KEY: ${{ secrets.E2B_API_KEY }}
-          DAYTONA_API_KEY: ${{ secrets.DAYTONA_API_KEY }}
-          # Both Daytona variants may be promoted in one payload, so thread each variant's region
-          # secret (daytona-vm ⇒ DAYTONA_TARGET, daytona-container ⇒ DAYTONA_CONTAINER_TARGET).
-          DAYTONA_TARGET: ${{ secrets.DAYTONA_TARGET || 'us-west-2' }}
-          DAYTONA_CONTAINER_TARGET: ${{ secrets.DAYTONA_CONTAINER_TARGET || 'us-west-2' }}
-          MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
-          MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
-          NOVITA_API_KEY: ${{ secrets.NOVITA_API_KEY }}
-          # The serial transaction re-validates the candidate Blueprint, then builds the version-named
-          # Blueprint from the same pinned base. Keep the SDK control-plane key out of unrelated scoped
-          # promotes, matching the run.cloud credential posture below.
+          # >>> generated: provider-inputs-promote — bun run generate-provider-wiring
+          E2B_API_KEY: ${{ contains(fromJSON(needs.plan.outputs.matrix).include.*.provider, 'e2b') && secrets.E2B_API_KEY || '' }}
+          E2B_TEMPLATE: ${{ contains(fromJSON(needs.plan.outputs.matrix).include.*.provider, 'e2b') && (env.E2B_TEMPLATE || vars.E2B_TEMPLATE || secrets.E2B_TEMPLATE) || '' }}
+          DAYTONA_API_KEY: ${{ (contains(fromJSON(needs.plan.outputs.matrix).include.*.provider, 'daytona-vm') || contains(fromJSON(needs.plan.outputs.matrix).include.*.provider, 'daytona-container')) && secrets.DAYTONA_API_KEY || '' }}
+          DAYTONA_TARGET: ${{ contains(fromJSON(needs.plan.outputs.matrix).include.*.provider, 'daytona-vm') && (env.DAYTONA_TARGET || vars.DAYTONA_TARGET || secrets.DAYTONA_TARGET || 'us-west-2') || '' }}
+          DAYTONA_SNAPSHOT: ${{ contains(fromJSON(needs.plan.outputs.matrix).include.*.provider, 'daytona-vm') && (env.DAYTONA_SNAPSHOT || vars.DAYTONA_SNAPSHOT || secrets.DAYTONA_SNAPSHOT) || '' }}
+          DAYTONA_CONTAINER_TARGET: ${{ contains(fromJSON(needs.plan.outputs.matrix).include.*.provider, 'daytona-container') && (env.DAYTONA_CONTAINER_TARGET || vars.DAYTONA_CONTAINER_TARGET || secrets.DAYTONA_CONTAINER_TARGET || 'us-west-2') || '' }}
+          DAYTONA_CONTAINER_SNAPSHOT: ${{ contains(fromJSON(needs.plan.outputs.matrix).include.*.provider, 'daytona-container') && (env.DAYTONA_CONTAINER_SNAPSHOT || vars.DAYTONA_CONTAINER_SNAPSHOT || secrets.DAYTONA_CONTAINER_SNAPSHOT) || '' }}
+          BL_API_KEY: ${{ contains(fromJSON(needs.plan.outputs.matrix).include.*.provider, 'blaxel') && secrets.BL_API_KEY || '' }}
+          BL_WORKSPACE: ${{ contains(fromJSON(needs.plan.outputs.matrix).include.*.provider, 'blaxel') && secrets.BL_WORKSPACE || '' }}
+          MSB_API_KEY: ${{ contains(fromJSON(needs.plan.outputs.matrix).include.*.provider, 'microsandbox-cloud') && secrets.MSB_API_KEY || '' }}
+          MSB_API_URL: ${{ contains(fromJSON(needs.plan.outputs.matrix).include.*.provider, 'microsandbox-cloud') && (env.MSB_API_URL || vars.MSB_API_URL || secrets.MSB_API_URL) || '' }}
+          MODAL_TOKEN_ID: ${{ (contains(fromJSON(needs.plan.outputs.matrix).include.*.provider, 'modal-gvisor') || contains(fromJSON(needs.plan.outputs.matrix).include.*.provider, 'modal-vm')) && secrets.MODAL_TOKEN_ID || '' }}
+          MODAL_TOKEN_SECRET: ${{ (contains(fromJSON(needs.plan.outputs.matrix).include.*.provider, 'modal-gvisor') || contains(fromJSON(needs.plan.outputs.matrix).include.*.provider, 'modal-vm')) && secrets.MODAL_TOKEN_SECRET || '' }}
+          NOVITA_API_KEY: ${{ contains(fromJSON(needs.plan.outputs.matrix).include.*.provider, 'novita') && secrets.NOVITA_API_KEY || '' }}
+          NOVITA_TEMPLATE: ${{ contains(fromJSON(needs.plan.outputs.matrix).include.*.provider, 'novita') && (env.NOVITA_TEMPLATE || vars.NOVITA_TEMPLATE || secrets.NOVITA_TEMPLATE) || '' }}
           RUNLOOP_API_KEY: ${{ contains(fromJSON(needs.plan.outputs.matrix).include.*.provider, 'runloop') && secrets.RUNLOOP_API_KEY || '' }}
-          # A scoped promote imports every provider module in one process. Keep the run.cloud key out
-          # of that process unless the resolved release plan will actually re-validate runcloud.
+          RUNLOOP_BLUEPRINT: ${{ contains(fromJSON(needs.plan.outputs.matrix).include.*.provider, 'runloop') && (env.RUNLOOP_BLUEPRINT || vars.RUNLOOP_BLUEPRINT || secrets.RUNLOOP_BLUEPRINT) || '' }}
+          NSC_TOKEN_FILE: ${{ steps.namespace.outputs.token-file }}
+          VERCEL_OIDC_TOKEN: ${{ contains(fromJSON(needs.plan.outputs.matrix).include.*.provider, 'vercel') && steps.vercel-auth.outcome == 'success' && env.VERCEL_OIDC_TOKEN || '' }}
+          VERCEL_TEAM_SLUG: ${{ contains(fromJSON(needs.plan.outputs.matrix).include.*.provider, 'vercel') && (env.VERCEL_TEAM_SLUG || vars.VERCEL_TEAM_SLUG || secrets.VERCEL_TEAM_SLUG) || '' }}
+          VERCEL_PROJECT_NAME: ${{ contains(fromJSON(needs.plan.outputs.matrix).include.*.provider, 'vercel') && (env.VERCEL_PROJECT_NAME || vars.VERCEL_PROJECT_NAME || secrets.VERCEL_PROJECT_NAME) || '' }}
           RUN_CLOUD_API_KEY: ${{ contains(fromJSON(needs.plan.outputs.matrix).include.*.provider, 'runcloud') && secrets.RUN_CLOUD_API_KEY || '' }}
-          # Namespace's re-validation boot reads this OIDC-federated token file (see the Namespace CLI
-          # steps above). Not a stored secret: empty when the exchange/mint was skipped/failed, which
-          # skips namespace's re-validation without failing the promote (namespace is not in --require).
-          NSC_TOKEN_FILE: ${{ steps.nsc-token.outcome == 'success' && format('{0}/nsc-token.json', runner.temp) || '' }}
-          # The promote transaction re-validates every in-scope provider. Unlike every credential around it, this
-          # is a literal rather than a `secrets.*` reference, so it has no missing-value skip path — it
-          # is safe only because this job is PINNED to `starsling-ubuntu-24.04-2` (see runs-on above),
-          # the same virtualization-capable label the bake matrix uses. Moving promote to a runner
-          # without KVM must clear this at the same time, or every release spends a doomed libkrun boot
-          # whose failure is invisible in promote-payload.json (microsandbox-local is not in --require,
-          # so `blocks()` is false and promote never records it). Cloud uses its key + optional endpoint.
-          MICROSANDBOX_LOCAL_BENCH: "1"
-          MSB_API_URL: ${{ secrets.MSB_API_URL }}
-          MSB_API_KEY: ${{ secrets.MSB_API_KEY }}
-          VERCEL_OIDC_TOKEN: ${{ steps.vercel-auth.outcome == 'success' && env.VERCEL_OIDC_TOKEN || '' }}
+          TAMA_TOKEN: ${{ contains(fromJSON(needs.plan.outputs.matrix).include.*.provider, 'tama') && secrets.TAMA_TOKEN || '' }}
+          TAMA_CLI: ${{ contains(fromJSON(needs.plan.outputs.matrix).include.*.provider, 'tama') && (env.TAMA_CLI || vars.TAMA_CLI || secrets.TAMA_CLI) || '' }}
+          # <<< end generated: provider-inputs-promote
           VERCEL_CANDIDATE_IMAGE: ${{ steps.vercel-vcr.outcome == 'success' && steps.vercel-vcr.outputs.digest-ref || '' }}
         run: |
           set -euo pipefail

@@ -24,7 +24,7 @@ name: Update leaderboard
 # ruleset requires no status checks, so a bot-authored PR (whose `ci.yml` GitHub suppresses) is not
 # waiting on anything once review rules are satisfied; content correctness is guaranteed by the
 # deterministic renderer plus the in-job Biome preflight. Path allowlisting refuses to commit or merge
-# unless the change set is exactly LEADERBOARD.md. See docs/ci-secrets.md rule 7 / operator setup.
+# unless the change set contains only LEADERBOARD.md and docs/figures/*.webp. See docs/ci-secrets.md rule 7 / operator setup.
 on:
   workflow_dispatch:
     inputs:
@@ -109,6 +109,21 @@ jobs:
       # the same command the leaderboard-artifact-sync gate names in its failure message.
       - name: Regenerate leaderboard
         run: bun apps/cli/src/bin/leaderboard.ts "data/dataset/runs/$TARGET_RUN_ID.json" LEADERBOARD.md
+
+      # Validate the generated Markdown, linked chart set and source-run consistency before release.
+      - name: Verify leaderboard and figure artifacts
+        run: bun test tooling/repo-checks/src/leaderboard-artifact-sync.test.ts
+
+      - name: Summarize generated figures
+        run: |
+          {
+            echo "## Leaderboard and figures"
+            echo "Source: committed dataset run $TARGET_RUN_ID"
+            echo ""
+            echo "$(find docs/figures -maxdepth 1 -name '*.webp' | wc -l | tr -d ' ') charts regenerated with pinned Chrome."
+            echo ""
+            echo "Headline selection: Node.js web tooling; fio buffered 4KB random write; STREAM Triad; iperf3 WAN download and upload; Git common operations."
+          } >> "$GITHUB_STEP_SUMMARY"
 
       # Pre-flight the exact gate the PR must pass — `biome check . --error-on-warnings`, the same
       # command ci.yml's lint job runs — so a genuine formatting/lint regression fails here, before any

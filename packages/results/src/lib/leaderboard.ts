@@ -23,6 +23,7 @@
  * medians separate under Mann-Whitney U (with Kolmogorov-Smirnov reported alongside, since a bimodal
  * provider can match another's median while behaving nothing like it).
  */
+
 import type {
 	Dimension,
 	GapCause,
@@ -46,9 +47,15 @@ import {
 	METRIC_CATALOG,
 	mannWhitneyU,
 	providerReportedNothing,
+	reportedMedianOf,
 	SUITE_NAMES,
-	sandboxMedianOf,
 } from "@sandbox-benchmarks/schema";
+import type {
+	CombineDatasetsOptions,
+	LeaderboardDataset,
+	PooledDataset,
+} from "./leaderboard-datasets.ts";
+import { combineLeaderboardDatasets } from "./leaderboard-datasets.ts";
 
 /**
  * The repository the published leaderboard lives in — the base for every provenance link in the header.
@@ -104,6 +111,14 @@ export const LEADERBOARD_DIMENSION_ORDER: readonly Dimension[] = [
  * the renderer changes its mind.
  */
 export const FIGURE_DIMENSION: Dimension = "realworld";
+/**
+ * The phrase that marks a rendered board as POOLED rather than one published experiment.
+ *
+ * Exported because the artifact gate has to recognise it in a committed document, and reading the
+ * rendered prose is the only input that gate has. Rewording this heading without it would leave the
+ * gate matching a string nothing emits — silently passing the exact condition it exists to refuse.
+ */
+export const POOLED_BOARD_HEADING = "Combined dataset analysis";
 
 /**
  * One rendered suite chart the Markdown embeds — what the renderer needs in order to link a figure
@@ -131,6 +146,30 @@ export interface LeaderboardFigure {
 	readonly charted: number;
 	readonly incomplete: number;
 	readonly tasks: number;
+}
+
+/**
+ * One rendered metric chart the Markdown embeds — a ranked bar chart for one synthetic metric,
+ * the counterpart of {@link LeaderboardFigure} for the dimensions the pipeline charts do not
+ * draw. Same contract: the renderer links exactly the list it is handed, and the list is what
+ * was actually rendered.
+ */
+export interface LeaderboardMetricFigure {
+	/** The catalog id, e.g. `stream_type_triad`. */
+	readonly metricId: string;
+	/** The catalog label for the alt text, e.g. `STREAM Triad`. */
+	readonly label: string;
+	/** The dimension whose section embeds it. */
+	readonly dimension: string;
+	/** Whether this metric's chart sits above the dimension's collapse. */
+	readonly headline: boolean;
+	/** Path the Markdown links, relative to the directory holding it. */
+	readonly file: string;
+	/** Display width in CSS px, as for a suite figure. */
+	readonly width: number;
+	/** Environments charted, and validated environments disclosed as having no result. */
+	readonly charted: number;
+	readonly unmeasured: number;
 }
 
 /** One provider's standing on one Metric. */
@@ -307,9 +346,11 @@ export interface AbsentProvider {
 	displayName: string;
 }
 
-/** The full comparison surface derived from one Run. */
-export interface Leaderboard {
+/** The fields every comparison surface carries, whichever kind of dataset produced it. */
+interface LeaderboardFields {
 	runId: string;
+	comparisonCohort?: string;
+	partial?: NonNullable<Run["experiment"]>["partial"];
 	sha: string;
 	generatedAt: string;
 	/** The requested comparison target recorded on this Run — never substituted from global config. */
@@ -332,6 +373,21 @@ export interface Leaderboard {
 }
 
 /**
+ * The comparison surface of ONE published experiment. Shaped like {@link PublishedDataset}, and for
+ * the same reason.
+ */
+export type PublishedLeaderboard = LeaderboardFields & {
+	sources?: undefined;
+	poolingNotes?: undefined;
+};
+
+/** The comparison surface of a pooled view. The pooled contract is stated once, by the dataset. */
+export type PooledLeaderboard = LeaderboardFields & Pick<PooledDataset, "sources" | "poolingNotes">;
+
+/** The full comparison surface derived from one published Run, or from a pooled view of several. */
+export type Leaderboard = PublishedLeaderboard | PooledLeaderboard;
+
+/**
  * Whether the Run's producer was able to classify gaps at all — true once ANY gap carries a structured
  * cause. This is what decides whether an ABSENT cause is meaningful.
  *
@@ -341,7 +397,7 @@ export interface Leaderboard {
  * were written by a harness that predated the taxonomy. Gating on the version would strip the disk
  * classification off every backfilled run in the committed series; gating on the evidence does not.
  */
-function producerClassifiesGaps(run: Run): boolean {
+function producerClassifiesGaps(run: LeaderboardDataset): boolean {
 	return run.providers.some((provider) => provider.gaps.some((gap) => gap.cause !== undefined));
 }
 
@@ -384,7 +440,7 @@ const REGISTERED_SUITES = new Set<string>(SUITE_NAMES);
  * outlives the registry that validated it — a suite deregistered later would otherwise re-enter the
  * denominator and accuse every current provider of missing a suite nobody can run anymore.
  */
-function suitesExercised(run: Run): string[] {
+function suitesExercised(run: LeaderboardDataset): string[] {
 	const suites = new Set<string>();
 	for (const provider of run.providers) {
 		for (const suite of provider.suitesCovered) {
@@ -407,7 +463,7 @@ function suitesExercised(run: Run): string[] {
  * sandbox that died before writing its marker leaves behind, and it is invisible in every other view —
  * the ranked tables can only show providers that produced a value.
  */
-function coverageGapsOf(run: Run): CoverageGap[] {
+function coverageGapsOf(run: LeaderboardDataset): CoverageGap[] {
 	const exercised = suitesExercised(run);
 	// Computed once per Run, not per gap: whether an absent cause means "unclassified" or "this producer
 	// had no causes to give".
@@ -465,7 +521,7 @@ function coverageGapsOf(run: Run): CoverageGap[] {
 }
 
 /** Rank all providers that emitted one Metric; empty when the Run has no result for it. */
-function rankMetric(run: Run, metric: MetricDef): LeaderboardRow[] {
+function rankMetric(run: LeaderboardDataset, metric: MetricDef): LeaderboardRow[] {
 	// Carry each provider's raw Samples alongside its row: the ranking needs the full distributions,
 	// not just their medians, to tell a real difference from environmental noise.
 	const candidates = run.providers.flatMap((provider) => {
@@ -473,7 +529,16 @@ function rankMetric(run: Run, metric: MetricDef): LeaderboardRow[] {
 		if (!result) return [];
 		// The per-replicate sample slices, present only once the aggregate merged ≥2 replicate sandboxes.
 		const replicates = result.replicates?.map((r) => r.samples);
-		const seed = `${run.runId}:${metric.id}:${provider.providerId}`;
+		const contributingIds = run.sources
+			?.filter((source) =>
+				source.providers.some(
+					(p) =>
+						p.providerId === provider.providerId && p.metrics.some((m) => m.metricId === metric.id),
+				),
+			)
+			.map((source) => source.runId)
+			.join("+");
+		const seed = `${contributingIds ?? run.runId}:${metric.id}:${provider.providerId}`;
 		const row: LeaderboardRow = {
 			providerId: provider.providerId,
 			displayName: getProvider(provider.providerId)?.displayName ?? provider.providerId,
@@ -483,8 +548,9 @@ function rankMetric(run: Run, metric: MetricDef): LeaderboardRow[] {
 			// so the noisiest machine earned the most votes: on the committed data ρ(trials, within-sandbox
 			// CV) = 0.76, and one headline row published 20.99 from sandbox medians {18.87, 21.06, 18.95}
 			// because the 15-pass machine held 71% of the weight. The pooled Samples stay in the dataset as
-			// the raw evidence; they are no longer the ranking statistic.
-			value: replicates ? sandboxMedianOf(replicates) : result.aggregates.p50,
+			// the raw evidence; they are no longer the ranking statistic. `reportedMedianOf` owns this
+			// choice for every surface that prints a value.
+			value: reportedMedianOf(result),
 			rank: 0, // assigned after sort
 			// Seed from stable identity so a committed leaderboard is byte-identical on every regeneration —
 			// a Math.random() bootstrap would churn the diff on every run. The interval is the CLUSTER
@@ -658,7 +724,7 @@ function isolationClass(declared: string | undefined): "gvisor" | "container" | 
  * recognized classes ("gvisor"/"container"/"vm") that disagrees with the declared one — a detected
  * "unknown" (the common case) or any unrecognized raw value never counts, so the declaration wins.
  */
-function buildRoster(run: Run): ProviderRosterEntry[] {
+function buildRoster(run: LeaderboardDataset): ProviderRosterEntry[] {
 	// "Every provider measured in this Run": a zero-evidence registry placeholder was not measured —
 	// it lands in the absent-providers note instead of a roster row claiming an isolation nobody probed.
 	const measured = run.providers.filter((p) => !providerReportedNothing(p));
@@ -688,7 +754,13 @@ function buildRoster(run: Run): ProviderRosterEntry[] {
 }
 
 /** Build the structured leaderboard from a validated Run. Pure — Run in, ranking out. */
-export function buildLeaderboard(run: Run): Leaderboard {
+export function buildLeaderboard(
+	input: LeaderboardDataset | readonly Run[],
+	options: CombineDatasetsOptions = {},
+): Leaderboard {
+	const isArray = (value: LeaderboardDataset | readonly Run[]): value is readonly Run[] =>
+		Array.isArray(value);
+	const run = isArray(input) ? combineLeaderboardDatasets(input, options) : input;
 	const dimensions: LeaderboardDimension[] = [];
 
 	for (const dimension of LEADERBOARD_DIMENSION_ORDER) {
@@ -707,8 +779,10 @@ export function buildLeaderboard(run: Run): Leaderboard {
 		}
 	}
 
-	return {
+	const fields: LeaderboardFields = {
 		runId: run.runId,
+		...(run.experiment?.partial ? { partial: run.experiment.partial } : {}),
+		...(run.experiment?.cohortDigest ? { comparisonCohort: run.experiment.cohortDigest } : {}),
 		sha: run.sha,
 		generatedAt: run.generatedAt,
 		targetSpec: run.targetSpec,
@@ -731,6 +805,9 @@ export function buildLeaderboard(run: Run): Leaderboard {
 		),
 		coverageGaps: coverageGapsOf(run),
 	};
+	// One arm or the other, never a spread that could produce neither: a board with pooling notes
+	// and no sources to attribute them to is now unconstructable rather than merely unintended.
+	return run.sources ? { ...fields, sources: run.sources, poolingNotes: run.poolingNotes } : fields;
 }
 
 /**
@@ -854,8 +931,10 @@ function datasetSourceLink(runId: string): string {
  */
 function syntheticSummary(metrics: readonly LeaderboardMetric[]): string {
 	const count = `<strong>${metrics.length} synthetic metric${metrics.length === 1 ? "" : "s"}</strong>`;
-	const headline = metrics.find(({ metric }) => metric.headline);
-	return headline ? `${count} · headline: ${escapeHtml(headline.metric.label)}` : count;
+	const headlines = metrics.filter(({ metric }) => metric.headline);
+	return headlines.length
+		? `${count} · headline${headlines.length === 1 ? "" : "s"}: ${headlines.map(({ metric }) => escapeHtml(metric.label)).join(" · ")}`
+		: count;
 }
 
 /**
@@ -882,10 +961,12 @@ function figureSection(figures: readonly LeaderboardFigure[]): string[] {
 	// How many charts there are is a property of the RUN (the ingest drops uncharted suites, and
 	// a new suite lands upstream without touching this file), so the prose must never hand-count
 	// them — "the three charts" was wrong the day a suite dropped to one completing environment.
+	// The scale sentence is a claim about reading ACROSS charts, so it is stated only when there
+	// is more than one to read across.
 	const scaleClaim =
 		figures.length === 1
-			? "" //  one chart still uses the shared scale, but there is no cross-chart claim to state.
-			: " The charts share one time scale, so a second is the same length in all of them.";
+			? ""
+			: " Each chart scales to its own slowest pipeline, so compare bar lengths within a chart and the printed totals across charts.";
 	const lines: string[] = [
 		"What a developer or a CI job actually waits on: each bar is one environment's whole pipeline",
 		`for that repo, segmented by task in execution order.${scaleClaim}`,
@@ -905,6 +986,19 @@ function figureSection(figures: readonly LeaderboardFigure[]): string[] {
 		);
 	}
 	return lines;
+}
+
+/**
+ * The `<img>` line for one metric chart. The alt text names the metric, the size of the
+ * comparison and the disclosure count — what a reader with the image unavailable gets instead.
+ */
+function metricFigureImage(figure: LeaderboardMetricFigure): string {
+	const environments = `${figure.charted} environment${figure.charted === 1 ? "" : "s"}`;
+	const disclosed = figure.unmeasured === 0 ? "" : `, ${figure.unmeasured} disclosed as unmeasured`;
+	const alt = escapeAttribute(
+		`${figure.label}: ${environments} ranked best-first${disclosed}, with 95% intervals`,
+	);
+	return `<img src="${escapeAttribute(figure.file)}" width="${figure.width}" alt="${alt}">`;
 }
 
 /** HTML attribute escaping for the `<img>` tags above: `Bun.escapeHTML` covers the full set
@@ -1084,7 +1178,11 @@ function rosterSection(roster: readonly ProviderRosterEntry[]): string[] {
 export function renderLeaderboardMarkdown(
 	board: Leaderboard,
 	figures: readonly LeaderboardFigure[],
+	metricFigures: readonly LeaderboardMetricFigure[] = [],
 ): string {
+	// Each synthetic dimension embeds its own charts: the headline's above the collapse, the rest
+	// beside their tables. Keyed once here so the loop below can ask per dimension and per metric.
+	const metricFigureById = new Map(metricFigures.map((figure) => [figure.metricId, figure]));
 	// Render the board's OWN target, not the global constant, so the header can never claim the pinned
 	// spec while the comparability warnings below report another one.
 	const spec = formatSpec(board.targetSpec);
@@ -1115,8 +1213,32 @@ export function renderLeaderboardMarkdown(
 	const lines: string[] = [
 		"# Sandbox provider leaderboard",
 		"",
-		`Run ${runSourceLinks(board.runId)} · commit ${commitSourceLink(board.sha)} ·`,
-		`dataset ${datasetSourceLink(board.runId)} · generated ${board.generatedAt}`,
+		...(board.sources
+			? [
+					`**${POOLED_BOARD_HEADING} (not a new published experiment).**`,
+					...board.sources.map(
+						(source) =>
+							`Source ${runSourceLinks(source.runId)} · commit ${commitSourceLink(source.sha)} · dataset ${datasetSourceLink(source.runId)}${source.experiment?.partial ? ` · ${source.experiment.partial.complete}/${source.experiment.partial.planned} cells complete` : ""}`,
+					),
+					...board.poolingNotes,
+				]
+			: [
+					`Run ${runSourceLinks(board.runId)} · commit ${commitSourceLink(board.sha)} ·`,
+					`dataset ${datasetSourceLink(board.runId)} · generated ${board.generatedAt}`,
+				]),
+		...(board.partial
+			? [
+					"",
+					`**Partial results — incomplete experiment.** ${board.partial.complete} of ${board.partial.planned} planned cells complete; ${board.partial.incomplete} incomplete; ${board.partial.excluded} excluded.`,
+					"Only verified measurements are ranked. Missing trials and failed cells remain in the dataset's frozen coverage; provider coverage is uneven and these results do not establish a complete comparison.",
+				]
+			: []),
+		...(board.comparisonCohort
+			? [
+					"",
+					`Comparison cohort: \`${board.comparisonCohort}\`. Compare scores only with the same workload and eligible metric cohort.`,
+				]
+			: []),
 		"",
 		`Requested target for every provider: **${spec}**. This run contains **${rows.length} metric records**`,
 		`backed by **${observationCount} retained trial observations**, across **${metricCount} ${metricNoun}** and`,
@@ -1157,6 +1279,15 @@ export function renderLeaderboardMarkdown(
 			"",
 		);
 	}
+	if (metricFigures.length > 0) {
+		lines.push(
+			"**Every synthetic metric is charted too.** Each dimension shows its headline metrics as ranked bar",
+			"charts above the triangle, and every other metric's chart sits beside its table inside. Bars are",
+			"the same medians the tables print, best first, with the 95% interval as a whisker; each chart",
+			"scales to its own largest value, so lengths compare within a chart and never across two.",
+			"",
+		);
+	}
 	lines.push(...rosterSection(board.roster));
 	if (board.absentProviders.length > 0) {
 		// One line, not per-suite `missing` rows: the Run does not record the dispatch plan
@@ -1184,6 +1315,12 @@ export function renderLeaderboardMarkdown(
 		// The figure dimension puts its charts ABOVE the collapse, so the section reads as three
 		// pictures with the receipts folded underneath.
 		if (dimension === FIGURE_DIMENSION) lines.push(...figureSection(figures));
+		// A synthetic dimension leads with its headline chart, above the collapse, for the same reason
+		// the figure dimension leads with its pipelines: the picture is what the section is for.
+		const headlineFigures = metrics
+			.map(({ metric }) => metricFigureById.get(metric.id))
+			.filter((figure): figure is LeaderboardMetricFigure => figure?.headline === true);
+		for (const figure of headlineFigures) lines.push(metricFigureImage(figure), "");
 		// A synthetic dimension collapses its TABLES, never its heading: the heading stays in the rendered
 		// document outline so the board still discloses which hardware axes were measured — collapsing it
 		// too would make a measured dimension indistinguishable from one that never ran.
@@ -1203,6 +1340,13 @@ export function renderLeaderboardMarkdown(
 			const notes = metricRows.map(rowNote);
 			const hasNotes = notes.some((note) => note !== "");
 			const headline = metric.headline ? " _(headline)_" : "";
+			// The metric's own chart, beside its table — except the headline's, already shown above
+			// the collapse: the same image twice in one section would be noise, not disclosure.
+			const metricFigure = metricFigureById.get(metric.id);
+			const chartLines =
+				metricFigure && !headlineFigures.includes(metricFigure)
+					? [metricFigureImage(metricFigure), ""]
+					: [];
 			lines.push(
 				`### ${metric.label}${headline}`,
 				"",
@@ -1210,6 +1354,7 @@ export function renderLeaderboardMarkdown(
 				"",
 				`_${metricTakeaway(dimension, metric, metricRows)}_`,
 				"",
+				...chartLines,
 				// Sandboxes BEFORE trials, and both labelled. The unit of replication is the machine, and a
 				// single `n` column silently mixed the two: n=12 meant twelve machines, n=70 meant three.
 				hasNotes

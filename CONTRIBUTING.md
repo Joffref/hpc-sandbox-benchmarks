@@ -41,28 +41,33 @@ PTS-catalog changes also have a drift gate:
 ```sh
 bun run --filter @sandbox-benchmarks/schema generate-catalog   # regenerate from vendored profiles
 bun run check:catalog-drift                                    # fail if the committed draft drifted
+bun run check:provider-registry-drift                           # fail if provider metadata assembly drifted
+bun run check:provider-wiring                                   # fail if generated CI/docs/env wiring drifted
 ```
 
 ## Add a provider
 
-1. **Identity & economics** — add the id to `ProviderId` and a `REGISTRY` entry in
-   [`packages/schema/src/providers.ts`](./packages/schema/src/providers.ts): `displayName`, `website`,
-   `sdkPackage`, `requiredEnvVars`, `isolation`, vetted `pricing` (per-vCPU/per-GiB, normalized to USD),
-   `maturity`, `specPinning`, and the `transport` capability (`streaming`/`syncCapMs`/`detachedPoll`).
-   The `Record<ProviderId, …>` type makes a missing entry a compile error.
+1. **Identity + metadata** — append the id to `PROVIDER_IDS` in
+   [`packages/schema/src/provider-ids.ts`](./packages/schema/src/provider-ids.ts), then add the one
+   hand-authored `packages/schema/src/provider-meta/<id>.ts` module. Declare display/vendor identity,
+   inputs, artifact lifecycle, isolation, vetted pricing, maturity, spec pinning, and transport there.
+   Run `bun run generate-provider-registry` and `bun run generate-provider-wiring`, then review the
+   generated correlated index plus managed workflow/docs/env regions. Filename, tuple key, and
+   declared id disagreement is a compile error; malformed descriptor semantics fail the generator's
+   Tier-3 arktype gate. Keep the independent hardcoded provider oracle in `providers.test.ts` current.
 2. **Adapter** — add a matching entry to the adapter map in
    [`packages/providers`](./packages/providers): how to `createCompute()` and the create-time
    `createOptions` (the pinned target spec + toolchain image). The two registries are joined by id, so a
    one-sided provider is a compile error.
-3. **Template** — add a template builder under [`packages/templates`](./packages/templates) so the
-   provider can be baked with the toolchain image.
-4. **Exhaustive consumers** — update the CLI bake map, candidate create-options switch, release-plan
-   artifact switch, provider-id test oracles, the credential environment in
-   [`bench-suite.yml`](./.github/workflows/bench-suite.yml) (the one benchmark cell both dispatch lanes
-   call, so there is a single block to edit), and the `provider` dispatch options in
-   [`bench-smoke.yml`](./.github/workflows/bench-smoke.yml). Provider matrix fan-out, normalization,
-   leaderboard, and economics remain automatic.
-5. Bring it up live with a single-provider branch dispatch before adding it to the default matrix list.
+3. **Artifact implementation** — only when the descriptor's `artifact.kind` requires one, add the
+   provider-specific bake/template implementation. Providers using a stock or shared image do not get
+   no-op bakers.
+4. **Generated wiring** — do not hand-edit provider choice/input regions. Provider metadata generates
+   the smoke dispatch options, three least-privilege workflow input blocks, runner routing,
+   `.env.example`, CI configuration docs, and the privileged-environment checklist. The drift gate
+   rejects stale or hand-edited output.
+5. Bring the provider up with a single-provider branch dispatch. Adding it to the default benchmark
+   matrix remains a separate promotion decision after live validation.
 
 ## Add a suite
 
@@ -100,7 +105,8 @@ bun run check:catalog-drift                                    # fail if the com
    recorded `composite.xml` fixture under `packages/results/src/lib/__fixtures__/` (the
    [golden gate](./packages/results/src/lib/pts-golden.test.ts) proves it).
 3. Curate editorial fields in [`pts-overrides.ts`](./packages/schema/src/pts-overrides.ts): a short
-   `label`, any `dimension` correction, and exactly one `headline: true` per dimension.
+   `label`, any `dimension` correction, and the curated `headline: true` metrics (one per
+   dimension, except network's two WAN directions — ADR-0015).
 4. Commit the regenerated `pts-generated.ts` (the drift gate diffs it; overrides are excluded).
 
 **Non-PTS metric** (harness-measured or derived): add the `MetricDef` to the relevant hand-authored
@@ -112,7 +118,7 @@ don't trip the drift gate.
 
 - **Parse, don't validate**: arktype schemas at every boundary; the TypeScript types are inferred from
   the runtime schema, never hand-written twice.
-- **Cross-registry invariants** (id-uniqueness, one-headline-per-dimension, the suite contract) are
+- **Cross-registry invariants** (id-uniqueness, the per-dimension headline count, the suite contract) are
   plain throws at module load over typed in-repo constants — fail fast at import.
 - Keep packages within the [dependency DAG](./docs/architecture.md#dependency-dag-enforced); `@repo/repo-checks`
   fails CI on a boundary violation.

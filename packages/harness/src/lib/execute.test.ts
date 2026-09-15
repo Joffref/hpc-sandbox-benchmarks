@@ -69,6 +69,21 @@ describe("selectTransport", () => {
 });
 
 describe("sandbox preamble", () => {
+	for (const uid of [0, 1000]) {
+		it(`passes the selected privilege command to child tasks for uid ${uid}`, () => {
+			const result = Bun.spawnSync([
+				"bash",
+				"-c",
+				[
+					`unset SUDO; id() { printf '%s\\n' '${uid}'; }; sudo() { :; }`,
+					buildPreamble(),
+					`bash -c 'printf "%s" "\${SUDO-unset}"'`,
+				].join("; "),
+			]);
+			expect(result.exitCode).toBe(0);
+			expect(result.stdout.toString()).toBe(uid === 0 ? "" : "sudo -E");
+		});
+	}
 	it("does not auto-install repository developer tools when running benchmark tasks", () => {
 		expect(PREAMBLE).toContain("MISE_TASK_RUN_AUTO_INSTALL=0");
 	});
@@ -245,10 +260,31 @@ describe("StepRunner", () => {
 		await expect(runner.run("fail", "false", 5_000)).rejects.toThrow(/exit code 1/);
 		const tolerated = await runner.run("fail-ok", "false", 5_000, { allowFailure: true });
 		expect(tolerated.exitCode).toBe(1);
+		// The receipt must let a reader tell the tolerated exit from the real failure.
+		expect(runner.stepLog).toEqual([
+			{ phase: "setup", label: "fail", ms: expect.any(Number), exitCode: 1 },
+			{ phase: "setup", label: "fail-ok", ms: expect.any(Number), exitCode: 1, allowFailure: true },
+		]);
 	});
 });
 
 describe("StepRunner.runDetached", () => {
+	it("captures diagnostic output when native launch never settles", async () => {
+		const commands: string[] = [];
+		const sandbox: SandboxHandle = {
+			runCommand: async (command, options) => {
+				commands.push(command);
+				if (options?.background) return new Promise(() => {});
+				return { exitCode: 0, stdout: "last output from native launch" };
+			},
+			destroy: async () => {},
+		};
+		const runner = new StepRunner(sandbox);
+		await expect(runner.runDetached("hung launch", "true", 10)).rejects.toThrow("timed out");
+		expect(runner.detachedEvidence[0]?.state).toBe("deadline-exceeded");
+		expect(runner.detachedEvidence[0]?.logTail).toContain("last output from native launch");
+		expect(commands.some((command) => command.includes("pkill"))).toBe(true);
+	});
 	// A fake sandbox whose filesystem reports the done-file present after `readyAfter` polls and
 	// serves canned log/exit-code contents — the detached transport's two reads.
 	function detachedSandbox(opts: { readyAfter?: number; exitCode?: string; log?: string }): {
@@ -266,7 +302,9 @@ describe("StepRunner.runDetached", () => {
 			filesystem: {
 				exists: async (path) => path.endsWith(".done") && polls++ >= (opts.readyAfter ?? 0),
 				readFile: async (path) =>
-					path.endsWith(".done") ? (opts.exitCode ?? "0") : (opts.log ?? "benchmark output"),
+					path.endsWith(".done")
+						? receipt(path, opts.exitCode ?? "0")
+						: (opts.log ?? "benchmark output"),
 			},
 		};
 		return { sandbox, commands };
@@ -372,7 +410,7 @@ describe("StepRunner.runDetached", () => {
 		} finally {
 			console.log = spy;
 		}
-		expect(logged.join("\n")).toContain("stopped responding");
+		expect(logged.join("\n")).toContain("cause is unknown");
 	});
 
 	// A sandbox with NO filesystem API: the detached transport must still detach (double-fork) and
@@ -391,7 +429,10 @@ describe("StepRunner.runDetached", () => {
 				if (command.includes("nohup")) return { exitCode: 0, stdout: "launched" };
 				if (command.includes(".done")) {
 					const ready = probes++ >= readyAfter;
-					return { exitCode: 0, stdout: ready ? (opts.exitCode ?? "0") : "__RUNNING__" };
+					return {
+						exitCode: 0,
+						stdout: ready ? receipt(command, opts.exitCode ?? "0") : "__RUNNING__",
+					};
 				}
 				return { exitCode: 0, stdout: opts.log ?? "cat output" }; // the `.log` read
 			},
@@ -533,7 +574,7 @@ describe("StepRunner.runDetached", () => {
 					if (polls === 1) throw new Error("transient fs blip");
 					return polls >= 3;
 				},
-				readFile: async (path) => (path.endsWith(".done") ? "0" : "recovered fine"),
+				readFile: async (path) => (path.endsWith(".done") ? receipt(path) : "recovered fine"),
 			},
 		};
 		const runner = new StepRunner(sandbox, CAPPED, async () => undefined);
@@ -553,7 +594,7 @@ describe("StepRunner.runDetached", () => {
 			filesystem: {
 				exists: async (path) => path.endsWith(".done"),
 				readFile: async (path) => {
-					if (path.endsWith(".done")) return "0";
+					if (path.endsWith(".done")) return receipt(path);
 					if (++logReads < 3) throw new Error("fs API slow");
 					return "read back on attempt 3";
 				},
@@ -580,7 +621,7 @@ describe("StepRunner.runDetached", () => {
 			filesystem: {
 				exists: async (path) => path.endsWith(".done"),
 				readFile: async (path) => {
-					if (path.endsWith(".done")) return "0";
+					if (path.endsWith(".done")) return receipt(path);
 					throw new Error("fs API down"); // every .log read
 				},
 			},
@@ -605,7 +646,7 @@ describe("StepRunner.runDetached", () => {
 			filesystem: {
 				exists: async (path) => path.endsWith(".done"),
 				readFile: async (path) => {
-					if (path.endsWith(".done")) return "0";
+					if (path.endsWith(".done")) return receipt(path);
 					throw new Error("fs API down");
 				},
 			},
@@ -638,7 +679,7 @@ describe("StepRunner.runDetached", () => {
 		} finally {
 			console.log = spy;
 		}
-		expect(logged.join("\n")).toContain("stopped responding");
+		expect(logged.join("\n")).toContain("cause is unknown");
 	});
 
 	it("backs off the poll interval geometrically up to the cap", async () => {
@@ -672,7 +713,7 @@ describe("StepRunner.step (capability-driven transport)", () => {
 			destroy: async () => undefined,
 			filesystem: {
 				exists: async (path) => path.endsWith(".done"),
-				readFile: async (path) => (path.endsWith(".done") ? "0" : "out"),
+				readFile: async (path) => (path.endsWith(".done") ? receipt(path) : "out"),
 			},
 		};
 		return { sandbox, commands };
@@ -727,3 +768,8 @@ describe("StepRunner.step (capability-driven transport)", () => {
 		expect(commands[0]?.background).toBe(true);
 	});
 });
+
+function receipt(location: string, code = "0"): string {
+	const identity = /bench-[a-f0-9-]+/.exec(location)?.[0];
+	return `v1 ${identity} ${code}`;
+}

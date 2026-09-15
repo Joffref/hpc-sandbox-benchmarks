@@ -1,0 +1,92 @@
+#!/usr/bin/env bun
+import { appendFileSync, mkdirSync } from "node:fs";
+import { join } from "node:path";
+import { describeDriverFailure } from "@sandbox-benchmarks/driver";
+import { diagnosticSecretsFromEnv } from "@sandbox-benchmarks/driver/env";
+import { exitAfterSandboxCleanup } from "@sandbox-benchmarks/harness";
+import { describeCoverageShortfall } from "@sandbox-benchmarks/results";
+import { batchCoverage, executeExperimentBatch } from "../lib/execute-experiment.ts";
+import { writeImmutableJson } from "../lib/experiment-artifacts.ts";
+import { githubExperimentStore } from "../lib/experiment-store.ts";
+import {
+	artifactDownloadConcurrency,
+	downloadExperimentAttempts,
+	downloadExperimentPlan,
+} from "../lib/experiment-transfer.ts";
+import { githubAccountJournal, githubGitRequest } from "../lib/github-account-journal.ts";
+import { workflowAxes, workflowBatch, workflowExperiment } from "../lib/workflow-experiment.ts";
+
+if (import.meta.main) {
+	const commandStarted = performance.now();
+	try {
+		const [command, account, wave] = process.argv.slice(2);
+		const id = process.env.BENCH_EXPERIMENT_ID ?? process.env.GITHUB_RUN_ID;
+		if (!id) throw new Error("experiment id is required");
+		const store = githubExperimentStore(id);
+		const root = "experiment";
+		const planRoot = join(root, "manifest");
+		mkdirSync(planRoot, { recursive: true });
+		let plan: ReturnType<typeof workflowExperiment>;
+		if (command === "plan" && process.env.GITHUB_RUN_ATTEMPT === "1") {
+			plan = workflowExperiment(process.env, new Date().toISOString().slice(0, 10));
+			writeImmutableJson(join(planRoot, "plan.json"), plan);
+			await store.upload(`experiment-plan-${plan.id}`, planRoot);
+		} else plan = await downloadExperimentPlan(store, id, planRoot);
+		if (command !== "collect" && plan.sha !== process.env.GITHUB_SHA)
+			throw new Error("checkout revision differs from frozen experiment");
+		if (command === "plan" || command === "axes") {
+			const axis = workflowAxes(plan, account, wave);
+			if (!process.env.GITHUB_OUTPUT) throw new Error("workflow output file is required");
+			appendFileSync(process.env.GITHUB_OUTPUT, `axis=${JSON.stringify(axis)}\n`);
+		} else if (command === "execute") {
+			const batchId = process.env.BENCH_BATCH_ID;
+			if (!batchId) throw new Error("batch id is required");
+			const batch = workflowBatch(
+				plan,
+				batchId,
+				process.env.BENCH_ACCOUNT,
+				process.env.BENCH_BATCH_PROVIDERS,
+			);
+			const cellBudget = Number(process.env.BENCH_CELL_BUDGET_MINUTES);
+			if (cellBudget < batch.budgetMinutes)
+				throw new Error(
+					`BENCH_CELL_BUDGET_MINUTES ${cellBudget} is below batch ${batchId} budgetMinutes ${batch.budgetMinutes}`,
+				);
+
+			const attempts = await executeExperimentBatch({
+				plan,
+				batchId,
+				root: join(root, "attempts"),
+				workflowAttempt: Number(process.env.GITHUB_RUN_ATTEMPT),
+				job: process.env.GITHUB_JOB ?? "unknown",
+				store,
+				journal: githubAccountJournal(githubGitRequest()),
+			});
+			// An incomplete batch must say which cells fell short: this exit is the only signal the
+			// job gives, and a bare code sends the reader to another job's coverage artifact.
+			const coverage = batchCoverage(plan, join(root, "attempts"), attempts);
+			if (!coverage.complete)
+				console.error(
+					[`batch ${batchId} is incomplete`, ...describeCoverageShortfall(coverage)].join("\n"),
+				);
+			await exitAfterSandboxCleanup(coverage.complete ? 0 : 1);
+		} else if (command === "collect") {
+			const summary = await downloadExperimentAttempts(
+				store,
+				githubAccountJournal(githubGitRequest()),
+				plan,
+				join(root, "attempts"),
+				{ concurrency: artifactDownloadConcurrency() },
+			);
+			console.log(
+				`experiment collection: ${JSON.stringify({ ...summary, collectCommandMs: performance.now() - commandStarted })}`,
+			);
+		} else
+			throw new Error(
+				"usage: workflow-experiment plan | axes [account] [wave] | execute | collect",
+			);
+	} catch (error) {
+		console.error(describeDriverFailure(error, diagnosticSecretsFromEnv(process.env)));
+		await exitAfterSandboxCleanup(1);
+	}
+}

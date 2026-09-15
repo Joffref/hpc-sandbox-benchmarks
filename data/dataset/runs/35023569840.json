@@ -1,0 +1,2669 @@
+{
+  "schemaVersion": "8",
+  "runId": "35023569840",
+  "sha": "deeee5a41e598dbde923c80f018e9174e554f3fd",
+  "generatedAt": "2026-09-15T21:33:08.891Z",
+  "targetSpec": {
+    "vcpus": 4,
+    "memoryGb": 8,
+    "diskGb": 40
+  },
+  "providers": [
+    {
+      "providerId": "blaxel",
+      "costEvidence": [],
+      "artifactEvidence": [
+        {
+          "cell": {
+            "runId": "35023569840",
+            "providerId": "blaxel",
+            "suite": "cpu-node",
+            "replicateIndex": 2
+          },
+          "sandboxId": "benchmark-9ef3cae7-076f-4c7f-98e6-cf0321f3b67e",
+          "provenance": {
+            "source": "request-fallback",
+            "requested": {
+              "kind": "none"
+            }
+          }
+        },
+        {
+          "cell": {
+            "runId": "35023569840",
+            "providerId": "blaxel",
+            "suite": "system",
+            "replicateIndex": 0
+          },
+          "sandboxId": "benchmark-be68d7e5-ce76-4043-8a07-cdae4816481e",
+          "provenance": {
+            "source": "request-fallback",
+            "requested": {
+              "kind": "none"
+            }
+          }
+        }
+      ],
+      "validationStatus": "validated",
+      "specMatched": true,
+      "observedSpecs": {
+        "cpuModel": "AMD EPYC",
+        "detectedIsolation": "vm",
+        "diskGb": 40.2,
+        "hostMemoryGb": 8,
+        "hostVcpus": 4,
+        "kernel": "6.1.166",
+        "memoryGb": 7.78,
+        "os": "Debian GNU/Linux 12 (bookworm)",
+        "vcpus": 4,
+        "virtualization": "kvm",
+        "asnSource": "cymru",
+        "city": "Amsterdam",
+        "country": "NL",
+        "egressAsn": "AS396356",
+        "egressOrg": "AS396356 Latitude.sh",
+        "egressOrgName": "Latitude.sh",
+        "geoSource": "ipinfo",
+        "location": "52.3740,4.8897",
+        "networkPrefix": "2605:6440:d000::/36",
+        "region": "North Holland",
+        "timezone": "Europe/Amsterdam"
+      },
+      "observedMixtures": {
+        "sandboxes": 54,
+        "hostHardware": {
+          "99ce4099de99537b": {
+            "count": 2,
+            "specs": {
+              "cpuModel": "AMD EPYC",
+              "detectedIsolation": "vm",
+              "diskGb": 40.2,
+              "hostMemoryGb": 8,
+              "hostVcpus": 4,
+              "kernel": "6.1.166",
+              "memoryGb": 7.78,
+              "os": "Debian GNU/Linux 12 (bookworm)",
+              "vcpus": 4,
+              "virtualization": "kvm"
+            },
+            "specMatched": true
+          }
+        },
+        "hostNetwork": {
+          "511421bfef0edbec": {
+            "count": 1,
+            "specs": {
+              "asnSource": "cymru",
+              "city": "Amsterdam",
+              "country": "NL",
+              "egressAsn": "AS396356",
+              "egressOrg": "AS396356 Latitude.sh",
+              "egressOrgName": "Latitude.sh",
+              "geoSource": "ipinfo",
+              "location": "52.3740,4.8897",
+              "networkPrefix": "2605:6440:d000::/36",
+              "region": "North Holland",
+              "timezone": "Europe/Amsterdam"
+            }
+          }
+        }
+      },
+      "hostMetadata": [
+        {
+          "source": "phoronix/result-file-to-json",
+          "sourceFile": "cpu-node/pts_node-web-tooling--metadata.json",
+          "fields": [
+            {
+              "path": "ci.client_version",
+              "value": "10.8.4"
+            },
+            {
+              "path": "ci.data.cpu-microcode",
+              "value": "0x1000065"
+            },
+            {
+              "path": "ci.data.environment-variables",
+              "value": "BL_DEBUG_TELEMETRY=false"
+            },
+            {
+              "path": "ci.data.kernel-extra-details",
+              "value": "Transparent Huge Pages: madvise"
+            },
+            {
+              "path": "ci.data.security",
+              "value": "gather_data_sampling: Not affected + indirect_target_selection: Not affected + itlb_multihit: Not affected + l1tf: Not affected + mds: Not affected + meltdown: Not affected + mmio_stale_data: Not affected + reg_file_data_sampling: Not affected + retbleed: Not affected + spec_rstack_overflow: Mitigation of safe RET no microcode + spec_store_bypass: Mitigation of SSB disabled via prctl + spectre_v1: Mitigation of usercopy/swapgs barriers and __user pointer sanitization + spectre_v2: Mitigation of Retpolines; IBPB: conditional; IBRS_FW; STIBP: always-on; RSB filling; PBRSB-eIBRS: Not affected; BHI: Not affected + srbds: Not affected + tsa: Mitigation of Clear buffers + tsx_async_abort: Not affected + vmscape: Not affected"
+            },
+            {
+              "path": "ci.hardware.Disk",
+              "value": "41GB"
+            },
+            {
+              "path": "ci.hardware.Memory",
+              "value": "8GB"
+            },
+            {
+              "path": "ci.hardware.Processor",
+              "value": "AMD EPYC (2 Cores / 4 Threads)"
+            },
+            {
+              "path": "ci.identifier",
+              "value": "ci"
+            },
+            {
+              "path": "ci.software.Compiler",
+              "value": "GCC 12.2.0"
+            },
+            {
+              "path": "ci.software.File-System",
+              "value": "xfs"
+            },
+            {
+              "path": "ci.software.Kernel",
+              "value": "6.1.166 (x86_64)"
+            },
+            {
+              "path": "ci.software.OS",
+              "value": "Debian GNU/Linux 12"
+            },
+            {
+              "path": "ci.software.System Layer",
+              "value": "KVM"
+            },
+            {
+              "path": "ci.timestamp",
+              "value": "2026-09-15 21:08:24"
+            },
+            {
+              "path": "ci.user",
+              "value": "root"
+            }
+          ],
+          "sandboxes": 1,
+          "hostHardwareId": "99ce4099de99537b"
+        },
+        {
+          "source": "phoronix/result-file-to-json",
+          "sourceFile": "system/pts_git--metadata.json",
+          "fields": [
+            {
+              "path": "ci.client_version",
+              "value": "10.8.4"
+            },
+            {
+              "path": "ci.data.cpu-microcode",
+              "value": "0x1000065"
+            },
+            {
+              "path": "ci.data.environment-variables",
+              "value": "BL_DEBUG_TELEMETRY=false"
+            },
+            {
+              "path": "ci.data.kernel-extra-details",
+              "value": "Transparent Huge Pages: madvise"
+            },
+            {
+              "path": "ci.data.security",
+              "value": "gather_data_sampling: Not affected + indirect_target_selection: Not affected + itlb_multihit: Not affected + l1tf: Not affected + mds: Not affected + meltdown: Not affected + mmio_stale_data: Not affected + reg_file_data_sampling: Not affected + retbleed: Not affected + spec_rstack_overflow: Mitigation of safe RET no microcode + spec_store_bypass: Mitigation of SSB disabled via prctl + spectre_v1: Mitigation of usercopy/swapgs barriers and __user pointer sanitization + spectre_v2: Mitigation of Retpolines; IBPB: conditional; IBRS_FW; STIBP: always-on; RSB filling; PBRSB-eIBRS: Not affected; BHI: Not affected + srbds: Not affected + tsa: Mitigation of Clear buffers + tsx_async_abort: Not affected + vmscape: Not affected"
+            },
+            {
+              "path": "ci.hardware.Disk",
+              "value": "41GB"
+            },
+            {
+              "path": "ci.hardware.Memory",
+              "value": "8GB"
+            },
+            {
+              "path": "ci.hardware.Processor",
+              "value": "AMD EPYC (2 Cores / 4 Threads)"
+            },
+            {
+              "path": "ci.identifier",
+              "value": "ci"
+            },
+            {
+              "path": "ci.software.Compiler",
+              "value": "GCC 12.2.0"
+            },
+            {
+              "path": "ci.software.File-System",
+              "value": "xfs"
+            },
+            {
+              "path": "ci.software.Kernel",
+              "value": "6.1.166 (x86_64)"
+            },
+            {
+              "path": "ci.software.OS",
+              "value": "Debian GNU/Linux 12"
+            },
+            {
+              "path": "ci.software.System Layer",
+              "value": "KVM"
+            },
+            {
+              "path": "ci.timestamp",
+              "value": "2026-09-15 21:17:08"
+            },
+            {
+              "path": "ci.user",
+              "value": "root"
+            }
+          ],
+          "sandboxes": 1,
+          "hostHardwareId": "99ce4099de99537b",
+          "hostNetworkId": "511421bfef0edbec"
+        },
+        {
+          "source": "phoronix/result-file-to-json",
+          "sourceFile": "system/pts_pybench--metadata.json",
+          "fields": [
+            {
+              "path": "ci.client_version",
+              "value": "10.8.4"
+            },
+            {
+              "path": "ci.data.cpu-microcode",
+              "value": "0x1000065"
+            },
+            {
+              "path": "ci.data.environment-variables",
+              "value": "BL_DEBUG_TELEMETRY=false"
+            },
+            {
+              "path": "ci.data.kernel-extra-details",
+              "value": "Transparent Huge Pages: madvise"
+            },
+            {
+              "path": "ci.data.python",
+              "value": "Python 3.11.2"
+            },
+            {
+              "path": "ci.data.security",
+              "value": "gather_data_sampling: Not affected + indirect_target_selection: Not affected + itlb_multihit: Not affected + l1tf: Not affected + mds: Not affected + meltdown: Not affected + mmio_stale_data: Not affected + reg_file_data_sampling: Not affected + retbleed: Not affected + spec_rstack_overflow: Mitigation of safe RET no microcode + spec_store_bypass: Mitigation of SSB disabled via prctl + spectre_v1: Mitigation of usercopy/swapgs barriers and __user pointer sanitization + spectre_v2: Mitigation of Retpolines; IBPB: conditional; IBRS_FW; STIBP: always-on; RSB filling; PBRSB-eIBRS: Not affected; BHI: Not affected + srbds: Not affected + tsa: Mitigation of Clear buffers + tsx_async_abort: Not affected + vmscape: Not affected"
+            },
+            {
+              "path": "ci.hardware.Disk",
+              "value": "41GB"
+            },
+            {
+              "path": "ci.hardware.Memory",
+              "value": "8GB"
+            },
+            {
+              "path": "ci.hardware.Processor",
+              "value": "AMD EPYC (2 Cores / 4 Threads)"
+            },
+            {
+              "path": "ci.identifier",
+              "value": "ci"
+            },
+            {
+              "path": "ci.software.Compiler",
+              "value": "GCC 12.2.0"
+            },
+            {
+              "path": "ci.software.File-System",
+              "value": "xfs"
+            },
+            {
+              "path": "ci.software.Kernel",
+              "value": "6.1.166 (x86_64)"
+            },
+            {
+              "path": "ci.software.OS",
+              "value": "Debian GNU/Linux 12"
+            },
+            {
+              "path": "ci.software.System Layer",
+              "value": "KVM"
+            },
+            {
+              "path": "ci.timestamp",
+              "value": "2026-09-15 21:12:28"
+            },
+            {
+              "path": "ci.user",
+              "value": "root"
+            }
+          ],
+          "sandboxes": 1,
+          "hostHardwareId": "99ce4099de99537b",
+          "hostNetworkId": "511421bfef0edbec"
+        },
+        {
+          "source": "phoronix/result-file-to-json",
+          "sourceFile": "system/pts_sqlite-speedtest--metadata.json",
+          "fields": [
+            {
+              "path": "ci.client_version",
+              "value": "10.8.4"
+            },
+            {
+              "path": "ci.data.compiler-configuration",
+              "value": "--build=x86_64-linux-gnu --disable-vtable-verify --disable-werror --enable-cet --enable-checking=release --enable-clocale=gnu --enable-default-pie --enable-gnu-unique-object --enable-languages=c,ada,c++,go,d,fortran,objc,obj-c++,m2 --enable-libphobos-checking=release --enable-libstdcxx-debug --enable-libstdcxx-time=yes --enable-multiarch --enable-multilib --enable-nls --enable-objc-gc=auto --enable-offload-defaulted --enable-offload-targets=nvptx-none=/build/reproducible-path/gcc-12-12.2.0/debian/tmp-nvptx/usr,amdgcn-amdhsa=/build/reproducible-path/gcc-12-12.2.0/debian/tmp-gcn/usr --enable-plugin --enable-shared --enable-threads=posix --host=x86_64-linux-gnu --program-prefix=x86_64-linux-gnu- --target=x86_64-linux-gnu --with-abi=m64 --with-arch-32=i686 --with-default-libstdcxx-abi=new --with-gcc-major-version-only --with-multilib-list=m32,m64,mx32 --with-target-system-zlib=auto --with-tune=generic --without-cuda-driver -v"
+            },
+            {
+              "path": "ci.data.cpu-microcode",
+              "value": "0x1000065"
+            },
+            {
+              "path": "ci.data.environment-variables",
+              "value": "BL_DEBUG_TELEMETRY=false"
+            },
+            {
+              "path": "ci.data.kernel-extra-details",
+              "value": "Transparent Huge Pages: madvise"
+            },
+            {
+              "path": "ci.data.security",
+              "value": "gather_data_sampling: Not affected + indirect_target_selection: Not affected + itlb_multihit: Not affected + l1tf: Not affected + mds: Not affected + meltdown: Not affected + mmio_stale_data: Not affected + reg_file_data_sampling: Not affected + retbleed: Not affected + spec_rstack_overflow: Mitigation of safe RET no microcode + spec_store_bypass: Mitigation of SSB disabled via prctl + spectre_v1: Mitigation of usercopy/swapgs barriers and __user pointer sanitization + spectre_v2: Mitigation of Retpolines; IBPB: conditional; IBRS_FW; STIBP: always-on; RSB filling; PBRSB-eIBRS: Not affected; BHI: Not affected + srbds: Not affected + tsa: Mitigation of Clear buffers + tsx_async_abort: Not affected + vmscape: Not affected"
+            },
+            {
+              "path": "ci.hardware.Disk",
+              "value": "41GB"
+            },
+            {
+              "path": "ci.hardware.Memory",
+              "value": "8GB"
+            },
+            {
+              "path": "ci.hardware.Processor",
+              "value": "AMD EPYC (2 Cores / 4 Threads)"
+            },
+            {
+              "path": "ci.identifier",
+              "value": "ci"
+            },
+            {
+              "path": "ci.software.Compiler",
+              "value": "GCC 12.2.0"
+            },
+            {
+              "path": "ci.software.File-System",
+              "value": "xfs"
+            },
+            {
+              "path": "ci.software.Kernel",
+              "value": "6.1.166 (x86_64)"
+            },
+            {
+              "path": "ci.software.OS",
+              "value": "Debian GNU/Linux 12"
+            },
+            {
+              "path": "ci.software.System Layer",
+              "value": "KVM"
+            },
+            {
+              "path": "ci.timestamp",
+              "value": "2026-09-15 21:13:39"
+            },
+            {
+              "path": "ci.user",
+              "value": "root"
+            }
+          ],
+          "sandboxes": 1,
+          "hostHardwareId": "99ce4099de99537b",
+          "hostNetworkId": "511421bfef0edbec"
+        },
+        {
+          "source": "mise/system-provider",
+          "sourceFile": "system/system-provider.json",
+          "fields": [
+            {
+              "path": "acpi_creator",
+              "value": "FCAT"
+            },
+            {
+              "path": "acpi_oem",
+              "value": "FIRECK"
+            },
+            {
+              "path": "acpi_oem_table",
+              "value": "FCVMDSDT"
+            },
+            {
+              "path": "asn",
+              "value": "AS396356"
+            },
+            {
+              "path": "asn_source",
+              "value": "cymru"
+            },
+            {
+              "path": "bios_vendor",
+              "value": ""
+            },
+            {
+              "path": "block_devices",
+              "value": "loop0,loop1,loop2,loop3,loop4,loop5,loop6,loop7,vda,vdb"
+            },
+            {
+              "path": "bootlog_names_gvisor",
+              "value": "false"
+            },
+            {
+              "path": "cap_sys_admin",
+              "value": "true"
+            },
+            {
+              "path": "cgroup_engine",
+              "value": ""
+            },
+            {
+              "path": "cgroup_root_writable",
+              "value": "true"
+            },
+            {
+              "path": "city",
+              "value": "Amsterdam"
+            },
+            {
+              "path": "confidential_computing",
+              "value": ""
+            },
+            {
+              "path": "container_candidates.0.id",
+              "value": "oci-container"
+            },
+            {
+              "path": "container_candidates.0.reasons.0",
+              "value": "the root filesystem is an overlay (20)"
+            },
+            {
+              "path": "container_candidates.0.score",
+              "value": "20"
+            },
+            {
+              "path": "container_confidence",
+              "value": "none"
+            },
+            {
+              "path": "container_markers",
+              "value": ""
+            },
+            {
+              "path": "container_runner_up_score",
+              "value": "0"
+            },
+            {
+              "path": "container_runtime",
+              "value": "none"
+            },
+            {
+              "path": "container_score",
+              "value": "0"
+            },
+            {
+              "path": "country",
+              "value": "NL"
+            },
+            {
+              "path": "cpu_hypervisor",
+              "value": "KVM"
+            },
+            {
+              "path": "cpu_is_uml",
+              "value": "false"
+            },
+            {
+              "path": "cpuinfo_flags",
+              "value": "true"
+            },
+            {
+              "path": "detected_virt",
+              "value": "kvm"
+            },
+            {
+              "path": "detected_virt_container",
+              "value": "none"
+            },
+            {
+              "path": "detected_virt_vm",
+              "value": "kvm"
+            },
+            {
+              "path": "detected_virt_what",
+              "value": ""
+            },
+            {
+              "path": "dind_mode",
+              "value": "unavailable"
+            },
+            {
+              "path": "dind_readiness",
+              "value": "blocked"
+            },
+            {
+              "path": "dind_reasons",
+              "value": "no a dockerd or podman binary"
+            },
+            {
+              "path": "docker_cli",
+              "value": "false"
+            },
+            {
+              "path": "docker_reachable",
+              "value": "false"
+            },
+            {
+              "path": "docker_server_version",
+              "value": ""
+            },
+            {
+              "path": "docker_socket",
+              "value": "false"
+            },
+            {
+              "path": "docker_storage_driver",
+              "value": ""
+            },
+            {
+              "path": "dockerd_binary",
+              "value": "false"
+            },
+            {
+              "path": "geo_source",
+              "value": "ipinfo"
+            },
+            {
+              "path": "has_acpi",
+              "value": "true"
+            },
+            {
+              "path": "has_fuse",
+              "value": "true"
+            },
+            {
+              "path": "has_hvc0",
+              "value": "false"
+            },
+            {
+              "path": "has_kvm",
+              "value": "false"
+            },
+            {
+              "path": "has_smbios",
+              "value": "false"
+            },
+            {
+              "path": "has_veth",
+              "value": "false"
+            },
+            {
+              "path": "has_virtiofs",
+              "value": "false"
+            },
+            {
+              "path": "has_vmbus",
+              "value": "false"
+            },
+            {
+              "path": "has_vsock",
+              "value": "true"
+            },
+            {
+              "path": "has_xen_node",
+              "value": "false"
+            },
+            {
+              "path": "hypervisor_flag",
+              "value": "true"
+            },
+            {
+              "path": "is_root",
+              "value": "true"
+            },
+            {
+              "path": "isolation_class",
+              "value": "microvm"
+            },
+            {
+              "path": "isolation_confidence",
+              "value": "confirmed"
+            },
+            {
+              "path": "isolation_runtime",
+              "value": "firecracker"
+            },
+            {
+              "path": "isolation_why",
+              "value": "ACPI OEM id FIRECK (100)|pci=off, Firecracker's default (30)|explicit virtio-mmio device windows (30)|console on an emulated 8250 (15)"
+            },
+            {
+              "path": "kernel_build",
+              "value": "Linux version 6.1.166 (runner@depot-machine) (gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0, GNU ld (GNU Binutils for Ubuntu) 2.42) #1 SMP PREEMPT_DYNAMIC Tue Sep 15 00:09:13 UTC 2026"
+            },
+            {
+              "path": "kernel_cmdline_markers",
+              "value": "panic=-1,pci=off,virtio_mmio.device,console=ttyS0"
+            },
+            {
+              "path": "kernel_names_gvisor",
+              "value": "false"
+            },
+            {
+              "path": "loc",
+              "value": "52.3740,4.8897"
+            },
+            {
+              "path": "lsm_profile",
+              "value": ""
+            },
+            {
+              "path": "machine_candidates.0.id",
+              "value": "firecracker"
+            },
+            {
+              "path": "machine_candidates.0.reasons.0",
+              "value": "ACPI OEM id FIRECK (100)"
+            },
+            {
+              "path": "machine_candidates.0.reasons.1",
+              "value": "pci=off, Firecracker's default (30)"
+            },
+            {
+              "path": "machine_candidates.0.reasons.2",
+              "value": "explicit virtio-mmio device windows (30)"
+            },
+            {
+              "path": "machine_candidates.0.reasons.3",
+              "value": "console on an emulated 8250 (15)"
+            },
+            {
+              "path": "machine_candidates.0.score",
+              "value": "175"
+            },
+            {
+              "path": "machine_candidates.1.id",
+              "value": "microvm-unidentified"
+            },
+            {
+              "path": "machine_candidates.1.reasons.0",
+              "value": "a virtio guest with no SMBIOS: a minimal VMM, not identified (45)"
+            },
+            {
+              "path": "machine_candidates.1.score",
+              "value": "45"
+            },
+            {
+              "path": "machine_candidates.2.id",
+              "value": "vm-unidentified"
+            },
+            {
+              "path": "machine_candidates.2.reasons.0",
+              "value": "CPUID reports a hypervisor (40)"
+            },
+            {
+              "path": "machine_candidates.2.score",
+              "value": "40"
+            },
+            {
+              "path": "machine_confidence",
+              "value": "confirmed"
+            },
+            {
+              "path": "machine_runner_up_score",
+              "value": "0"
+            },
+            {
+              "path": "machine_score",
+              "value": "175"
+            },
+            {
+              "path": "machine_vmm",
+              "value": "firecracker"
+            },
+            {
+              "path": "manufacturer",
+              "value": ""
+            },
+            {
+              "path": "masked_proc",
+              "value": "false"
+            },
+            {
+              "path": "mount_fstypes",
+              "value": "cgroup2,devpts,devtmpfs,erofs,fuse,overlay,proc,sysfs,tmpfs,xfs"
+            },
+            {
+              "path": "net_drivers",
+              "value": "virtio_net"
+            },
+            {
+              "path": "net_ifaces",
+              "value": "eth0"
+            },
+            {
+              "path": "org",
+              "value": "AS396356 Latitude.sh"
+            },
+            {
+              "path": "org_name",
+              "value": "Latitude.sh"
+            },
+            {
+              "path": "overlay_engine",
+              "value": ""
+            },
+            {
+              "path": "overlayfs_supported",
+              "value": "true"
+            },
+            {
+              "path": "pci_vendors",
+              "value": ""
+            },
+            {
+              "path": "podman_binary",
+              "value": "false"
+            },
+            {
+              "path": "prefix",
+              "value": "2605:6440:d000::/36"
+            },
+            {
+              "path": "product_name",
+              "value": ""
+            },
+            {
+              "path": "public_ip",
+              "value": "2605:6440:d000:211:a80:4:0:12a"
+            },
+            {
+              "path": "region",
+              "value": "North Holland"
+            },
+            {
+              "path": "reverse_dns",
+              "value": "nat64.dyndns.dk"
+            },
+            {
+              "path": "root_fstype",
+              "value": "overlay"
+            },
+            {
+              "path": "schema_version",
+              "value": "2.0"
+            },
+            {
+              "path": "timezone",
+              "value": "Europe/Amsterdam"
+            },
+            {
+              "path": "userns_mapped",
+              "value": "false"
+            },
+            {
+              "path": "virtio_devices",
+              "value": "blk,net,vsock"
+            },
+            {
+              "path": "virtio_transport",
+              "value": "mmio"
+            }
+          ],
+          "sandboxes": 1,
+          "hostHardwareId": "99ce4099de99537b",
+          "hostNetworkId": "511421bfef0edbec"
+        }
+      ],
+      "metrics": [
+        {
+          "metricId": "git_seconds",
+          "samples": [36.965, 37.091],
+          "aggregates": {
+            "p50": 37.028000000000006,
+            "p95": 37.0847,
+            "mean": 37.028000000000006,
+            "stdev": 0.08909545442950083,
+            "min": 36.965,
+            "max": 37.091,
+            "n": 2
+          },
+          "sourceFile": "system/pts_git.xml",
+          "ptsSampleSource": "raw-string",
+          "hostHardwareId": "99ce4099de99537b",
+          "hostNetworkId": "511421bfef0edbec"
+        },
+        {
+          "metricId": "node_web_tooling_runs_per_s",
+          "samples": [19.56, 18.87],
+          "aggregates": {
+            "p50": 19.215,
+            "p95": 19.525499999999997,
+            "mean": 19.215,
+            "stdev": 0.4879036790187162,
+            "min": 18.87,
+            "max": 19.56,
+            "n": 2
+          },
+          "sourceFile": "cpu-node/pts_node-web-tooling.xml",
+          "ptsSampleSource": "raw-string",
+          "hostHardwareId": "99ce4099de99537b"
+        },
+        {
+          "metricId": "pybench_milliseconds",
+          "samples": [577, 539],
+          "aggregates": {
+            "p50": 558,
+            "p95": 575.1,
+            "mean": 558,
+            "stdev": 26.870057685088806,
+            "min": 539,
+            "max": 577,
+            "n": 2
+          },
+          "sourceFile": "system/pts_pybench.xml",
+          "ptsSampleSource": "raw-string",
+          "appVersion": "2018-02-16",
+          "hostHardwareId": "99ce4099de99537b",
+          "hostNetworkId": "511421bfef0edbec"
+        },
+        {
+          "metricId": "sqlite_speedtest_seconds",
+          "samples": [60.919, 60.539],
+          "aggregates": {
+            "p50": 60.729,
+            "p95": 60.9,
+            "mean": 60.729,
+            "stdev": 0.26870057685088483,
+            "min": 60.539,
+            "max": 60.919,
+            "n": 2
+          },
+          "sourceFile": "system/pts_sqlite-speedtest.xml",
+          "ptsSampleSource": "raw-string",
+          "appVersion": "3.30",
+          "hostHardwareId": "99ce4099de99537b",
+          "hostNetworkId": "511421bfef0edbec"
+        }
+      ],
+      "suitesCovered": ["cpu-node", "system"],
+      "gaps": [
+        {
+          "scope": "suite",
+          "id": "cpu-node",
+          "outcome": "failed",
+          "reason": "Failed to create sandbox: computesdk create failed: Sandbox deployment failed. Please try again or contact support if the issue persists.",
+          "cause": {
+            "kind": "sandbox-create-failed",
+            "detail": "computesdk create failed: Sandbox deployment failed. Please try again or contact support if the issue persists."
+          }
+        },
+        {
+          "scope": "suite",
+          "id": "cpu-node",
+          "outcome": "failed",
+          "reason": "Partial publication withheld unverified measurements: node_web_tooling_runs_per_s"
+        },
+        {
+          "scope": "suite",
+          "id": "disk",
+          "outcome": "failed",
+          "reason": "Failed to create sandbox: computesdk create failed: Sandbox deployment failed. Please try again or contact support if the issue persists.",
+          "cause": {
+            "kind": "sandbox-create-failed",
+            "detail": "computesdk create failed: Sandbox deployment failed. Please try again or contact support if the issue persists."
+          }
+        },
+        {
+          "scope": "suite",
+          "id": "disk",
+          "outcome": "failed",
+          "reason": "Partial publication withheld unverified measurements: hardlink_bogo_ops_per_s, fio_type_sequential_read_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_mb_per_s, fio_type_sequential_read_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_iops, fio_type_sequential_write_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_mb_per_s, fio_type_sequential_write_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_iops, fio_type_random_read_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_mb_per_s, fio_type_random_read_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_iops, fio_type_random_write_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_mb_per_s, fio_type_random_write_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_iops"
+        },
+        {
+          "scope": "suite",
+          "id": "memory",
+          "outcome": "failed",
+          "reason": "Failed to create sandbox: computesdk create failed: Sandbox deployment failed. Please try again or contact support if the issue persists.",
+          "cause": {
+            "kind": "sandbox-create-failed",
+            "detail": "computesdk create failed: Sandbox deployment failed. Please try again or contact support if the issue persists."
+          }
+        },
+        {
+          "scope": "suite",
+          "id": "memory",
+          "outcome": "failed",
+          "reason": "Partial publication withheld unverified measurements: stream_type_copy, stream_type_scale, stream_type_add, stream_type_triad"
+        },
+        {
+          "scope": "suite",
+          "id": "network",
+          "outcome": "failed",
+          "reason": "Failed to create sandbox: computesdk create failed: Sandbox deployment failed. Please try again or contact support if the issue persists.",
+          "cause": {
+            "kind": "sandbox-create-failed",
+            "detail": "computesdk create failed: Sandbox deployment failed. Please try again or contact support if the issue persists."
+          }
+        },
+        {
+          "scope": "suite",
+          "id": "network",
+          "outcome": "failed",
+          "reason": "Partial publication withheld unverified measurements: iperf_server_address_localhost_server_port_5201_duration_10_seconds_test_tcp_parallel_1, iperf_server_address_localhost_server_port_5201_duration_10_seconds_test_tcp_parallel_10, iperf_server_address_localhost_server_port_5201_duration_10_seconds_test_udp_10000mbit_objective_parallel_1, iperf_wan_direction_download, iperf_wan_direction_upload"
+        },
+        {
+          "scope": "suite",
+          "id": "pgbench",
+          "outcome": "failed",
+          "reason": "Failed to create sandbox: computesdk create failed: Sandbox deployment failed. Please try again or contact support if the issue persists.",
+          "cause": {
+            "kind": "sandbox-create-failed",
+            "detail": "computesdk create failed: Sandbox deployment failed. Please try again or contact support if the issue persists."
+          }
+        },
+        {
+          "scope": "suite",
+          "id": "pgbench",
+          "outcome": "failed",
+          "reason": "Partial publication withheld unverified measurements: pgbench_scaling_factor_100_clients_50_mode_read_only, pgbench_scaling_factor_100_clients_50_mode_read_only_average_latency, pgbench_scaling_factor_100_clients_50_mode_read_write, pgbench_scaling_factor_100_clients_50_mode_read_write_average_latency"
+        },
+        {
+          "scope": "suite",
+          "id": "realworld-better-auth",
+          "outcome": "failed",
+          "reason": "Failed to create sandbox: computesdk create failed: Sandbox deployment failed. Please try again or contact support if the issue persists.",
+          "cause": {
+            "kind": "sandbox-create-failed",
+            "detail": "computesdk create failed: Sandbox deployment failed. Please try again or contact support if the issue persists."
+          }
+        },
+        {
+          "scope": "suite",
+          "id": "realworld-better-auth",
+          "outcome": "failed",
+          "reason": "Partial publication withheld unverified measurements: realworld_better_auth_task_git_clone, realworld_better_auth_task_cold_install, realworld_better_auth_task_lint_biome, realworld_better_auth_task_lint_deps_knip, realworld_better_auth_task_lint_format, realworld_better_auth_task_lint_spell, realworld_better_auth_task_lint_types, realworld_better_auth_task_lint_packages, realworld_better_auth_task_typecheck, realworld_better_auth_task_build"
+        },
+        {
+          "scope": "suite",
+          "id": "realworld-mastra",
+          "outcome": "failed",
+          "reason": "Failed to create sandbox: computesdk create failed: Sandbox deployment failed. Please try again or contact support if the issue persists.",
+          "cause": {
+            "kind": "sandbox-create-failed",
+            "detail": "computesdk create failed: Sandbox deployment failed. Please try again or contact support if the issue persists."
+          }
+        },
+        {
+          "scope": "suite",
+          "id": "realworld-mastra",
+          "outcome": "failed",
+          "reason": "Partial publication withheld unverified measurements: realworld_mastra_task_git_clone, realworld_mastra_task_cold_install, realworld_mastra_task_lint_format, realworld_mastra_task_build_core, realworld_mastra_task_test_core"
+        },
+        {
+          "scope": "suite",
+          "id": "realworld-openclaw",
+          "outcome": "failed",
+          "reason": "Failed to create sandbox: computesdk create failed: Sandbox deployment failed. Please try again or contact support if the issue persists.",
+          "cause": {
+            "kind": "sandbox-create-failed",
+            "detail": "computesdk create failed: Sandbox deployment failed. Please try again or contact support if the issue persists."
+          }
+        },
+        {
+          "scope": "suite",
+          "id": "realworld-openclaw",
+          "outcome": "failed",
+          "reason": "Partial publication withheld unverified measurements: realworld_openclaw_task_git_clone, realworld_openclaw_task_cold_install, realworld_openclaw_task_lint_oxlint, realworld_openclaw_task_lint_extensions_all, realworld_openclaw_task_typecheck, realworld_openclaw_task_test_types"
+        },
+        {
+          "scope": "suite",
+          "id": "system",
+          "outcome": "failed",
+          "reason": "Failed to create sandbox: computesdk create failed: Sandbox deployment failed. Please try again or contact support if the issue persists.",
+          "cause": {
+            "kind": "sandbox-create-failed",
+            "detail": "computesdk create failed: Sandbox deployment failed. Please try again or contact support if the issue persists."
+          }
+        },
+        {
+          "scope": "suite",
+          "id": "system",
+          "outcome": "failed",
+          "reason": "Partial publication withheld unverified measurements: pybench_milliseconds, sqlite_speedtest_seconds, git_seconds"
+        }
+      ],
+      "uncatalogued": []
+    },
+    {
+      "providerId": "daytona-container",
+      "costEvidence": [],
+      "artifactEvidence": [],
+      "validationStatus": "pending",
+      "observedSpecs": {},
+      "metrics": [],
+      "suitesCovered": [],
+      "gaps": [],
+      "uncatalogued": []
+    },
+    {
+      "providerId": "daytona-vm",
+      "costEvidence": [],
+      "artifactEvidence": [],
+      "validationStatus": "pending",
+      "observedSpecs": {},
+      "metrics": [],
+      "suitesCovered": [],
+      "gaps": [],
+      "uncatalogued": []
+    },
+    {
+      "providerId": "e2b",
+      "costEvidence": [],
+      "artifactEvidence": [],
+      "validationStatus": "pending",
+      "observedSpecs": {},
+      "metrics": [],
+      "suitesCovered": [],
+      "gaps": [],
+      "uncatalogued": []
+    },
+    {
+      "providerId": "microsandbox-cloud",
+      "costEvidence": [],
+      "artifactEvidence": [],
+      "validationStatus": "pending",
+      "observedSpecs": {},
+      "metrics": [],
+      "suitesCovered": [],
+      "gaps": [],
+      "uncatalogued": []
+    },
+    {
+      "providerId": "modal-gvisor",
+      "costEvidence": [],
+      "artifactEvidence": [],
+      "validationStatus": "pending",
+      "observedSpecs": {},
+      "metrics": [],
+      "suitesCovered": [],
+      "gaps": [],
+      "uncatalogued": []
+    },
+    {
+      "providerId": "modal-vm",
+      "costEvidence": [],
+      "artifactEvidence": [],
+      "validationStatus": "pending",
+      "observedSpecs": {},
+      "metrics": [],
+      "suitesCovered": [],
+      "gaps": [],
+      "uncatalogued": []
+    },
+    {
+      "providerId": "namespace",
+      "costEvidence": [],
+      "artifactEvidence": [],
+      "validationStatus": "pending",
+      "observedSpecs": {},
+      "metrics": [],
+      "suitesCovered": [],
+      "gaps": [],
+      "uncatalogued": []
+    },
+    {
+      "providerId": "novita",
+      "costEvidence": [],
+      "artifactEvidence": [],
+      "validationStatus": "pending",
+      "observedSpecs": {},
+      "metrics": [],
+      "suitesCovered": [],
+      "gaps": [],
+      "uncatalogued": []
+    },
+    {
+      "providerId": "runcloud",
+      "costEvidence": [],
+      "artifactEvidence": [],
+      "validationStatus": "pending",
+      "observedSpecs": {},
+      "metrics": [],
+      "suitesCovered": [],
+      "gaps": [],
+      "uncatalogued": []
+    },
+    {
+      "providerId": "runloop",
+      "costEvidence": [],
+      "artifactEvidence": [],
+      "validationStatus": "pending",
+      "observedSpecs": {},
+      "metrics": [],
+      "suitesCovered": [],
+      "gaps": [],
+      "uncatalogued": []
+    },
+    {
+      "providerId": "tama",
+      "costEvidence": [],
+      "artifactEvidence": [],
+      "validationStatus": "pending",
+      "observedSpecs": {},
+      "metrics": [],
+      "suitesCovered": [],
+      "gaps": [],
+      "uncatalogued": []
+    },
+    {
+      "providerId": "vercel",
+      "costEvidence": [],
+      "artifactEvidence": [],
+      "validationStatus": "pending",
+      "observedSpecs": {},
+      "metrics": [],
+      "suitesCovered": [],
+      "gaps": [],
+      "uncatalogued": []
+    }
+  ],
+  "experiment": {
+    "planDigest": "sha256:f3a618539ae9767f07529b17634ccb322b74826bd1309514bea2a081392ac6f2",
+    "cohortDigest": "sha256:a22e5a9dbace615569aa91896083fe8011f9c60e0439309df46d5447f0edd3c6",
+    "attemptIds": [
+      "blaxel-cpu-node-r0-a1-9973e971-c6c4-417e-a95f-6fdac5221782",
+      "blaxel-cpu-node-r1-a1-fe6d0d28-1fba-40de-9caa-59fc12939ad0",
+      "blaxel-cpu-node-r2-a1-0643e806-49ee-46a9-ac4d-8c21d1fd5ff6",
+      "blaxel-system-r0-a1-5c13193e-caf2-4c8f-8eb2-fb947587e263",
+      "blaxel-system-r1-a1-d5d87a2d-8dba-499f-a390-554cd9aa5ef0",
+      "blaxel-system-r2-a1-cb2fd490-32e6-4f9c-9c3a-f13a0f261cc4",
+      "blaxel-pgbench-r0-a1-ac0a95e3-1f04-437a-b1be-c21b3978e833",
+      "blaxel-pgbench-r1-a1-9b434aef-84b3-41be-8d76-e2ce1d5cae60",
+      "blaxel-pgbench-r2-a1-78077a91-6f66-47bd-86e7-44388a44a816",
+      "blaxel-memory-r0-a1-b32138e0-d66d-42f8-991d-31d50e73f91c",
+      "blaxel-memory-r1-a1-779c4a6f-72e4-4732-9221-dfcfc460cff3",
+      "blaxel-memory-r2-a1-4ca0355a-6c80-4d2e-8d5f-a47732746b92",
+      "blaxel-disk-r0-a1-56da3919-45b9-440e-a632-d3186e898457",
+      "blaxel-disk-r1-a1-fb3f0603-6fc4-4cb6-85b4-2739935e6843",
+      "blaxel-disk-r2-a1-cef40277-1544-47b5-92b2-c5bcecbfa31b",
+      "blaxel-network-r0-a1-87771f5e-1b89-4839-90bd-29b6b5d67c2f",
+      "blaxel-network-r1-a1-1d7664de-7286-40a8-ac32-9dc8e9cac028",
+      "blaxel-network-r2-a1-8f9648a2-8cbc-4634-88b0-199479ce2a96",
+      "blaxel-realworld-mastra-r0-a1-d26d2684-1ec4-42c3-b4ca-e5d5f5890c81",
+      "blaxel-realworld-mastra-r1-a1-65c885d1-9238-4a5a-aabb-eb801b9ead4e",
+      "blaxel-realworld-mastra-r2-a1-c11f0187-9e5a-428d-b5c7-ddf73b813b72",
+      "blaxel-realworld-mastra-r3-a1-d9e0627c-5dd2-4f96-a8d6-616dbeeb4f0f",
+      "blaxel-realworld-mastra-r4-a1-9d5fcbf7-3eee-4dcf-b2f8-7785d2cd15b7",
+      "blaxel-realworld-mastra-r5-a1-18ec21b0-d917-4eeb-8799-8818dc92871d",
+      "blaxel-realworld-mastra-r6-a1-f48d9451-308f-4099-a3fb-60db9f4cd537",
+      "blaxel-realworld-mastra-r7-a1-2f8ea47b-0eb9-4f83-9d64-05978b93fc39",
+      "blaxel-realworld-mastra-r8-a1-558be49c-78d1-446c-a7d8-86112e0791a5",
+      "blaxel-realworld-mastra-r9-a1-87da0b81-56ed-4a00-876e-7e121d2d76fc",
+      "blaxel-realworld-mastra-r10-a1-1f222aff-5c29-42e6-8ce1-6b95887def0b",
+      "blaxel-realworld-mastra-r11-a1-14c12fe4-e174-4edc-b442-5ea46116f5ed",
+      "blaxel-realworld-better-auth-r0-a1-34780c05-478b-4a24-af99-6edff0a6d326",
+      "blaxel-realworld-better-auth-r1-a1-2bc704c0-a705-40e7-9d4f-f61507bd50e5",
+      "blaxel-realworld-better-auth-r2-a1-04ec12ba-71e3-4fa6-82ce-d53475e396b2",
+      "blaxel-realworld-better-auth-r3-a1-c628b6e1-777b-4d34-bfec-c9e7e2824210",
+      "blaxel-realworld-better-auth-r4-a1-1fe16835-71b7-4c76-a5dd-e49b624b72ed",
+      "blaxel-realworld-better-auth-r5-a1-ad945456-6f57-4d7c-a920-8c7c6e7f72c6",
+      "blaxel-realworld-better-auth-r6-a1-d8e4790f-f6c5-4bbe-a1ee-bb0347437ab3",
+      "blaxel-realworld-better-auth-r7-a1-ddb71075-4492-40a3-82b7-b2d3ad78c874",
+      "blaxel-realworld-better-auth-r8-a1-4074e124-53f7-4a2e-96f5-f14259db987d",
+      "blaxel-realworld-better-auth-r9-a1-87fc799a-94cf-464a-9173-4a4d4ebb09df",
+      "blaxel-realworld-better-auth-r10-a1-28af3270-e370-47dd-957f-a790378a0a0d",
+      "blaxel-realworld-better-auth-r11-a1-de9443b3-aa08-404b-85c3-513f86f8c007",
+      "blaxel-realworld-openclaw-r0-a1-fdf5936a-0d14-438a-94b8-3176f5b5e9e9",
+      "blaxel-realworld-openclaw-r1-a1-711a2e19-de3d-4d21-9984-97e93688c078",
+      "blaxel-realworld-openclaw-r2-a1-d1310400-9758-41d9-bd42-ed531ba645b1",
+      "blaxel-realworld-openclaw-r3-a1-7a3b4989-d737-40dc-bce4-a8ba9fbfeca2",
+      "blaxel-realworld-openclaw-r4-a1-47adaebf-f0bd-40e2-bff8-b41ef3924f2f",
+      "blaxel-realworld-openclaw-r5-a1-df5b1a6b-2d56-4bb3-ae20-aa97c3c838fc",
+      "blaxel-realworld-openclaw-r6-a1-81775102-2b93-44ca-aeb5-08f4bd8c3f26",
+      "blaxel-realworld-openclaw-r7-a1-45ad0c13-689f-443e-91e9-08f4d7043dc6",
+      "blaxel-realworld-openclaw-r8-a1-620a3457-8bfa-45f7-ba0e-9b462333ee3d",
+      "blaxel-realworld-openclaw-r9-a1-016e879e-a23a-4c21-bcca-9470c6bb26cb",
+      "blaxel-realworld-openclaw-r10-a1-f2a1a9a6-4a76-4a2e-9f0e-83dfdc120095",
+      "blaxel-realworld-openclaw-r11-a1-150adf4c-af1b-44a8-babf-097098471139"
+    ],
+    "partial": {
+      "status": "partial",
+      "planned": 54,
+      "complete": 2,
+      "incomplete": 52,
+      "excluded": 0,
+      "cells": [
+        {
+          "id": "blaxel-cpu-node-r0",
+          "status": "failed",
+          "missingMetrics": ["node_web_tooling_runs_per_s"],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-cpu-node-r0-a1-9973e971-c6c4-417e-a95f-6fdac5221782",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "cpu-node",
+          "replicate": 0,
+          "plannedMetrics": ["node_web_tooling_runs_per_s"],
+          "passes": 2
+        },
+        {
+          "id": "blaxel-cpu-node-r1",
+          "status": "failed",
+          "missingMetrics": ["node_web_tooling_runs_per_s"],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-cpu-node-r1-a1-fe6d0d28-1fba-40de-9caa-59fc12939ad0",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "cpu-node",
+          "replicate": 1,
+          "plannedMetrics": ["node_web_tooling_runs_per_s"],
+          "passes": 2
+        },
+        {
+          "id": "blaxel-cpu-node-r2",
+          "status": "complete",
+          "missingMetrics": [],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-cpu-node-r2-a1-0643e806-49ee-46a9-ac4d-8c21d1fd5ff6",
+          "retainedMetrics": ["node_web_tooling_runs_per_s"],
+          "provider": "blaxel",
+          "suite": "cpu-node",
+          "replicate": 2,
+          "plannedMetrics": ["node_web_tooling_runs_per_s"],
+          "passes": 2
+        },
+        {
+          "id": "blaxel-system-r0",
+          "status": "complete",
+          "missingMetrics": [],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-system-r0-a1-5c13193e-caf2-4c8f-8eb2-fb947587e263",
+          "retainedMetrics": ["pybench_milliseconds", "sqlite_speedtest_seconds", "git_seconds"],
+          "provider": "blaxel",
+          "suite": "system",
+          "replicate": 0,
+          "plannedMetrics": ["pybench_milliseconds", "sqlite_speedtest_seconds", "git_seconds"],
+          "passes": 2
+        },
+        {
+          "id": "blaxel-system-r1",
+          "status": "failed",
+          "missingMetrics": ["pybench_milliseconds", "sqlite_speedtest_seconds", "git_seconds"],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-system-r1-a1-d5d87a2d-8dba-499f-a390-554cd9aa5ef0",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "system",
+          "replicate": 1,
+          "plannedMetrics": ["pybench_milliseconds", "sqlite_speedtest_seconds", "git_seconds"],
+          "passes": 2
+        },
+        {
+          "id": "blaxel-system-r2",
+          "status": "failed",
+          "missingMetrics": ["pybench_milliseconds", "sqlite_speedtest_seconds", "git_seconds"],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-system-r2-a1-cb2fd490-32e6-4f9c-9c3a-f13a0f261cc4",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "system",
+          "replicate": 2,
+          "plannedMetrics": ["pybench_milliseconds", "sqlite_speedtest_seconds", "git_seconds"],
+          "passes": 2
+        },
+        {
+          "id": "blaxel-pgbench-r0",
+          "status": "failed",
+          "missingMetrics": [
+            "pgbench_scaling_factor_100_clients_50_mode_read_only",
+            "pgbench_scaling_factor_100_clients_50_mode_read_only_average_latency",
+            "pgbench_scaling_factor_100_clients_50_mode_read_write",
+            "pgbench_scaling_factor_100_clients_50_mode_read_write_average_latency"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-pgbench-r0-a1-ac0a95e3-1f04-437a-b1be-c21b3978e833",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "pgbench",
+          "replicate": 0,
+          "plannedMetrics": [
+            "pgbench_scaling_factor_100_clients_50_mode_read_only",
+            "pgbench_scaling_factor_100_clients_50_mode_read_only_average_latency",
+            "pgbench_scaling_factor_100_clients_50_mode_read_write",
+            "pgbench_scaling_factor_100_clients_50_mode_read_write_average_latency"
+          ],
+          "passes": 2
+        },
+        {
+          "id": "blaxel-pgbench-r1",
+          "status": "failed",
+          "missingMetrics": [
+            "pgbench_scaling_factor_100_clients_50_mode_read_only",
+            "pgbench_scaling_factor_100_clients_50_mode_read_only_average_latency",
+            "pgbench_scaling_factor_100_clients_50_mode_read_write",
+            "pgbench_scaling_factor_100_clients_50_mode_read_write_average_latency"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-pgbench-r1-a1-9b434aef-84b3-41be-8d76-e2ce1d5cae60",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "pgbench",
+          "replicate": 1,
+          "plannedMetrics": [
+            "pgbench_scaling_factor_100_clients_50_mode_read_only",
+            "pgbench_scaling_factor_100_clients_50_mode_read_only_average_latency",
+            "pgbench_scaling_factor_100_clients_50_mode_read_write",
+            "pgbench_scaling_factor_100_clients_50_mode_read_write_average_latency"
+          ],
+          "passes": 2
+        },
+        {
+          "id": "blaxel-pgbench-r2",
+          "status": "failed",
+          "missingMetrics": [
+            "pgbench_scaling_factor_100_clients_50_mode_read_only",
+            "pgbench_scaling_factor_100_clients_50_mode_read_only_average_latency",
+            "pgbench_scaling_factor_100_clients_50_mode_read_write",
+            "pgbench_scaling_factor_100_clients_50_mode_read_write_average_latency"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-pgbench-r2-a1-78077a91-6f66-47bd-86e7-44388a44a816",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "pgbench",
+          "replicate": 2,
+          "plannedMetrics": [
+            "pgbench_scaling_factor_100_clients_50_mode_read_only",
+            "pgbench_scaling_factor_100_clients_50_mode_read_only_average_latency",
+            "pgbench_scaling_factor_100_clients_50_mode_read_write",
+            "pgbench_scaling_factor_100_clients_50_mode_read_write_average_latency"
+          ],
+          "passes": 2
+        },
+        {
+          "id": "blaxel-memory-r0",
+          "status": "failed",
+          "missingMetrics": [
+            "stream_type_copy",
+            "stream_type_scale",
+            "stream_type_add",
+            "stream_type_triad"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-memory-r0-a1-b32138e0-d66d-42f8-991d-31d50e73f91c",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "memory",
+          "replicate": 0,
+          "plannedMetrics": [
+            "stream_type_copy",
+            "stream_type_scale",
+            "stream_type_add",
+            "stream_type_triad"
+          ],
+          "passes": 2
+        },
+        {
+          "id": "blaxel-memory-r1",
+          "status": "failed",
+          "missingMetrics": [
+            "stream_type_copy",
+            "stream_type_scale",
+            "stream_type_add",
+            "stream_type_triad"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-memory-r1-a1-779c4a6f-72e4-4732-9221-dfcfc460cff3",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "memory",
+          "replicate": 1,
+          "plannedMetrics": [
+            "stream_type_copy",
+            "stream_type_scale",
+            "stream_type_add",
+            "stream_type_triad"
+          ],
+          "passes": 2
+        },
+        {
+          "id": "blaxel-memory-r2",
+          "status": "failed",
+          "missingMetrics": [
+            "stream_type_copy",
+            "stream_type_scale",
+            "stream_type_add",
+            "stream_type_triad"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-memory-r2-a1-4ca0355a-6c80-4d2e-8d5f-a47732746b92",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "memory",
+          "replicate": 2,
+          "plannedMetrics": [
+            "stream_type_copy",
+            "stream_type_scale",
+            "stream_type_add",
+            "stream_type_triad"
+          ],
+          "passes": 2
+        },
+        {
+          "id": "blaxel-disk-r0",
+          "status": "failed",
+          "missingMetrics": [
+            "hardlink_bogo_ops_per_s",
+            "fio_type_sequential_read_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_mb_per_s",
+            "fio_type_sequential_read_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_iops",
+            "fio_type_sequential_write_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_mb_per_s",
+            "fio_type_sequential_write_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_iops",
+            "fio_type_random_read_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_mb_per_s",
+            "fio_type_random_read_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_iops",
+            "fio_type_random_write_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_mb_per_s",
+            "fio_type_random_write_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_iops"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-disk-r0-a1-56da3919-45b9-440e-a632-d3186e898457",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "disk",
+          "replicate": 0,
+          "plannedMetrics": [
+            "hardlink_bogo_ops_per_s",
+            "fio_type_sequential_read_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_mb_per_s",
+            "fio_type_sequential_read_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_iops",
+            "fio_type_sequential_write_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_mb_per_s",
+            "fio_type_sequential_write_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_iops",
+            "fio_type_random_read_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_mb_per_s",
+            "fio_type_random_read_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_iops",
+            "fio_type_random_write_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_mb_per_s",
+            "fio_type_random_write_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_iops"
+          ],
+          "passes": 2
+        },
+        {
+          "id": "blaxel-disk-r1",
+          "status": "failed",
+          "missingMetrics": [
+            "hardlink_bogo_ops_per_s",
+            "fio_type_sequential_read_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_mb_per_s",
+            "fio_type_sequential_read_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_iops",
+            "fio_type_sequential_write_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_mb_per_s",
+            "fio_type_sequential_write_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_iops",
+            "fio_type_random_read_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_mb_per_s",
+            "fio_type_random_read_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_iops",
+            "fio_type_random_write_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_mb_per_s",
+            "fio_type_random_write_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_iops"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-disk-r1-a1-fb3f0603-6fc4-4cb6-85b4-2739935e6843",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "disk",
+          "replicate": 1,
+          "plannedMetrics": [
+            "hardlink_bogo_ops_per_s",
+            "fio_type_sequential_read_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_mb_per_s",
+            "fio_type_sequential_read_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_iops",
+            "fio_type_sequential_write_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_mb_per_s",
+            "fio_type_sequential_write_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_iops",
+            "fio_type_random_read_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_mb_per_s",
+            "fio_type_random_read_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_iops",
+            "fio_type_random_write_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_mb_per_s",
+            "fio_type_random_write_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_iops"
+          ],
+          "passes": 2
+        },
+        {
+          "id": "blaxel-disk-r2",
+          "status": "failed",
+          "missingMetrics": [
+            "hardlink_bogo_ops_per_s",
+            "fio_type_sequential_read_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_mb_per_s",
+            "fio_type_sequential_read_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_iops",
+            "fio_type_sequential_write_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_mb_per_s",
+            "fio_type_sequential_write_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_iops",
+            "fio_type_random_read_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_mb_per_s",
+            "fio_type_random_read_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_iops",
+            "fio_type_random_write_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_mb_per_s",
+            "fio_type_random_write_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_iops"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-disk-r2-a1-cef40277-1544-47b5-92b2-c5bcecbfa31b",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "disk",
+          "replicate": 2,
+          "plannedMetrics": [
+            "hardlink_bogo_ops_per_s",
+            "fio_type_sequential_read_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_mb_per_s",
+            "fio_type_sequential_read_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_iops",
+            "fio_type_sequential_write_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_mb_per_s",
+            "fio_type_sequential_write_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_iops",
+            "fio_type_random_read_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_mb_per_s",
+            "fio_type_random_read_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_iops",
+            "fio_type_random_write_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_mb_per_s",
+            "fio_type_random_write_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_iops"
+          ],
+          "passes": 2
+        },
+        {
+          "id": "blaxel-network-r0",
+          "status": "failed",
+          "missingMetrics": [
+            "iperf_server_address_localhost_server_port_5201_duration_10_seconds_test_tcp_parallel_1",
+            "iperf_server_address_localhost_server_port_5201_duration_10_seconds_test_tcp_parallel_10",
+            "iperf_server_address_localhost_server_port_5201_duration_10_seconds_test_udp_10000mbit_objective_parallel_1",
+            "iperf_wan_direction_download",
+            "iperf_wan_direction_upload"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-network-r0-a1-87771f5e-1b89-4839-90bd-29b6b5d67c2f",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "network",
+          "replicate": 0,
+          "plannedMetrics": [
+            "iperf_server_address_localhost_server_port_5201_duration_10_seconds_test_tcp_parallel_1",
+            "iperf_server_address_localhost_server_port_5201_duration_10_seconds_test_tcp_parallel_10",
+            "iperf_server_address_localhost_server_port_5201_duration_10_seconds_test_udp_10000mbit_objective_parallel_1",
+            "iperf_wan_direction_download",
+            "iperf_wan_direction_upload"
+          ],
+          "passes": 2
+        },
+        {
+          "id": "blaxel-network-r1",
+          "status": "failed",
+          "missingMetrics": [
+            "iperf_server_address_localhost_server_port_5201_duration_10_seconds_test_tcp_parallel_1",
+            "iperf_server_address_localhost_server_port_5201_duration_10_seconds_test_tcp_parallel_10",
+            "iperf_server_address_localhost_server_port_5201_duration_10_seconds_test_udp_10000mbit_objective_parallel_1",
+            "iperf_wan_direction_download",
+            "iperf_wan_direction_upload"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-network-r1-a1-1d7664de-7286-40a8-ac32-9dc8e9cac028",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "network",
+          "replicate": 1,
+          "plannedMetrics": [
+            "iperf_server_address_localhost_server_port_5201_duration_10_seconds_test_tcp_parallel_1",
+            "iperf_server_address_localhost_server_port_5201_duration_10_seconds_test_tcp_parallel_10",
+            "iperf_server_address_localhost_server_port_5201_duration_10_seconds_test_udp_10000mbit_objective_parallel_1",
+            "iperf_wan_direction_download",
+            "iperf_wan_direction_upload"
+          ],
+          "passes": 2
+        },
+        {
+          "id": "blaxel-network-r2",
+          "status": "failed",
+          "missingMetrics": [
+            "iperf_server_address_localhost_server_port_5201_duration_10_seconds_test_tcp_parallel_1",
+            "iperf_server_address_localhost_server_port_5201_duration_10_seconds_test_tcp_parallel_10",
+            "iperf_server_address_localhost_server_port_5201_duration_10_seconds_test_udp_10000mbit_objective_parallel_1",
+            "iperf_wan_direction_download",
+            "iperf_wan_direction_upload"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-network-r2-a1-8f9648a2-8cbc-4634-88b0-199479ce2a96",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "network",
+          "replicate": 2,
+          "plannedMetrics": [
+            "iperf_server_address_localhost_server_port_5201_duration_10_seconds_test_tcp_parallel_1",
+            "iperf_server_address_localhost_server_port_5201_duration_10_seconds_test_tcp_parallel_10",
+            "iperf_server_address_localhost_server_port_5201_duration_10_seconds_test_udp_10000mbit_objective_parallel_1",
+            "iperf_wan_direction_download",
+            "iperf_wan_direction_upload"
+          ],
+          "passes": 2
+        },
+        {
+          "id": "blaxel-realworld-mastra-r0",
+          "status": "failed",
+          "missingMetrics": [
+            "realworld_mastra_task_git_clone",
+            "realworld_mastra_task_cold_install",
+            "realworld_mastra_task_lint_format",
+            "realworld_mastra_task_build_core",
+            "realworld_mastra_task_test_core"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-realworld-mastra-r0-a1-d26d2684-1ec4-42c3-b4ca-e5d5f5890c81",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "realworld-mastra",
+          "replicate": 0,
+          "plannedMetrics": [
+            "realworld_mastra_task_git_clone",
+            "realworld_mastra_task_cold_install",
+            "realworld_mastra_task_lint_format",
+            "realworld_mastra_task_build_core",
+            "realworld_mastra_task_test_core"
+          ],
+          "passes": 1
+        },
+        {
+          "id": "blaxel-realworld-mastra-r1",
+          "status": "failed",
+          "missingMetrics": [
+            "realworld_mastra_task_git_clone",
+            "realworld_mastra_task_cold_install",
+            "realworld_mastra_task_lint_format",
+            "realworld_mastra_task_build_core",
+            "realworld_mastra_task_test_core"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-realworld-mastra-r1-a1-65c885d1-9238-4a5a-aabb-eb801b9ead4e",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "realworld-mastra",
+          "replicate": 1,
+          "plannedMetrics": [
+            "realworld_mastra_task_git_clone",
+            "realworld_mastra_task_cold_install",
+            "realworld_mastra_task_lint_format",
+            "realworld_mastra_task_build_core",
+            "realworld_mastra_task_test_core"
+          ],
+          "passes": 1
+        },
+        {
+          "id": "blaxel-realworld-mastra-r2",
+          "status": "failed",
+          "missingMetrics": [
+            "realworld_mastra_task_git_clone",
+            "realworld_mastra_task_cold_install",
+            "realworld_mastra_task_lint_format",
+            "realworld_mastra_task_build_core",
+            "realworld_mastra_task_test_core"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-realworld-mastra-r2-a1-c11f0187-9e5a-428d-b5c7-ddf73b813b72",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "realworld-mastra",
+          "replicate": 2,
+          "plannedMetrics": [
+            "realworld_mastra_task_git_clone",
+            "realworld_mastra_task_cold_install",
+            "realworld_mastra_task_lint_format",
+            "realworld_mastra_task_build_core",
+            "realworld_mastra_task_test_core"
+          ],
+          "passes": 1
+        },
+        {
+          "id": "blaxel-realworld-mastra-r3",
+          "status": "failed",
+          "missingMetrics": [
+            "realworld_mastra_task_git_clone",
+            "realworld_mastra_task_cold_install",
+            "realworld_mastra_task_lint_format",
+            "realworld_mastra_task_build_core",
+            "realworld_mastra_task_test_core"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-realworld-mastra-r3-a1-d9e0627c-5dd2-4f96-a8d6-616dbeeb4f0f",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "realworld-mastra",
+          "replicate": 3,
+          "plannedMetrics": [
+            "realworld_mastra_task_git_clone",
+            "realworld_mastra_task_cold_install",
+            "realworld_mastra_task_lint_format",
+            "realworld_mastra_task_build_core",
+            "realworld_mastra_task_test_core"
+          ],
+          "passes": 1
+        },
+        {
+          "id": "blaxel-realworld-mastra-r4",
+          "status": "failed",
+          "missingMetrics": [
+            "realworld_mastra_task_git_clone",
+            "realworld_mastra_task_cold_install",
+            "realworld_mastra_task_lint_format",
+            "realworld_mastra_task_build_core",
+            "realworld_mastra_task_test_core"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-realworld-mastra-r4-a1-9d5fcbf7-3eee-4dcf-b2f8-7785d2cd15b7",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "realworld-mastra",
+          "replicate": 4,
+          "plannedMetrics": [
+            "realworld_mastra_task_git_clone",
+            "realworld_mastra_task_cold_install",
+            "realworld_mastra_task_lint_format",
+            "realworld_mastra_task_build_core",
+            "realworld_mastra_task_test_core"
+          ],
+          "passes": 1
+        },
+        {
+          "id": "blaxel-realworld-mastra-r5",
+          "status": "failed",
+          "missingMetrics": [
+            "realworld_mastra_task_git_clone",
+            "realworld_mastra_task_cold_install",
+            "realworld_mastra_task_lint_format",
+            "realworld_mastra_task_build_core",
+            "realworld_mastra_task_test_core"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-realworld-mastra-r5-a1-18ec21b0-d917-4eeb-8799-8818dc92871d",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "realworld-mastra",
+          "replicate": 5,
+          "plannedMetrics": [
+            "realworld_mastra_task_git_clone",
+            "realworld_mastra_task_cold_install",
+            "realworld_mastra_task_lint_format",
+            "realworld_mastra_task_build_core",
+            "realworld_mastra_task_test_core"
+          ],
+          "passes": 1
+        },
+        {
+          "id": "blaxel-realworld-mastra-r6",
+          "status": "failed",
+          "missingMetrics": [
+            "realworld_mastra_task_git_clone",
+            "realworld_mastra_task_cold_install",
+            "realworld_mastra_task_lint_format",
+            "realworld_mastra_task_build_core",
+            "realworld_mastra_task_test_core"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-realworld-mastra-r6-a1-f48d9451-308f-4099-a3fb-60db9f4cd537",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "realworld-mastra",
+          "replicate": 6,
+          "plannedMetrics": [
+            "realworld_mastra_task_git_clone",
+            "realworld_mastra_task_cold_install",
+            "realworld_mastra_task_lint_format",
+            "realworld_mastra_task_build_core",
+            "realworld_mastra_task_test_core"
+          ],
+          "passes": 1
+        },
+        {
+          "id": "blaxel-realworld-mastra-r7",
+          "status": "failed",
+          "missingMetrics": [
+            "realworld_mastra_task_git_clone",
+            "realworld_mastra_task_cold_install",
+            "realworld_mastra_task_lint_format",
+            "realworld_mastra_task_build_core",
+            "realworld_mastra_task_test_core"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-realworld-mastra-r7-a1-2f8ea47b-0eb9-4f83-9d64-05978b93fc39",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "realworld-mastra",
+          "replicate": 7,
+          "plannedMetrics": [
+            "realworld_mastra_task_git_clone",
+            "realworld_mastra_task_cold_install",
+            "realworld_mastra_task_lint_format",
+            "realworld_mastra_task_build_core",
+            "realworld_mastra_task_test_core"
+          ],
+          "passes": 1
+        },
+        {
+          "id": "blaxel-realworld-mastra-r8",
+          "status": "failed",
+          "missingMetrics": [
+            "realworld_mastra_task_git_clone",
+            "realworld_mastra_task_cold_install",
+            "realworld_mastra_task_lint_format",
+            "realworld_mastra_task_build_core",
+            "realworld_mastra_task_test_core"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-realworld-mastra-r8-a1-558be49c-78d1-446c-a7d8-86112e0791a5",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "realworld-mastra",
+          "replicate": 8,
+          "plannedMetrics": [
+            "realworld_mastra_task_git_clone",
+            "realworld_mastra_task_cold_install",
+            "realworld_mastra_task_lint_format",
+            "realworld_mastra_task_build_core",
+            "realworld_mastra_task_test_core"
+          ],
+          "passes": 1
+        },
+        {
+          "id": "blaxel-realworld-mastra-r9",
+          "status": "failed",
+          "missingMetrics": [
+            "realworld_mastra_task_git_clone",
+            "realworld_mastra_task_cold_install",
+            "realworld_mastra_task_lint_format",
+            "realworld_mastra_task_build_core",
+            "realworld_mastra_task_test_core"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-realworld-mastra-r9-a1-87da0b81-56ed-4a00-876e-7e121d2d76fc",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "realworld-mastra",
+          "replicate": 9,
+          "plannedMetrics": [
+            "realworld_mastra_task_git_clone",
+            "realworld_mastra_task_cold_install",
+            "realworld_mastra_task_lint_format",
+            "realworld_mastra_task_build_core",
+            "realworld_mastra_task_test_core"
+          ],
+          "passes": 1
+        },
+        {
+          "id": "blaxel-realworld-mastra-r10",
+          "status": "failed",
+          "missingMetrics": [
+            "realworld_mastra_task_git_clone",
+            "realworld_mastra_task_cold_install",
+            "realworld_mastra_task_lint_format",
+            "realworld_mastra_task_build_core",
+            "realworld_mastra_task_test_core"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-realworld-mastra-r10-a1-1f222aff-5c29-42e6-8ce1-6b95887def0b",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "realworld-mastra",
+          "replicate": 10,
+          "plannedMetrics": [
+            "realworld_mastra_task_git_clone",
+            "realworld_mastra_task_cold_install",
+            "realworld_mastra_task_lint_format",
+            "realworld_mastra_task_build_core",
+            "realworld_mastra_task_test_core"
+          ],
+          "passes": 1
+        },
+        {
+          "id": "blaxel-realworld-mastra-r11",
+          "status": "failed",
+          "missingMetrics": [
+            "realworld_mastra_task_git_clone",
+            "realworld_mastra_task_cold_install",
+            "realworld_mastra_task_lint_format",
+            "realworld_mastra_task_build_core",
+            "realworld_mastra_task_test_core"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-realworld-mastra-r11-a1-14c12fe4-e174-4edc-b442-5ea46116f5ed",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "realworld-mastra",
+          "replicate": 11,
+          "plannedMetrics": [
+            "realworld_mastra_task_git_clone",
+            "realworld_mastra_task_cold_install",
+            "realworld_mastra_task_lint_format",
+            "realworld_mastra_task_build_core",
+            "realworld_mastra_task_test_core"
+          ],
+          "passes": 1
+        },
+        {
+          "id": "blaxel-realworld-better-auth-r0",
+          "status": "failed",
+          "missingMetrics": [
+            "realworld_better_auth_task_git_clone",
+            "realworld_better_auth_task_cold_install",
+            "realworld_better_auth_task_lint_biome",
+            "realworld_better_auth_task_lint_deps_knip",
+            "realworld_better_auth_task_lint_format",
+            "realworld_better_auth_task_lint_spell",
+            "realworld_better_auth_task_lint_types",
+            "realworld_better_auth_task_lint_packages",
+            "realworld_better_auth_task_typecheck",
+            "realworld_better_auth_task_build"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-realworld-better-auth-r0-a1-34780c05-478b-4a24-af99-6edff0a6d326",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "realworld-better-auth",
+          "replicate": 0,
+          "plannedMetrics": [
+            "realworld_better_auth_task_git_clone",
+            "realworld_better_auth_task_cold_install",
+            "realworld_better_auth_task_lint_biome",
+            "realworld_better_auth_task_lint_deps_knip",
+            "realworld_better_auth_task_lint_format",
+            "realworld_better_auth_task_lint_spell",
+            "realworld_better_auth_task_lint_types",
+            "realworld_better_auth_task_lint_packages",
+            "realworld_better_auth_task_typecheck",
+            "realworld_better_auth_task_build"
+          ],
+          "passes": 1
+        },
+        {
+          "id": "blaxel-realworld-better-auth-r1",
+          "status": "failed",
+          "missingMetrics": [
+            "realworld_better_auth_task_git_clone",
+            "realworld_better_auth_task_cold_install",
+            "realworld_better_auth_task_lint_biome",
+            "realworld_better_auth_task_lint_deps_knip",
+            "realworld_better_auth_task_lint_format",
+            "realworld_better_auth_task_lint_spell",
+            "realworld_better_auth_task_lint_types",
+            "realworld_better_auth_task_lint_packages",
+            "realworld_better_auth_task_typecheck",
+            "realworld_better_auth_task_build"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-realworld-better-auth-r1-a1-2bc704c0-a705-40e7-9d4f-f61507bd50e5",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "realworld-better-auth",
+          "replicate": 1,
+          "plannedMetrics": [
+            "realworld_better_auth_task_git_clone",
+            "realworld_better_auth_task_cold_install",
+            "realworld_better_auth_task_lint_biome",
+            "realworld_better_auth_task_lint_deps_knip",
+            "realworld_better_auth_task_lint_format",
+            "realworld_better_auth_task_lint_spell",
+            "realworld_better_auth_task_lint_types",
+            "realworld_better_auth_task_lint_packages",
+            "realworld_better_auth_task_typecheck",
+            "realworld_better_auth_task_build"
+          ],
+          "passes": 1
+        },
+        {
+          "id": "blaxel-realworld-better-auth-r2",
+          "status": "failed",
+          "missingMetrics": [
+            "realworld_better_auth_task_git_clone",
+            "realworld_better_auth_task_cold_install",
+            "realworld_better_auth_task_lint_biome",
+            "realworld_better_auth_task_lint_deps_knip",
+            "realworld_better_auth_task_lint_format",
+            "realworld_better_auth_task_lint_spell",
+            "realworld_better_auth_task_lint_types",
+            "realworld_better_auth_task_lint_packages",
+            "realworld_better_auth_task_typecheck",
+            "realworld_better_auth_task_build"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-realworld-better-auth-r2-a1-04ec12ba-71e3-4fa6-82ce-d53475e396b2",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "realworld-better-auth",
+          "replicate": 2,
+          "plannedMetrics": [
+            "realworld_better_auth_task_git_clone",
+            "realworld_better_auth_task_cold_install",
+            "realworld_better_auth_task_lint_biome",
+            "realworld_better_auth_task_lint_deps_knip",
+            "realworld_better_auth_task_lint_format",
+            "realworld_better_auth_task_lint_spell",
+            "realworld_better_auth_task_lint_types",
+            "realworld_better_auth_task_lint_packages",
+            "realworld_better_auth_task_typecheck",
+            "realworld_better_auth_task_build"
+          ],
+          "passes": 1
+        },
+        {
+          "id": "blaxel-realworld-better-auth-r3",
+          "status": "failed",
+          "missingMetrics": [
+            "realworld_better_auth_task_git_clone",
+            "realworld_better_auth_task_cold_install",
+            "realworld_better_auth_task_lint_biome",
+            "realworld_better_auth_task_lint_deps_knip",
+            "realworld_better_auth_task_lint_format",
+            "realworld_better_auth_task_lint_spell",
+            "realworld_better_auth_task_lint_types",
+            "realworld_better_auth_task_lint_packages",
+            "realworld_better_auth_task_typecheck",
+            "realworld_better_auth_task_build"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-realworld-better-auth-r3-a1-c628b6e1-777b-4d34-bfec-c9e7e2824210",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "realworld-better-auth",
+          "replicate": 3,
+          "plannedMetrics": [
+            "realworld_better_auth_task_git_clone",
+            "realworld_better_auth_task_cold_install",
+            "realworld_better_auth_task_lint_biome",
+            "realworld_better_auth_task_lint_deps_knip",
+            "realworld_better_auth_task_lint_format",
+            "realworld_better_auth_task_lint_spell",
+            "realworld_better_auth_task_lint_types",
+            "realworld_better_auth_task_lint_packages",
+            "realworld_better_auth_task_typecheck",
+            "realworld_better_auth_task_build"
+          ],
+          "passes": 1
+        },
+        {
+          "id": "blaxel-realworld-better-auth-r4",
+          "status": "failed",
+          "missingMetrics": [
+            "realworld_better_auth_task_git_clone",
+            "realworld_better_auth_task_cold_install",
+            "realworld_better_auth_task_lint_biome",
+            "realworld_better_auth_task_lint_deps_knip",
+            "realworld_better_auth_task_lint_format",
+            "realworld_better_auth_task_lint_spell",
+            "realworld_better_auth_task_lint_types",
+            "realworld_better_auth_task_lint_packages",
+            "realworld_better_auth_task_typecheck",
+            "realworld_better_auth_task_build"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-realworld-better-auth-r4-a1-1fe16835-71b7-4c76-a5dd-e49b624b72ed",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "realworld-better-auth",
+          "replicate": 4,
+          "plannedMetrics": [
+            "realworld_better_auth_task_git_clone",
+            "realworld_better_auth_task_cold_install",
+            "realworld_better_auth_task_lint_biome",
+            "realworld_better_auth_task_lint_deps_knip",
+            "realworld_better_auth_task_lint_format",
+            "realworld_better_auth_task_lint_spell",
+            "realworld_better_auth_task_lint_types",
+            "realworld_better_auth_task_lint_packages",
+            "realworld_better_auth_task_typecheck",
+            "realworld_better_auth_task_build"
+          ],
+          "passes": 1
+        },
+        {
+          "id": "blaxel-realworld-better-auth-r5",
+          "status": "failed",
+          "missingMetrics": [
+            "realworld_better_auth_task_git_clone",
+            "realworld_better_auth_task_cold_install",
+            "realworld_better_auth_task_lint_biome",
+            "realworld_better_auth_task_lint_deps_knip",
+            "realworld_better_auth_task_lint_format",
+            "realworld_better_auth_task_lint_spell",
+            "realworld_better_auth_task_lint_types",
+            "realworld_better_auth_task_lint_packages",
+            "realworld_better_auth_task_typecheck",
+            "realworld_better_auth_task_build"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-realworld-better-auth-r5-a1-ad945456-6f57-4d7c-a920-8c7c6e7f72c6",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "realworld-better-auth",
+          "replicate": 5,
+          "plannedMetrics": [
+            "realworld_better_auth_task_git_clone",
+            "realworld_better_auth_task_cold_install",
+            "realworld_better_auth_task_lint_biome",
+            "realworld_better_auth_task_lint_deps_knip",
+            "realworld_better_auth_task_lint_format",
+            "realworld_better_auth_task_lint_spell",
+            "realworld_better_auth_task_lint_types",
+            "realworld_better_auth_task_lint_packages",
+            "realworld_better_auth_task_typecheck",
+            "realworld_better_auth_task_build"
+          ],
+          "passes": 1
+        },
+        {
+          "id": "blaxel-realworld-better-auth-r6",
+          "status": "failed",
+          "missingMetrics": [
+            "realworld_better_auth_task_git_clone",
+            "realworld_better_auth_task_cold_install",
+            "realworld_better_auth_task_lint_biome",
+            "realworld_better_auth_task_lint_deps_knip",
+            "realworld_better_auth_task_lint_format",
+            "realworld_better_auth_task_lint_spell",
+            "realworld_better_auth_task_lint_types",
+            "realworld_better_auth_task_lint_packages",
+            "realworld_better_auth_task_typecheck",
+            "realworld_better_auth_task_build"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-realworld-better-auth-r6-a1-d8e4790f-f6c5-4bbe-a1ee-bb0347437ab3",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "realworld-better-auth",
+          "replicate": 6,
+          "plannedMetrics": [
+            "realworld_better_auth_task_git_clone",
+            "realworld_better_auth_task_cold_install",
+            "realworld_better_auth_task_lint_biome",
+            "realworld_better_auth_task_lint_deps_knip",
+            "realworld_better_auth_task_lint_format",
+            "realworld_better_auth_task_lint_spell",
+            "realworld_better_auth_task_lint_types",
+            "realworld_better_auth_task_lint_packages",
+            "realworld_better_auth_task_typecheck",
+            "realworld_better_auth_task_build"
+          ],
+          "passes": 1
+        },
+        {
+          "id": "blaxel-realworld-better-auth-r7",
+          "status": "failed",
+          "missingMetrics": [
+            "realworld_better_auth_task_git_clone",
+            "realworld_better_auth_task_cold_install",
+            "realworld_better_auth_task_lint_biome",
+            "realworld_better_auth_task_lint_deps_knip",
+            "realworld_better_auth_task_lint_format",
+            "realworld_better_auth_task_lint_spell",
+            "realworld_better_auth_task_lint_types",
+            "realworld_better_auth_task_lint_packages",
+            "realworld_better_auth_task_typecheck",
+            "realworld_better_auth_task_build"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-realworld-better-auth-r7-a1-ddb71075-4492-40a3-82b7-b2d3ad78c874",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "realworld-better-auth",
+          "replicate": 7,
+          "plannedMetrics": [
+            "realworld_better_auth_task_git_clone",
+            "realworld_better_auth_task_cold_install",
+            "realworld_better_auth_task_lint_biome",
+            "realworld_better_auth_task_lint_deps_knip",
+            "realworld_better_auth_task_lint_format",
+            "realworld_better_auth_task_lint_spell",
+            "realworld_better_auth_task_lint_types",
+            "realworld_better_auth_task_lint_packages",
+            "realworld_better_auth_task_typecheck",
+            "realworld_better_auth_task_build"
+          ],
+          "passes": 1
+        },
+        {
+          "id": "blaxel-realworld-better-auth-r8",
+          "status": "failed",
+          "missingMetrics": [
+            "realworld_better_auth_task_git_clone",
+            "realworld_better_auth_task_cold_install",
+            "realworld_better_auth_task_lint_biome",
+            "realworld_better_auth_task_lint_deps_knip",
+            "realworld_better_auth_task_lint_format",
+            "realworld_better_auth_task_lint_spell",
+            "realworld_better_auth_task_lint_types",
+            "realworld_better_auth_task_lint_packages",
+            "realworld_better_auth_task_typecheck",
+            "realworld_better_auth_task_build"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-realworld-better-auth-r8-a1-4074e124-53f7-4a2e-96f5-f14259db987d",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "realworld-better-auth",
+          "replicate": 8,
+          "plannedMetrics": [
+            "realworld_better_auth_task_git_clone",
+            "realworld_better_auth_task_cold_install",
+            "realworld_better_auth_task_lint_biome",
+            "realworld_better_auth_task_lint_deps_knip",
+            "realworld_better_auth_task_lint_format",
+            "realworld_better_auth_task_lint_spell",
+            "realworld_better_auth_task_lint_types",
+            "realworld_better_auth_task_lint_packages",
+            "realworld_better_auth_task_typecheck",
+            "realworld_better_auth_task_build"
+          ],
+          "passes": 1
+        },
+        {
+          "id": "blaxel-realworld-better-auth-r9",
+          "status": "failed",
+          "missingMetrics": [
+            "realworld_better_auth_task_git_clone",
+            "realworld_better_auth_task_cold_install",
+            "realworld_better_auth_task_lint_biome",
+            "realworld_better_auth_task_lint_deps_knip",
+            "realworld_better_auth_task_lint_format",
+            "realworld_better_auth_task_lint_spell",
+            "realworld_better_auth_task_lint_types",
+            "realworld_better_auth_task_lint_packages",
+            "realworld_better_auth_task_typecheck",
+            "realworld_better_auth_task_build"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-realworld-better-auth-r9-a1-87fc799a-94cf-464a-9173-4a4d4ebb09df",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "realworld-better-auth",
+          "replicate": 9,
+          "plannedMetrics": [
+            "realworld_better_auth_task_git_clone",
+            "realworld_better_auth_task_cold_install",
+            "realworld_better_auth_task_lint_biome",
+            "realworld_better_auth_task_lint_deps_knip",
+            "realworld_better_auth_task_lint_format",
+            "realworld_better_auth_task_lint_spell",
+            "realworld_better_auth_task_lint_types",
+            "realworld_better_auth_task_lint_packages",
+            "realworld_better_auth_task_typecheck",
+            "realworld_better_auth_task_build"
+          ],
+          "passes": 1
+        },
+        {
+          "id": "blaxel-realworld-better-auth-r10",
+          "status": "failed",
+          "missingMetrics": [
+            "realworld_better_auth_task_git_clone",
+            "realworld_better_auth_task_cold_install",
+            "realworld_better_auth_task_lint_biome",
+            "realworld_better_auth_task_lint_deps_knip",
+            "realworld_better_auth_task_lint_format",
+            "realworld_better_auth_task_lint_spell",
+            "realworld_better_auth_task_lint_types",
+            "realworld_better_auth_task_lint_packages",
+            "realworld_better_auth_task_typecheck",
+            "realworld_better_auth_task_build"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-realworld-better-auth-r10-a1-28af3270-e370-47dd-957f-a790378a0a0d",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "realworld-better-auth",
+          "replicate": 10,
+          "plannedMetrics": [
+            "realworld_better_auth_task_git_clone",
+            "realworld_better_auth_task_cold_install",
+            "realworld_better_auth_task_lint_biome",
+            "realworld_better_auth_task_lint_deps_knip",
+            "realworld_better_auth_task_lint_format",
+            "realworld_better_auth_task_lint_spell",
+            "realworld_better_auth_task_lint_types",
+            "realworld_better_auth_task_lint_packages",
+            "realworld_better_auth_task_typecheck",
+            "realworld_better_auth_task_build"
+          ],
+          "passes": 1
+        },
+        {
+          "id": "blaxel-realworld-better-auth-r11",
+          "status": "failed",
+          "missingMetrics": [
+            "realworld_better_auth_task_git_clone",
+            "realworld_better_auth_task_cold_install",
+            "realworld_better_auth_task_lint_biome",
+            "realworld_better_auth_task_lint_deps_knip",
+            "realworld_better_auth_task_lint_format",
+            "realworld_better_auth_task_lint_spell",
+            "realworld_better_auth_task_lint_types",
+            "realworld_better_auth_task_lint_packages",
+            "realworld_better_auth_task_typecheck",
+            "realworld_better_auth_task_build"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-realworld-better-auth-r11-a1-de9443b3-aa08-404b-85c3-513f86f8c007",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "realworld-better-auth",
+          "replicate": 11,
+          "plannedMetrics": [
+            "realworld_better_auth_task_git_clone",
+            "realworld_better_auth_task_cold_install",
+            "realworld_better_auth_task_lint_biome",
+            "realworld_better_auth_task_lint_deps_knip",
+            "realworld_better_auth_task_lint_format",
+            "realworld_better_auth_task_lint_spell",
+            "realworld_better_auth_task_lint_types",
+            "realworld_better_auth_task_lint_packages",
+            "realworld_better_auth_task_typecheck",
+            "realworld_better_auth_task_build"
+          ],
+          "passes": 1
+        },
+        {
+          "id": "blaxel-realworld-openclaw-r0",
+          "status": "failed",
+          "missingMetrics": [
+            "realworld_openclaw_task_git_clone",
+            "realworld_openclaw_task_cold_install",
+            "realworld_openclaw_task_lint_oxlint",
+            "realworld_openclaw_task_lint_extensions_all",
+            "realworld_openclaw_task_typecheck",
+            "realworld_openclaw_task_test_types"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-realworld-openclaw-r0-a1-fdf5936a-0d14-438a-94b8-3176f5b5e9e9",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "realworld-openclaw",
+          "replicate": 0,
+          "plannedMetrics": [
+            "realworld_openclaw_task_git_clone",
+            "realworld_openclaw_task_cold_install",
+            "realworld_openclaw_task_lint_oxlint",
+            "realworld_openclaw_task_lint_extensions_all",
+            "realworld_openclaw_task_typecheck",
+            "realworld_openclaw_task_test_types"
+          ],
+          "passes": 1
+        },
+        {
+          "id": "blaxel-realworld-openclaw-r1",
+          "status": "failed",
+          "missingMetrics": [
+            "realworld_openclaw_task_git_clone",
+            "realworld_openclaw_task_cold_install",
+            "realworld_openclaw_task_lint_oxlint",
+            "realworld_openclaw_task_lint_extensions_all",
+            "realworld_openclaw_task_typecheck",
+            "realworld_openclaw_task_test_types"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-realworld-openclaw-r1-a1-711a2e19-de3d-4d21-9984-97e93688c078",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "realworld-openclaw",
+          "replicate": 1,
+          "plannedMetrics": [
+            "realworld_openclaw_task_git_clone",
+            "realworld_openclaw_task_cold_install",
+            "realworld_openclaw_task_lint_oxlint",
+            "realworld_openclaw_task_lint_extensions_all",
+            "realworld_openclaw_task_typecheck",
+            "realworld_openclaw_task_test_types"
+          ],
+          "passes": 1
+        },
+        {
+          "id": "blaxel-realworld-openclaw-r2",
+          "status": "failed",
+          "missingMetrics": [
+            "realworld_openclaw_task_git_clone",
+            "realworld_openclaw_task_cold_install",
+            "realworld_openclaw_task_lint_oxlint",
+            "realworld_openclaw_task_lint_extensions_all",
+            "realworld_openclaw_task_typecheck",
+            "realworld_openclaw_task_test_types"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-realworld-openclaw-r2-a1-d1310400-9758-41d9-bd42-ed531ba645b1",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "realworld-openclaw",
+          "replicate": 2,
+          "plannedMetrics": [
+            "realworld_openclaw_task_git_clone",
+            "realworld_openclaw_task_cold_install",
+            "realworld_openclaw_task_lint_oxlint",
+            "realworld_openclaw_task_lint_extensions_all",
+            "realworld_openclaw_task_typecheck",
+            "realworld_openclaw_task_test_types"
+          ],
+          "passes": 1
+        },
+        {
+          "id": "blaxel-realworld-openclaw-r3",
+          "status": "failed",
+          "missingMetrics": [
+            "realworld_openclaw_task_git_clone",
+            "realworld_openclaw_task_cold_install",
+            "realworld_openclaw_task_lint_oxlint",
+            "realworld_openclaw_task_lint_extensions_all",
+            "realworld_openclaw_task_typecheck",
+            "realworld_openclaw_task_test_types"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-realworld-openclaw-r3-a1-7a3b4989-d737-40dc-bce4-a8ba9fbfeca2",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "realworld-openclaw",
+          "replicate": 3,
+          "plannedMetrics": [
+            "realworld_openclaw_task_git_clone",
+            "realworld_openclaw_task_cold_install",
+            "realworld_openclaw_task_lint_oxlint",
+            "realworld_openclaw_task_lint_extensions_all",
+            "realworld_openclaw_task_typecheck",
+            "realworld_openclaw_task_test_types"
+          ],
+          "passes": 1
+        },
+        {
+          "id": "blaxel-realworld-openclaw-r4",
+          "status": "failed",
+          "missingMetrics": [
+            "realworld_openclaw_task_git_clone",
+            "realworld_openclaw_task_cold_install",
+            "realworld_openclaw_task_lint_oxlint",
+            "realworld_openclaw_task_lint_extensions_all",
+            "realworld_openclaw_task_typecheck",
+            "realworld_openclaw_task_test_types"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-realworld-openclaw-r4-a1-47adaebf-f0bd-40e2-bff8-b41ef3924f2f",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "realworld-openclaw",
+          "replicate": 4,
+          "plannedMetrics": [
+            "realworld_openclaw_task_git_clone",
+            "realworld_openclaw_task_cold_install",
+            "realworld_openclaw_task_lint_oxlint",
+            "realworld_openclaw_task_lint_extensions_all",
+            "realworld_openclaw_task_typecheck",
+            "realworld_openclaw_task_test_types"
+          ],
+          "passes": 1
+        },
+        {
+          "id": "blaxel-realworld-openclaw-r5",
+          "status": "failed",
+          "missingMetrics": [
+            "realworld_openclaw_task_git_clone",
+            "realworld_openclaw_task_cold_install",
+            "realworld_openclaw_task_lint_oxlint",
+            "realworld_openclaw_task_lint_extensions_all",
+            "realworld_openclaw_task_typecheck",
+            "realworld_openclaw_task_test_types"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-realworld-openclaw-r5-a1-df5b1a6b-2d56-4bb3-ae20-aa97c3c838fc",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "realworld-openclaw",
+          "replicate": 5,
+          "plannedMetrics": [
+            "realworld_openclaw_task_git_clone",
+            "realworld_openclaw_task_cold_install",
+            "realworld_openclaw_task_lint_oxlint",
+            "realworld_openclaw_task_lint_extensions_all",
+            "realworld_openclaw_task_typecheck",
+            "realworld_openclaw_task_test_types"
+          ],
+          "passes": 1
+        },
+        {
+          "id": "blaxel-realworld-openclaw-r6",
+          "status": "failed",
+          "missingMetrics": [
+            "realworld_openclaw_task_git_clone",
+            "realworld_openclaw_task_cold_install",
+            "realworld_openclaw_task_lint_oxlint",
+            "realworld_openclaw_task_lint_extensions_all",
+            "realworld_openclaw_task_typecheck",
+            "realworld_openclaw_task_test_types"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-realworld-openclaw-r6-a1-81775102-2b93-44ca-aeb5-08f4bd8c3f26",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "realworld-openclaw",
+          "replicate": 6,
+          "plannedMetrics": [
+            "realworld_openclaw_task_git_clone",
+            "realworld_openclaw_task_cold_install",
+            "realworld_openclaw_task_lint_oxlint",
+            "realworld_openclaw_task_lint_extensions_all",
+            "realworld_openclaw_task_typecheck",
+            "realworld_openclaw_task_test_types"
+          ],
+          "passes": 1
+        },
+        {
+          "id": "blaxel-realworld-openclaw-r7",
+          "status": "failed",
+          "missingMetrics": [
+            "realworld_openclaw_task_git_clone",
+            "realworld_openclaw_task_cold_install",
+            "realworld_openclaw_task_lint_oxlint",
+            "realworld_openclaw_task_lint_extensions_all",
+            "realworld_openclaw_task_typecheck",
+            "realworld_openclaw_task_test_types"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-realworld-openclaw-r7-a1-45ad0c13-689f-443e-91e9-08f4d7043dc6",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "realworld-openclaw",
+          "replicate": 7,
+          "plannedMetrics": [
+            "realworld_openclaw_task_git_clone",
+            "realworld_openclaw_task_cold_install",
+            "realworld_openclaw_task_lint_oxlint",
+            "realworld_openclaw_task_lint_extensions_all",
+            "realworld_openclaw_task_typecheck",
+            "realworld_openclaw_task_test_types"
+          ],
+          "passes": 1
+        },
+        {
+          "id": "blaxel-realworld-openclaw-r8",
+          "status": "failed",
+          "missingMetrics": [
+            "realworld_openclaw_task_git_clone",
+            "realworld_openclaw_task_cold_install",
+            "realworld_openclaw_task_lint_oxlint",
+            "realworld_openclaw_task_lint_extensions_all",
+            "realworld_openclaw_task_typecheck",
+            "realworld_openclaw_task_test_types"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-realworld-openclaw-r8-a1-620a3457-8bfa-45f7-ba0e-9b462333ee3d",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "realworld-openclaw",
+          "replicate": 8,
+          "plannedMetrics": [
+            "realworld_openclaw_task_git_clone",
+            "realworld_openclaw_task_cold_install",
+            "realworld_openclaw_task_lint_oxlint",
+            "realworld_openclaw_task_lint_extensions_all",
+            "realworld_openclaw_task_typecheck",
+            "realworld_openclaw_task_test_types"
+          ],
+          "passes": 1
+        },
+        {
+          "id": "blaxel-realworld-openclaw-r9",
+          "status": "failed",
+          "missingMetrics": [
+            "realworld_openclaw_task_git_clone",
+            "realworld_openclaw_task_cold_install",
+            "realworld_openclaw_task_lint_oxlint",
+            "realworld_openclaw_task_lint_extensions_all",
+            "realworld_openclaw_task_typecheck",
+            "realworld_openclaw_task_test_types"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-realworld-openclaw-r9-a1-016e879e-a23a-4c21-bcca-9470c6bb26cb",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "realworld-openclaw",
+          "replicate": 9,
+          "plannedMetrics": [
+            "realworld_openclaw_task_git_clone",
+            "realworld_openclaw_task_cold_install",
+            "realworld_openclaw_task_lint_oxlint",
+            "realworld_openclaw_task_lint_extensions_all",
+            "realworld_openclaw_task_typecheck",
+            "realworld_openclaw_task_test_types"
+          ],
+          "passes": 1
+        },
+        {
+          "id": "blaxel-realworld-openclaw-r10",
+          "status": "failed",
+          "missingMetrics": [
+            "realworld_openclaw_task_git_clone",
+            "realworld_openclaw_task_cold_install",
+            "realworld_openclaw_task_lint_oxlint",
+            "realworld_openclaw_task_lint_extensions_all",
+            "realworld_openclaw_task_typecheck",
+            "realworld_openclaw_task_test_types"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-realworld-openclaw-r10-a1-f2a1a9a6-4a76-4a2e-9f0e-83dfdc120095",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "realworld-openclaw",
+          "replicate": 10,
+          "plannedMetrics": [
+            "realworld_openclaw_task_git_clone",
+            "realworld_openclaw_task_cold_install",
+            "realworld_openclaw_task_lint_oxlint",
+            "realworld_openclaw_task_lint_extensions_all",
+            "realworld_openclaw_task_typecheck",
+            "realworld_openclaw_task_test_types"
+          ],
+          "passes": 1
+        },
+        {
+          "id": "blaxel-realworld-openclaw-r11",
+          "status": "failed",
+          "missingMetrics": [
+            "realworld_openclaw_task_git_clone",
+            "realworld_openclaw_task_cold_install",
+            "realworld_openclaw_task_lint_oxlint",
+            "realworld_openclaw_task_lint_extensions_all",
+            "realworld_openclaw_task_typecheck",
+            "realworld_openclaw_task_test_types"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-realworld-openclaw-r11-a1-150adf4c-af1b-44a8-babf-097098471139",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "realworld-openclaw",
+          "replicate": 11,
+          "plannedMetrics": [
+            "realworld_openclaw_task_git_clone",
+            "realworld_openclaw_task_cold_install",
+            "realworld_openclaw_task_lint_oxlint",
+            "realworld_openclaw_task_lint_extensions_all",
+            "realworld_openclaw_task_typecheck",
+            "realworld_openclaw_task_test_types"
+          ],
+          "passes": 1
+        }
+      ]
+    }
+  }
+}

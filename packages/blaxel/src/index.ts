@@ -16,13 +16,18 @@ import type {
 	ExecOptions,
 	SandboxObservation,
 } from "@sandbox-benchmarks/driver";
-import { shellQuote } from "@sandbox-benchmarks/driver";
+import {
+	describeDriverFailure,
+	redactDiagnosticText,
+	shellQuote,
+} from "@sandbox-benchmarks/driver";
 import type {
 	ComputeSdkCreatedRequestVerification,
 	ComputeSdkCreateRequestCoverage,
 	ComputeSdkDriverSpec,
 } from "@sandbox-benchmarks/driver/computesdk";
 import { computeSdkSpec, defineComputeSdkDriver } from "@sandbox-benchmarks/driver/computesdk";
+import { diagnosticSecretsFromEnv } from "@sandbox-benchmarks/driver/env";
 import { nativeSdkCompute } from "@sandbox-benchmarks/driver/native";
 import { type } from "arktype";
 import { BLAXEL_PROVENANCE } from "./provenance.ts";
@@ -237,17 +242,54 @@ export async function prepareBlaxelSandbox(
 	options: DriverOperationOptions,
 ): Promise<ComputeSdkCreatedRequestVerification> {
 	options.signal?.throwIfAborted();
-	const keepalive = await native.process.exec({
-		name: BLAXEL_KEEPALIVE_PROCESS,
-		command: "sleep infinity",
-		keepAlive: true,
-		timeout: 0,
-		waitForCompletion: false,
-	});
+	// Fork-local: the ComputeSDK bridge replaces whatever this callback throws with a generic
+	// "preparation and verification callback failed" (see providerCallbackFailure in
+	// packages/driver/src/computesdk.ts), so name the failing step and a redacted rendering of the
+	// error on stderr before it is lost. Secrets are redacted with the same helper the CLI uses.
+	const secrets = diagnosticSecretsFromEnv(process.env);
+	const note = (text: string) =>
+		console.error(
+			`[blaxel prepare ${native.metadata.name}] ${redactDiagnosticText(text, secrets)}`,
+		);
+	const failed = (step: string, caught: unknown): never => {
+		let text = describeDriverFailure(caught, secrets);
+		if (text === "Unknown failure") {
+			try {
+				text = JSON.stringify(caught) ?? String(caught);
+			} catch {
+				text = String(caught);
+			}
+		}
+		note(`step "${step}" failed: ${text.slice(0, 4096)}`);
+		throw caught;
+	};
+	const attempt = async <T>(step: string, run: () => Promise<T>): Promise<T> => {
+		try {
+			return await run();
+		} catch (caught) {
+			return failed(step, caught);
+		}
+	};
+	const keepalive = await attempt("keepalive exec", () =>
+		native.process.exec({
+			name: BLAXEL_KEEPALIVE_PROCESS,
+			command: "sleep infinity",
+			keepAlive: true,
+			timeout: 0,
+			waitForCompletion: false,
+		}),
+	);
+	note(`keepalive status=${keepalive.status} pid=${keepalive.pid ?? "?"}`);
 	if (keepalive.status !== "running") {
-		throw new Error(`Blaxel keepalive process is ${keepalive.status}, not running`);
+		failed(
+			"keepalive status",
+			new Error(`Blaxel keepalive process is ${keepalive.status}, not running`),
+		);
 	}
 	const memoryMb = native.spec.runtime?.memory;
+	note(
+		`runtime memory=${memoryMb ?? "unknown"} MB (requested ${request.spec.memoryGb * 1024}) image=${native.spec.runtime?.image ?? "?"} region=${native.metadata.labels?.region ?? "?"}`,
+	);
 	if (memoryMb !== request.spec.memoryGb * 1024) {
 		return {
 			status: "unsupported",
@@ -255,14 +297,21 @@ export async function prepareBlaxelSandbox(
 		};
 	}
 	if (request.spec.diskGb === undefined) return { status: "honored" };
-	const probe = await execBlaxelCommand(
-		native,
-		`df -Pk ${shellQuote(BLAXEL_PTS_DATA_DIR)} | awk 'NR==2 {print $2}'`,
-		options,
+	// `uname -m` goes to stderr so the diagnostic line names the CPU architecture without
+	// disturbing the numeric stdout contract the capacity check below parses.
+	const probe = await attempt("volume probe exec", () =>
+		execBlaxelCommand(
+			native,
+			`df -Pk ${shellQuote(BLAXEL_PTS_DATA_DIR)} | awk 'NR==2 {print $2}' && uname -m >&2`,
+			options,
+		),
+	);
+	note(
+		`volume probe exit=${probe.exitCode} stdout=${JSON.stringify(probe.stdout.slice(0, 200))} stderr=${JSON.stringify(probe.stderr.slice(0, 200))}`,
 	);
 	const output = probe.stdout.trim();
 	if (probe.exitCode !== 0 || !/^\d+$/.test(output)) {
-		throw new Error("Blaxel volume capacity probe failed");
+		failed("volume probe result", new Error("Blaxel volume capacity probe failed"));
 	}
 	const capacityGb = Number(output) / 1024 / 1024;
 	return capacityGb >= request.spec.diskGb

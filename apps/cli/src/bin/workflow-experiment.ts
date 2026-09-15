@@ -5,7 +5,11 @@ import { describeDriverFailure } from "@sandbox-benchmarks/driver";
 import { diagnosticSecretsFromEnv } from "@sandbox-benchmarks/driver/env";
 import { exitAfterSandboxCleanup } from "@sandbox-benchmarks/harness";
 import { describeCoverageShortfall } from "@sandbox-benchmarks/results";
-import { batchCoverage, executeExperimentBatch } from "../lib/execute-experiment.ts";
+import {
+	batchCoverage,
+	executeExperimentBatch,
+	isDuplicateAttemptNoopRerun,
+} from "../lib/execute-experiment.ts";
 import { writeImmutableJson } from "../lib/experiment-artifacts.ts";
 import { githubExperimentStore } from "../lib/experiment-store.ts";
 import {
@@ -65,11 +69,18 @@ if (import.meta.main) {
 			// An incomplete batch must say which cells fell short: this exit is the only signal the
 			// job gives, and a bare code sends the reader to another job's coverage artifact.
 			const coverage = batchCoverage(plan, join(root, "attempts"), attempts);
-			if (!coverage.complete)
+			const rerunNoop =
+				Number(process.env.GITHUB_RUN_ATTEMPT ?? "1") > 1 &&
+				isDuplicateAttemptNoopRerun(attempts);
+			if (!coverage.complete && !rerunNoop)
 				console.error(
 					[`batch ${batchId} is incomplete`, ...describeCoverageShortfall(coverage)].join("\n"),
 				);
-			await exitAfterSandboxCleanup(coverage.complete ? 0 : 1);
+			if (rerunNoop)
+				console.log(
+					`batch ${batchId} already attempted in an earlier workflow attempt; treating rerun as no-op`,
+				);
+			await exitAfterSandboxCleanup(coverage.complete || rerunNoop ? 0 : 1);
 		} else if (command === "collect") {
 			const summary = await downloadExperimentAttempts(
 				store,

@@ -55,6 +55,23 @@ export interface BatchExecution {
 	open?: (provider: ProviderId) => Promise<OpenedDriver>;
 }
 
+export const DUPLICATE_ATTEMPT_DIAGNOSTIC =
+	"this planned cell already has an attempt; retries require an authorized lineage or a fresh experiment";
+
+/** A workflow rerun can be a no-op when every cell was already attempted in an earlier run attempt. */
+export function isDuplicateAttemptNoopRerun(attempts: readonly ExperimentAttempt[]): boolean {
+	return (
+		attempts.length > 0 &&
+		attempts.every(
+			(attempt) =>
+				attempt.outcome === "failed" &&
+				!attempt.measurementStarted &&
+				attempt.cleanup === "not-allocated" &&
+				attempt.diagnostic?.includes(DUPLICATE_ATTEMPT_DIAGNOSTIC),
+		)
+	);
+}
+
 /** Per-cell create/setup deadline: earlier of the cell startup budget and the batch residual after workload+finish. */
 export function cellStartupDeadline(
 	cell: Pick<ExperimentCell, "startupMinutes" | "workloadMinutes" | "finishMinutes">,
@@ -174,9 +191,7 @@ export async function executeExperimentBatch(
 		let runDigest: string | undefined;
 		try {
 			if (history.some((record) => record.planDigest === plan.digest && record.cellId === cell.id))
-				throw new Error(
-					"this planned cell already has an attempt; retries require an authorized lineage or a fresh experiment",
-				);
+				throw new Error(DUPLICATE_ATTEMPT_DIAGNOSTIC);
 			if (failure !== undefined) throw failure;
 			const opened = drivers.get(cell.provider);
 			if (!opened) throw new Error("driver was not admitted");

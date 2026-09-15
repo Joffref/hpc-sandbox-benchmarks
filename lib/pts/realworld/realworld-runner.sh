@@ -206,8 +206,10 @@ run_bounded() {
 	timeout --kill-after=30 "$TASK_TIMEOUT_SECONDS" "$@" || status=$?
 	if [ "$status" -eq 124 ] || [ "$status" -eq 137 ]; then
 		echo "task '${TASK}' command timed out or was killed after ${TASK_TIMEOUT_SECONDS}s (exit ${status})" >&2
-		# Terminal-state snapshot into the (already-redirected) task log so the forensics tarball
-		# can settle thrash-vs-deadlock for a hung provider.
+	fi
+	if [ "$status" -ne 0 ]; then
+		# Capture every failure: upstream wrappers can turn a compiler SIGKILL into exit 1,
+		# hiding it from the timeout-only diagnostics. Evidence stays in the task's forensic log.
 		head -3 /proc/meminfo >&2 2>/dev/null || true
 		ps -eo pid,ppid,pgid,rss,etime,comm --sort=-rss 2>/dev/null | head -15 >&2 || true
 		# The cap's own verdict, for the same tarball: a real cgroup OOM increments oom_kill in
@@ -217,6 +219,8 @@ run_bounded() {
 		if [ -n "${BENCH_CG:-}" ] && [ -f "$BENCH_CG/memory.events" ]; then
 			sed 's/^/bench-cgroup: memory.events /' "$BENCH_CG/memory.events" >&2 2>/dev/null || true
 		fi
+	fi
+	if [ "$status" -eq 124 ] || [ "$status" -eq 137 ]; then
 		# timeout signals its own process group, but children that made a NEW group (openclaw's
 		# run-oxlint-shards spawns shards detached) survive — and an escapee need not carry the
 		# workspace path in its argv at all, so a leaked memory hog is swept three ways before it

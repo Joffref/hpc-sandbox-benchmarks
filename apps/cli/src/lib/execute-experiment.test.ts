@@ -1,5 +1,5 @@
 import { afterAll, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type { ExecResult, ProviderId, SandboxSession } from "@sandbox-benchmarks/driver";
@@ -836,4 +836,109 @@ test("cellStartupDeadline is bounded by cell startup and by remaining batch budg
 	expect(cellStartupDeadline(cell, takenAt, takenAt + 100 * 60_000)).toBe(
 		takenAt + 100 * 60_000 - (80 + 15) * 60_000,
 	);
+});
+
+test("retains a verified allocation when post-create preparation and rollback both fail", async () => {
+	const { DriverError, FailedCreateCleanupError, sandboxRef } = await import(
+		"@sandbox-benchmarks/driver"
+	);
+	const f = await fixture("post-create-retained-id");
+	const open = f.options.open;
+	const ref = sandboxRef("tama", "bench-post-create");
+	f.options.open = async () => {
+		const opened = await open();
+		return {
+			...opened,
+			driver: {
+				...opened.driver,
+				create: async () => {
+					f.present.add(ref.id);
+					throw new FailedCreateCleanupError(
+						new DriverError("destroy-failed", "cleanup unavailable", { provider: "tama", ref }),
+						new DriverError("create-failed", "verification failed", { provider: "tama", ref }),
+						{
+							provider: "tama",
+							locator: { kind: "id", value: ref.id },
+							cleanup: async () => {
+								throw new Error("cleanup unavailable");
+							},
+						},
+					);
+				},
+			},
+		};
+	};
+	const attempts = await executeExperimentBatch({
+		...f.options,
+		plan: rollingPlan("post-create-retained-id"),
+	});
+	const first = attempts[0];
+	if (!first) throw new Error("missing first attempt");
+	expect(first.cleanup).toBe("unresolved");
+	expect(first?.measurementStarted).toBe(false);
+	const allocation = JSON.parse(
+		readFileSync(join(f.options.root, first.id, "raw", "allocation.json"), "utf8"),
+	);
+	expect(allocation.ref).toEqual(ref);
+	expect(allocation.attempt).toBe(first?.id);
+	expect(f.records.filter((record) => record.kind === "released")).toHaveLength(0);
+	const original = readFileSync(join(f.options.root, first.id, "attempt.json"), "utf8");
+	const recovered = await recoverAllocatedIntent({
+		directory: join(f.options.root, first.id),
+		openDriver: async () => (await open()).driver,
+		journal: f.options.journal,
+		assertQuiescent: async () => {},
+		signal: AbortSignal.timeout(10_000),
+	});
+	expect(recovered).toEqual(ref);
+	expect(f.present.size).toBe(0);
+	expect(f.records.map((record) => record.kind)).toEqual(["intent", "allocated", "released"]);
+	expect(readFileSync(join(f.options.root, first.id, "attempt.json"), "utf8")).toBe(original);
+});
+
+test.each([
+	"name",
+	"mismatched-id",
+	"foreign-provider",
+])("does not persist an unverified failed-create locator: %s", async (kind) => {
+	const { DriverError, FailedCreateCleanupError, sandboxRef } = await import(
+		"@sandbox-benchmarks/driver"
+	);
+	const f = await fixture(`unverified-${kind}`);
+	const open = f.options.open;
+	f.options.open = async () => {
+		const opened = await open();
+		return {
+			...opened,
+			driver: {
+				...opened.driver,
+				create: async () => {
+					throw new FailedCreateCleanupError(
+						new Error("cleanup unknown"),
+						new DriverError("create-failed", "verification failed", {
+							provider: kind === "foreign-provider" ? "e2b" : "tama",
+							ref: sandboxRef(kind === "foreign-provider" ? "e2b" : "tama", "known-id"),
+						}),
+						{
+							provider: "tama",
+							locator: {
+								kind: kind === "name" ? "name" : "id",
+								value: kind === "mismatched-id" ? "other-id" : "known-id",
+							},
+							cleanup: async () => {
+								throw new Error("cleanup unknown");
+							},
+						},
+					);
+				},
+			},
+		};
+	};
+	const attempts = await executeExperimentBatch({
+		...f.options,
+		plan: rollingPlan(`unverified-${kind}`),
+	});
+	for (const attempt of attempts)
+		expect(existsSync(join(f.options.root, attempt.id, "raw", "allocation.json"))).toBe(false);
+	expect(attempts[0]?.cleanup).toBe("unresolved");
 });

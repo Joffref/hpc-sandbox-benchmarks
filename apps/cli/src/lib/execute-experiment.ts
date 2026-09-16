@@ -2,7 +2,11 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import type { SandboxDriver, SandboxRef } from "@sandbox-benchmarks/driver";
-import { describeDriverFailure, isFailedCreateCleanupError } from "@sandbox-benchmarks/driver";
+import {
+	describeDriverFailure,
+	isDriverError,
+	isFailedCreateCleanupError,
+} from "@sandbox-benchmarks/driver";
 import { diagnosticSecretsFromEnv } from "@sandbox-benchmarks/driver/env";
 import { executeSuite } from "@sandbox-benchmarks/harness";
 import type { CoverageReport } from "@sandbox-benchmarks/results";
@@ -208,6 +212,24 @@ export async function executeExperimentBatch(
 						// absence. Any other create failure has already reconciled or never allocated.
 						createRejectedCleanly = !isFailedCreateCleanupError(error);
 						if (!createRejectedCleanly) stopRefill(cell);
+						// A post-create double fault can retain a canonical identity even though no
+						// session reached the harness. Preserve it for explicit identity-based recovery;
+						// neither the original failure nor its unresolved journal is cleared here.
+						if (
+							isFailedCreateCleanupError(error) &&
+							error.provider === cell.provider &&
+							error.locator.kind === "id" &&
+							isDriverError(error.suppressed) &&
+							error.suppressed.provider === cell.provider &&
+							error.suppressed.ref?.provider === cell.provider &&
+							error.suppressed.ref.id === error.locator.value
+						) {
+							writeImmutableJson(join(raw, "allocation.json"), {
+								...intent,
+								kind: "allocated",
+								ref: error.suppressed.ref,
+							} satisfies AccountRecord);
+						}
 						if (isConcurrentSandboxAdmissionError(error)) {
 							const capacityFailure = new Error(
 								concurrentSandboxAdmissionDetail(error, {

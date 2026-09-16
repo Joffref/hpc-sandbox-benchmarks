@@ -6,11 +6,12 @@ import { accountRecordSchema, confirmRemoval, withinSignal } from "./account-jou
 import { readExperimentAttempt } from "./experiment-artifacts.ts";
 
 /**
- * Identity-based recovery of an allocation whose durable journal append failed.
+ * Identity-based recovery of a retained allocation that never reached the harness.
  *
  * A create can return after the account journal rejects its `allocated` append. The harness never
  * receives that session, so no execution receipt carries the vendor identity; instead the executor
- * retains the identity-bound record in the attempt's raw tree before appending it. That retained
+ * retains the identity-bound record in the attempt's raw tree before appending it. A post-create
+ * verification/rollback double fault also retains its validated identity there. That retained
  * record — not an inventory sweep — is what makes the intent resolvable: ownership is released by
  * observing the removal of that exact sandbox, the same evidence the ordinary release path requires.
  *
@@ -28,7 +29,7 @@ export async function recoverAllocatedIntent(options: {
 	signal: AbortSignal;
 }): Promise<SandboxRef> {
 	const { evidence, execution, cleanup } = readExperimentAttempt(options.directory);
-	// The journal-append failure happens before the harness owns the session: an attempt that
+	// These failures happen before the harness owns the session: an attempt that
 	// measured anything, or that produced its own receipts, is a different failure with different
 	// evidence and must not be cleared here.
 	if (

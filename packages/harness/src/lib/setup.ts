@@ -60,7 +60,7 @@ const IS_ALPINE = "command -v apk >/dev/null 2>&1";
 const APK_ADD = [
 	"apk_add() {",
 	'n=0; while :; do if $SUDO apk add --no-cache "$@"; then return 0; fi;',
-	'n=$((n+1)); if [ "$n" -ge 3 ]; then break; fi; echo "apk attempt $n failed; retrying in 8s" >&2; sleep 8; done;',
+	'n=$((n+1)); if [ "$n" -ge 2 ]; then break; fi; echo "apk attempt $n failed; retrying in 8s" >&2; sleep 8; done;',
 	"if ! getent hosts dl-cdn.alpinelinux.org >/dev/null 2>&1; then",
 	'echo "apk: dl-cdn.alpinelinux.org does not resolve; adding public IPv4 resolvers" >&2;',
 	'printf "nameserver 1.1.1.1\\nnameserver 8.8.8.8\\n" | $SUDO tee -a /etc/resolv.conf >/dev/null;',
@@ -68,10 +68,16 @@ const APK_ADD = [
 	'v="v$(cut -d. -f1,2 /etc/alpine-release 2>/dev/null || echo 3.21)";',
 	'echo "apk: falling back to mirrors.edge.kernel.org ($v)" >&2;',
 	'$SUDO apk add --no-cache -X "https://mirrors.edge.kernel.org/alpine/$v/main" -X "https://mirrors.edge.kernel.org/alpine/$v/community" "$@" && return 0;',
-	'echo "=== apk diagnostics ===" >&2; cat /etc/apk/repositories >&2; echo "--- resolv.conf" >&2; cat /etc/resolv.conf >&2;',
-	'echo "--- resolve" >&2; (getent hosts dl-cdn.alpinelinux.org || nslookup dl-cdn.alpinelinux.org) >&2 2>&1;',
-	"for u in https://dl-cdn.alpinelinux.org/alpine/MIRRORS.txt https://github.com/ http://dl-cdn.alpinelinux.org/alpine/MIRRORS.txt; do",
-	'if wget -q -T 10 -O /dev/null "$u" 2>/dev/null; then echo "fetch $u: ok" >&2; else echo "fetch $u: FAILED" >&2; fi; done;',
+	// DNS-free diagnostics (run 35195449393 showed "Network unreachable" to 1.1.1.1 and an all-IPv6
+	// resolver list): which address families have a route, whether any configured resolver answers,
+	// and whether raw IPv4 / IPv6 egress exists at all, each on one short stderr line.
+	'echo "=== apk diagnostics ===" >&2; echo "--- resolv.conf" >&2; grep -v "^#" /etc/resolv.conf >&2;',
+	'echo "--- addrs" >&2; (ip -o addr 2>/dev/null || ifconfig 2>/dev/null) | cut -c1-140 >&2;',
+	'echo "--- routes" >&2; ip -4 route 2>&1 | head -4 >&2; ip -6 route 2>&1 | head -6 >&2;',
+	"echo \"--- resolvers\" >&2; for ns in $(awk '/^nameserver/ {print $2}' /etc/resolv.conf | head -6); do",
+	'if nslookup dl-cdn.alpinelinux.org "$ns" >/dev/null 2>&1; then echo "ns $ns: ok" >&2; else echo "ns $ns: FAILED" >&2; fi; done;',
+	'echo "--- raw fetch" >&2; for u in "http://1.1.1.1/" "http://[2606:4700:4700::1111]/" "https://[2a04:4e42::644]/alpine/MIRRORS.txt" "https://github.com/"; do',
+	'if wget -q -T 8 -O /dev/null "$u" 2>/dev/null; then echo "fetch $u: ok" >&2; else echo "fetch $u: FAILED" >&2; fi; done;',
 	"return 1; };",
 ].join(" ");
 

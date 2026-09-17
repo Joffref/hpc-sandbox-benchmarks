@@ -39,8 +39,13 @@ type BlaxelProcess = Awaited<ReturnType<SandboxInstance["process"]["exec"]>>;
 
 /** Blaxel resource names: lowercase alphanumeric plus hyphens, at most 49 characters. */
 export const BLAXEL_SANDBOX_ID = type(/^[a-z0-9][a-z0-9-]{0,48}$/);
-/** The Debian image: Blaxel's stock Alpine base has no apt, so PTS cannot be installed there. */
-export const BLAXEL_IMAGE = "blaxel/ts-app:latest";
+/**
+ * Fork-local: the stock Alpine base image. Upstream pins the Debian `blaxel/ts-app:latest` because
+ * PTS and the sandbox setup install through apt; on this image those steps must go through apk
+ * instead, so the in-sandbox setup (packages/harness/src/lib/setup.ts, lib/bench.sh) is the next
+ * thing to adapt.
+ */
+export const BLAXEL_IMAGE = "blaxel/base-image:latest";
 export const BLAXEL_REGION = "us-was-1";
 /** Blaxel couples CPU to RAM (measured: cores = memory MB / 2048) and exposes no independent knob. */
 export const BLAXEL_MEMORY_MB_PER_VCPU = 2048;

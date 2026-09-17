@@ -50,6 +50,32 @@ const PTS_VERSION = "10.8.4";
 const IS_ALPINE = "command -v apk >/dev/null 2>&1";
 
 /**
+ * Fork-local: `apk_add <packages…>` for the Alpine branches. apk has no retry of its own and reports
+ * every fetch failure as "temporary error (try again later)", which on the first Alpine smoke run
+ * (35195127356) it did for dl-cdn on both index fetches, so: retry the default mirrors, then repair
+ * DNS if the mirror host does not resolve (the sandbox resolver was seen timing out over IPv6), then
+ * try a second mirror, and finally print resolver + connectivity diagnostics so the failing layer is
+ * named in the step log rather than guessed. Defined per step because each step is a fresh shell.
+ */
+const APK_ADD = [
+	"apk_add() {",
+	'n=0; while :; do if $SUDO apk add --no-cache "$@"; then return 0; fi;',
+	'n=$((n+1)); if [ "$n" -ge 3 ]; then break; fi; echo "apk attempt $n failed; retrying in 8s" >&2; sleep 8; done;',
+	"if ! getent hosts dl-cdn.alpinelinux.org >/dev/null 2>&1; then",
+	'echo "apk: dl-cdn.alpinelinux.org does not resolve; adding public IPv4 resolvers" >&2;',
+	'printf "nameserver 1.1.1.1\\nnameserver 8.8.8.8\\n" | $SUDO tee -a /etc/resolv.conf >/dev/null;',
+	'$SUDO apk add --no-cache "$@" && return 0; fi;',
+	'v="v$(cut -d. -f1,2 /etc/alpine-release 2>/dev/null || echo 3.21)";',
+	'echo "apk: falling back to mirrors.edge.kernel.org ($v)" >&2;',
+	'$SUDO apk add --no-cache -X "https://mirrors.edge.kernel.org/alpine/$v/main" -X "https://mirrors.edge.kernel.org/alpine/$v/community" "$@" && return 0;',
+	'echo "=== apk diagnostics ===" >&2; cat /etc/apk/repositories >&2; echo "--- resolv.conf" >&2; cat /etc/resolv.conf >&2;',
+	'echo "--- resolve" >&2; (getent hosts dl-cdn.alpinelinux.org || nslookup dl-cdn.alpinelinux.org) >&2 2>&1;',
+	"for u in https://dl-cdn.alpinelinux.org/alpine/MIRRORS.txt https://github.com/ http://dl-cdn.alpinelinux.org/alpine/MIRRORS.txt; do",
+	'if wget -q -T 10 -O /dev/null "$u" 2>/dev/null; then echo "fetch $u: ok" >&2; else echo "fetch $u: FAILED" >&2; fi; done;',
+	"return 1; };",
+].join(" ");
+
+/**
  * Fork-local: the apk counterpart of PTS_APT_DEPS for an Alpine stock image. PTS itself is PHP (the
  * php83-* extensions it loads: dom/simplexml/zip for profiles, pcntl/posix for its runner, curl/openssl
  * for downloads); build-base + headers for the source-built profiles (fio → libaio, pgbench → icu +
@@ -86,7 +112,7 @@ export function setupSteps(suite: Suite, sourceRevision?: string): SetupStep[] {
 			// pieces the producer scripts assume (bash for the task shebangs, coreutils/gawk/procps for
 			// the probes) — busybox's applets are not enough for lscpu or `sleep infinity`.
 			script:
-				`if ${IS_ALPINE}; then $SUDO apk add --no-cache bash git curl ca-certificates tar gzip xz unzip python3 coreutils util-linux-misc procps-ng gawk grep sed findutils; fi; ` +
+				`if ${IS_ALPINE}; then ${APK_ADD} apk_add bash git curl ca-certificates tar gzip xz unzip python3 coreutils util-linux-misc procps-ng gawk grep sed findutils; fi; ` +
 				"(command -v git && command -v curl && command -v python3) >/dev/null 2>&1 " +
 				"|| ($SUDO apt-get update -qq && $SUDO apt-get install -y -qq git curl ca-certificates tar gzip xz-utils unzip python3) " +
 				"|| (command -v git >/dev/null && command -v curl >/dev/null)",
@@ -176,7 +202,7 @@ export function setupSteps(suite: Suite, sourceRevision?: string): SetupStep[] {
 			// sandbox, so the exact-version pin is relaxed to the major on that path only.
 			script: [
 				`cd "$HOME"`,
-				`if ${IS_ALPINE}; then (node -e 'process.exit(process.versions.node.split(".")[0] === "22" ? 0 : 1)' 2>/dev/null || $SUDO apk add --no-cache nodejs npm); else (node -e 'process.exit(process.versions.node === "${NODE_VERSION}" ? 0 : 1)' 2>/dev/null || $SUDO mise use --global --yes node@${NODE_VERSION}); fi`,
+				`if ${IS_ALPINE}; then ${APK_ADD} (node -e 'process.exit(process.versions.node.split(".")[0] === "22" ? 0 : 1)' 2>/dev/null || apk_add nodejs npm); else (node -e 'process.exit(process.versions.node === "${NODE_VERSION}" ? 0 : 1)' 2>/dev/null || $SUDO mise use --global --yes node@${NODE_VERSION}); fi`,
 				`if command -v pnpm >/dev/null 2>&1 && [ "$(pnpm -v)" = "${PNPM_VERSION}" ]; then :; else npm install --global --prefix "$HOME/.local" pnpm@${PNPM_VERSION}; fi`,
 				"node -v && pnpm -v",
 			].join(" && "),
@@ -198,7 +224,7 @@ export function setupSteps(suite: Suite, sourceRevision?: string): SetupStep[] {
 			// execs (Alpine ships the binary as php83); the apt branch is upstream's, untouched.
 			script:
 				`if ${IS_ALPINE}; then ` +
-				`$SUDO apk add --no-cache ${PTS_APK_DEPS} && { command -v php >/dev/null 2>&1 || $SUDO ln -sf "$(command -v php83)" /usr/local/bin/php; }; ` +
+				`${APK_ADD} apk_add ${PTS_APK_DEPS} && { command -v php >/dev/null 2>&1 || $SUDO ln -sf "$(command -v php83)" /usr/local/bin/php; }; ` +
 				"else " +
 				"$SUDO apt-get -o Acquire::Retries=3 update -qq || true; " +
 				`$SUDO apt-get install -y -qq ${PTS_APT_DEPS} || echo "WARNING: apt dep refresh failed (best-effort); relying on the baked image"; ` +

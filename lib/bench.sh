@@ -1092,6 +1092,16 @@ run_fio_pts() {
 	direct="$(fio_direct_choice)" || return 1
 	echo "fio scenario: Type=${type_name} Block Size=${bs_name} Direct=${direct}"
 
+	# Fork-local: pts/fio-2.1.0 downloads its source from brick.kernel.dk, which the Blaxel dev
+	# sandbox egress cannot reach (runs 35129999486 on x86 and 35247716410 on arm64: "Download
+	# Failed: http://brick.kernel.dk/snaps/fio-3.36.tar.gz", every fio scenario skipped). Seed PTS's
+	# download cache the way the iperf leaves do — retries, then a byte-identical mirror hosted as a
+	# release asset on this fork (sha256-verified on upload and again here before PTS sees it).
+	seed_pts_download_cache "fio-3.36.tar.gz" \
+		"0a07354876ca4d23518f8aa88682f23866455bbd2ff2d0f055d6e4b72f156553" \
+		"https://brick.kernel.dk/snaps/fio-3.36.tar.gz" \
+		"https://github.com/Joffref/hpc-sandbox-benchmarks/releases/download/mirror-fio-3.36/fio-3.36.tar.gz"
+
 	run_pinned_pts "pts/fio-2.1.0" "$prefix" \
 		"fio.type=${type_name};fio.engine=Linux AIO;fio.direct=${direct};fio.size=${bs_name};fio.cpu-threads=0;fio.auto-disk-mount-points=Default Test Directory"
 }

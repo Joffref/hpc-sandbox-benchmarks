@@ -79,7 +79,7 @@ describe("setupSteps", () => {
 	it("checksum-verifies the pinned mise fallback without executing a remote installer", () => {
 		const miseStep = setupSteps(SUITES["cpu-node"]).find((step) => step.label === "install mise");
 		expect(miseStep?.script).toContain("sha256sum -c -");
-		expect(miseStep?.script).toContain("mise-v2026.7.11-linux-$a.tar.gz");
+		expect(miseStep?.script).toContain("mise-v2026.7.11-linux-$a$libc.tar.gz");
 		expect(miseStep?.script).not.toContain("mise.run");
 		// The pin must name the extracted EXECUTABLE, not the archive, so this fallback keeps the same
 		// trust anchor as the toolchain image's direct-binary fetch (05-mise-binary.sh / pins.ts).

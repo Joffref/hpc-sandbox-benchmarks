@@ -62,6 +62,11 @@ export const BLAXEL_VOLUME_HEADROOM_MB = 256;
 export const BLAXEL_OWNER_LABEL = "sandbox-benchmarks";
 export const BLAXEL_ATTEMPT_LABEL = "sandbox-benchmarks-attempt";
 export const BLAXEL_KEEPALIVE_PROCESS = "benchmark-keepalive";
+/** Fork-local: see prepareBlaxelSandbox — integer seconds so busybox `sleep` accepts it. */
+export const BLAXEL_KEEPALIVE_SECONDS = 2_147_483_647;
+/** Fork-local: install bash through apk when the image lacks it; a no-op elsewhere. */
+export const BLAXEL_BASH_BOOTSTRAP =
+	"command -v bash >/dev/null 2>&1 || { command -v apk >/dev/null 2>&1 && (apk add --no-cache bash >/dev/null 2>&1 || sudo apk add --no-cache bash >/dev/null 2>&1); } && command -v bash >/dev/null 2>&1";
 export const BLAXEL_RECOVERY_CONFIRMATION_MS = 2_000;
 export const BLAXEL_RECOVERY_MAX_ATTEMPTS = 4;
 export const BLAXEL_READINESS = Object.freeze({ startup: "create-returns-ready" as const });
@@ -275,10 +280,12 @@ export async function prepareBlaxelSandbox(
 			return failed(step, caught);
 		}
 	};
+	// Fork-local: an integer sleep rather than `sleep infinity`, which busybox's sleep (the Alpine
+	// base image) rejects; 2^31-1 seconds outlives any sandbox TTL on coreutils and busybox alike.
 	const keepalive = await attempt("keepalive exec", () =>
 		native.process.exec({
 			name: BLAXEL_KEEPALIVE_PROCESS,
-			command: "sleep infinity",
+			command: `sleep ${BLAXEL_KEEPALIVE_SECONDS}`,
 			keepAlive: true,
 			timeout: 0,
 			waitForCompletion: false,
@@ -317,6 +324,21 @@ export async function prepareBlaxelSandbox(
 	const output = probe.stdout.trim();
 	if (probe.exitCode !== 0 || !/^\d+$/.test(output)) {
 		failed("volume probe result", new Error("Blaxel volume capacity probe failed"));
+	}
+	// Fork-local: the harness runs every setup step through `bash -c`, and the Alpine base image
+	// ships only busybox sh — so bash has to exist before the first step, and this hook is the only
+	// place that runs a command before the harness does. A no-op anywhere bash already exists.
+	const bootstrap = await attempt("bash bootstrap", () =>
+		execBlaxelCommand(native, BLAXEL_BASH_BOOTSTRAP, options),
+	);
+	note(
+		`bash bootstrap exit=${bootstrap.exitCode} stderr=${JSON.stringify(bootstrap.stderr.slice(0, 200))}`,
+	);
+	if (bootstrap.exitCode !== 0) {
+		failed(
+			"bash bootstrap result",
+			new Error("Blaxel sandbox has no bash and apk could not install it"),
+		);
 	}
 	const capacityGb = Number(output) / 1024 / 1024;
 	return capacityGb >= request.spec.diskGb

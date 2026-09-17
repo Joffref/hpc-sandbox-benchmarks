@@ -610,6 +610,26 @@ ensure_pts() {
 					iputils-ping tcl stress-ng unzip procps &&
 				${SUDO:-} dpkg -i "$tmp_deb") || true
 			rm -f "$tmp_deb"
+		elif have apk; then
+			# Fork-local Alpine stock-image path (blaxel/base-image): no dpkg, so install the same release
+			# from its generic tarball via PTS's install-sh under /usr/local. Package set mirrors
+			# PTS_APK_DEPS in packages/harness/src/lib/setup.ts; php83 is Alpine's binary name for php.
+			local pts_version="10.8.4"
+			local tgz_url="https://github.com/phoronix-test-suite/phoronix-test-suite/releases/download/v${pts_version}/phoronix-test-suite-${pts_version}.tar.gz"
+			local tmp_dir
+			tmp_dir="$(mktemp -d /tmp/pts-XXXXXX)"
+			(${SUDO:-} apk add --no-cache bash php83 php83-dom php83-xml php83-simplexml php83-xmlwriter php83-zip \
+				php83-openssl php83-posix php83-pcntl php83-curl php83-sockets php83-ctype php83-mbstring \
+				php83-phar php83-fileinfo php83-iconv build-base autoconf automake libtool flex bison bc \
+				elfutils-dev openssl-dev libaio-dev icu-dev pkgconf tcl tcl-dev readline-dev zlib-dev \
+				linux-headers perl python3 bind-tools jq netcat-openbsd iputils stress-ng unzip procps-ng \
+				util-linux-misc gawk coreutils &&
+				{ have php || ${SUDO:-} ln -sf "$(command -v php83)" /usr/local/bin/php; } &&
+				curl -fsSL --retry 3 --retry-all-errors --retry-delay 2 --retry-max-time 90 \
+					--connect-timeout 10 --max-time 60 "$tgz_url" -o "$tmp_dir/pts.tar.gz" &&
+				tar -xzf "$tmp_dir/pts.tar.gz" -C "$tmp_dir" &&
+				(cd "$tmp_dir/phoronix-test-suite" && ${SUDO:-} ./install-sh /usr/local)) || true
+			rm -rf "$tmp_dir"
 		fi
 	fi
 	if ! have phoronix-test-suite; then

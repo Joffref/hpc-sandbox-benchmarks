@@ -36,9 +36,35 @@ export const DIR = '"$HOME/sandbox-benchmarks"';
 const MISE_VERSION = "v2026.7.11";
 const MISE_SHA256_X64 = "d31578a16ae2708385249b439c95533068e04b9507a118e905aa6768905671fc";
 const MISE_SHA256_ARM64 = "e3cb3bf4795f494a0e9be3f69ee1464de9d12a991589f126035eebd973c17796";
+// Fork-local: the same mise release's musl builds, for Alpine stock images (blaxel/base-image). Same
+// version and the same extracted-executable trust anchor as the glibc pins above; verified from the
+// upstream release tarballs on 2026-09-17.
+const MISE_SHA256_X64_MUSL = "904896399722568d66589a45d928dee1094c03a4a1746176aeb42bf3c5f11233";
+const MISE_SHA256_ARM64_MUSL = "93d3aa7e6351e7615a4783809a8d73e347d40d3956285f236341a3ebd755999f";
 const NODE_VERSION = "22.23.1";
 const PNPM_VERSION = "10.34.5";
 const PTS_VERSION = "10.8.4";
+
+// Fork-local: Alpine detection for every step that has to pick a package manager or a libc build. A
+// stock Alpine image has apk and no apt; the toolchain image and every Debian stock image have apt.
+const IS_ALPINE = "command -v apk >/dev/null 2>&1";
+
+/**
+ * Fork-local: the apk counterpart of PTS_APT_DEPS for an Alpine stock image. PTS itself is PHP (the
+ * php83-* extensions it loads: dom/simplexml/zip for profiles, pcntl/posix for its runner, curl/openssl
+ * for downloads); build-base + headers for the source-built profiles (fio → libaio, pgbench → icu +
+ * readline + zlib + perl + bison/flex, sqlite → tcl, iperf → openssl); the probe/runner utilities the
+ * leaves shell out to; and the GNU userland pieces busybox lacks or differs on (lscpu, gawk, procps).
+ * fast-cli's Chrome cannot run on musl at all, so the chrome apt group has no apk counterpart.
+ */
+const PTS_APK_DEPS = [
+	"bash coreutils util-linux-misc procps-ng gawk grep sed findutils",
+	"php83 php83-dom php83-xml php83-simplexml php83-xmlwriter php83-zip php83-openssl php83-posix",
+	"php83-pcntl php83-curl php83-sockets php83-ctype php83-mbstring php83-phar php83-fileinfo php83-iconv",
+	"build-base autoconf automake libtool flex bison bc elfutils-dev openssl-dev libaio-dev icu-dev",
+	"pkgconf tcl tcl-dev readline-dev zlib-dev linux-headers perl python3",
+	"bind-tools jq netcat-openbsd iputils stress-ng unzip git curl",
+].join(" ");
 
 export interface SetupStep {
 	label: string;
@@ -56,7 +82,11 @@ export function setupSteps(suite: Suite, sourceRevision?: string): SetupStep[] {
 		{
 			label: "install base packages",
 			// No-op on pre-baked images; fall back gracefully on images that already ship git/curl.
+			// Fork-local: on an Alpine stock image install through apk first, including the GNU userland
+			// pieces the producer scripts assume (bash for the task shebangs, coreutils/gawk/procps for
+			// the probes) — busybox's applets are not enough for lscpu or `sleep infinity`.
 			script:
+				`if ${IS_ALPINE}; then $SUDO apk add --no-cache bash git curl ca-certificates tar gzip xz unzip python3 coreutils util-linux-misc procps-ng gawk grep sed findutils; fi; ` +
 				"(command -v git && command -v curl && command -v python3) >/dev/null 2>&1 " +
 				"|| ($SUDO apt-get update -qq && $SUDO apt-get install -y -qq git curl ca-certificates tar gzip xz-utils unzip python3) " +
 				"|| (command -v git >/dev/null && command -v curl >/dev/null)",
@@ -96,13 +126,18 @@ export function setupSteps(suite: Suite, sourceRevision?: string): SetupStep[] {
 			script: [
 				"command -v mise >/dev/null 2>&1 || {",
 				'mkdir -p "$HOME/.local/bin";',
-				'arch=$(uname -m); case "$arch" in',
+				// Fork-local: musl images (Alpine) take the -musl build of the same release; the glibc
+				// binary aborts on a musl loader before it can print anything.
+				'libc=""; if [ -f /etc/alpine-release ] || (ldd --version 2>&1 | grep -qi musl); then libc=-musl; fi;',
+				'arch=$(uname -m); case "$arch$libc" in',
+				`aarch64-musl|arm64-musl) a=arm64; sha=${MISE_SHA256_ARM64_MUSL};;`,
+				`x86_64-musl|amd64-musl) a=x64; sha=${MISE_SHA256_X64_MUSL};;`,
 				`aarch64|arm64) a=arm64; sha=${MISE_SHA256_ARM64};;`,
 				`x86_64|amd64) a=x64; sha=${MISE_SHA256_X64};;`,
 				'*) echo "Unsupported architecture for mise: $arch" >&2; exit 1;; esac;',
 				"tmp=$(mktemp -d); trap 'rm -rf \"$tmp\"' EXIT;",
 				"curl -fsSL --retry 3 --retry-all-errors --retry-delay 2 --retry-max-time 120",
-				`--connect-timeout 10 --max-time 90 -o "$tmp/mise.tar.gz" "https://github.com/jdx/mise/releases/download/${MISE_VERSION}/mise-${MISE_VERSION}-linux-$a.tar.gz"`,
+				`--connect-timeout 10 --max-time 90 -o "$tmp/mise.tar.gz" "https://github.com/jdx/mise/releases/download/${MISE_VERSION}/mise-${MISE_VERSION}-linux-$a$libc.tar.gz"`,
 				'&& tar -xzf "$tmp/mise.tar.gz" -C "$tmp" mise/bin/mise',
 				'&& printf "%s  %s\\n" "$sha" "$tmp/mise/bin/mise" | sha256sum -c -',
 				'&& chmod +x "$tmp/mise/bin/mise" && mv "$tmp/mise/bin/mise" "$HOME/.local/bin/mise"; };',
@@ -135,9 +170,13 @@ export function setupSteps(suite: Suite, sourceRevision?: string): SetupStep[] {
 			// a Runloop devbox, mise still reaches back to rebuild `latest` symlinks in the root-owned
 			// tree and fails anyway. The pnpm branch stays unelevated: its --prefix is under $HOME by
 			// design, and elevating it would plant root-owned files in the sandbox user's own home.
+			//
+			// Fork-local: on Alpine take the distribution's Node 22 from apk instead. mise's node backend
+			// has no prebuilt musl binaries for arm64 and would compile Node from source inside the
+			// sandbox, so the exact-version pin is relaxed to the major on that path only.
 			script: [
 				`cd "$HOME"`,
-				`(node -e 'process.exit(process.versions.node === "${NODE_VERSION}" ? 0 : 1)' 2>/dev/null || $SUDO mise use --global --yes node@${NODE_VERSION})`,
+				`if ${IS_ALPINE}; then (node -e 'process.exit(process.versions.node.split(".")[0] === "22" ? 0 : 1)' 2>/dev/null || $SUDO apk add --no-cache nodejs npm); else (node -e 'process.exit(process.versions.node === "${NODE_VERSION}" ? 0 : 1)' 2>/dev/null || $SUDO mise use --global --yes node@${NODE_VERSION}); fi`,
 				`if command -v pnpm >/dev/null 2>&1 && [ "$(pnpm -v)" = "${PNPM_VERSION}" ]; then :; else npm install --global --prefix "$HOME/.local" pnpm@${PNPM_VERSION}; fi`,
 				"node -v && pnpm -v",
 			].join(" && "),
@@ -155,9 +194,15 @@ export function setupSteps(suite: Suite, sourceRevision?: string): SetupStep[] {
 		// consumers (00-apt.sh, lib/bench.sh) are gated against the same constant by repo-checks.
 		steps.push({
 			label: "ensure PTS build deps + fresh apt index",
+			// Fork-local: the apk branch installs PTS_APK_DEPS on Alpine and gives PTS the `php` name it
+			// execs (Alpine ships the binary as php83); the apt branch is upstream's, untouched.
 			script:
+				`if ${IS_ALPINE}; then ` +
+				`$SUDO apk add --no-cache ${PTS_APK_DEPS} && { command -v php >/dev/null 2>&1 || $SUDO ln -sf "$(command -v php83)" /usr/local/bin/php; }; ` +
+				"else " +
 				"$SUDO apt-get -o Acquire::Retries=3 update -qq || true; " +
-				`$SUDO apt-get install -y -qq ${PTS_APT_DEPS} || echo "WARNING: apt dep refresh failed (best-effort); relying on the baked image"`,
+				`$SUDO apt-get install -y -qq ${PTS_APT_DEPS} || echo "WARNING: apt dep refresh failed (best-effort); relying on the baked image"; ` +
+				"fi",
 			timeoutMs: 15 * MIN,
 		});
 		steps.push({
@@ -167,13 +212,26 @@ export function setupSteps(suite: Suite, sourceRevision?: string): SetupStep[] {
 			// the same reason: an unbounded curl turns a stalled connection into the step's whole
 			// timeoutMs. The .deb is only ~2 MiB, so a transfer that cannot finish in 60s is stalled,
 			// not slow.
+			//
+			// Fork-local: Alpine has no dpkg, so it installs the same release from its generic tarball
+			// through PTS's own install-sh (prefix /usr/local, the layout lib/bench.sh's parser patch
+			// already expects: <bin>/../share/phoronix-test-suite).
 			script:
 				"command -v phoronix-test-suite >/dev/null 2>&1 || { " +
+				`if ${IS_ALPINE}; then ` +
+				[
+					"tmp=$(mktemp -d)",
+					`curl -fsSL --retry 3 --retry-all-errors --retry-delay 2 --retry-max-time 90 --connect-timeout 10 --max-time 60 "https://github.com/phoronix-test-suite/phoronix-test-suite/releases/download/v${PTS_VERSION}/phoronix-test-suite-${PTS_VERSION}.tar.gz" -o "$tmp/pts.tar.gz"`,
+					'tar -xzf "$tmp/pts.tar.gz" -C "$tmp"',
+					'(cd "$tmp/phoronix-test-suite" && $SUDO ./install-sh /usr/local)',
+					'rm -rf "$tmp"',
+				].join(" && ") +
+				"; else " +
 				[
 					`curl -fsSL --retry 3 --retry-all-errors --retry-delay 2 --retry-max-time 90 --connect-timeout 10 --max-time 60 "https://github.com/phoronix-test-suite/phoronix-test-suite/releases/download/v${PTS_VERSION}/phoronix-test-suite_${PTS_VERSION}_all.deb" -o /tmp/phoronix-test-suite.deb`,
 					"($SUDO dpkg -i /tmp/phoronix-test-suite.deb || $SUDO apt-get install -y -qq -f)",
 				].join(" && ") +
-				"; }; phoronix-test-suite version",
+				"; fi; }; phoronix-test-suite version",
 			timeoutMs: 10 * MIN,
 			retries: 2,
 		});

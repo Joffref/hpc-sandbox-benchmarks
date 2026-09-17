@@ -185,7 +185,7 @@ describe("Blaxel lifecycle", () => {
 			});
 			expect(fake.processCalls[0]).toMatchObject({
 				name: BLAXEL_KEEPALIVE_PROCESS,
-				command: "sleep infinity",
+				command: "sleep 2147483647",
 				keepAlive: true,
 				timeout: 0,
 				waitForCompletion: false,

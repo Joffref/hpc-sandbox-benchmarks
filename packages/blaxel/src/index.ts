@@ -67,6 +67,32 @@ export const BLAXEL_KEEPALIVE_SECONDS = 2_147_483_647;
 /** Fork-local: install bash through apk when the image lacks it; a no-op elsewhere. */
 export const BLAXEL_BASH_BOOTSTRAP =
 	"command -v bash >/dev/null 2>&1 || { command -v apk >/dev/null 2>&1 && (apk add --no-cache bash >/dev/null 2>&1 || sudo apk add --no-cache bash >/dev/null 2>&1); } && command -v bash >/dev/null 2>&1";
+/**
+ * Fork-local: public DNS64 resolvers (nat64.net) whose synthesized AAAA records route IPv4-only hosts
+ * through their NAT64 gateways over plain IPv6. The dev fleet is IPv6-only and github.com has no
+ * IPv6, yet the repo clone, mise and PTS all download from GitHub — so when the sandbox's own
+ * resolvers cannot resolve github.com these take over. Exactly three: musl consults at most three.
+ */
+export const BLAXEL_DNS64_RESOLVERS = Object.freeze([
+	"2a00:1098:2c::1",
+	"2a01:4f8:c2c:123f::1",
+	"2a00:1098:2b::1",
+]);
+const BLAXEL_DNS64_RESOLV_CONF = `${BLAXEL_DNS64_RESOLVERS.map((ns) => `nameserver ${ns}`).join("\\n")}\\noptions timeout:3 attempts:2\\n`;
+/**
+ * Fork-local: make sure the sandbox can resolve GitHub before the harness's first download. Leaves a
+ * working resolver alone; otherwise installs the DNS64 set above and re-checks. Fails loudly (the
+ * bridge hides the error, but prepareBlaxelSandbox logs it first) when even that does not resolve,
+ * which means the sandbox has no egress at all — nothing later in the run could succeed.
+ */
+export const BLAXEL_NETWORK_BOOTSTRAP = [
+	'resolves() { (getent hosts "$1" || nslookup "$1") >/dev/null 2>&1; };',
+	'if resolves github.com; then echo "dns: ok";',
+	'else echo "dns: github.com does not resolve; switching to public DNS64/NAT64 resolvers";',
+	`{ printf '${BLAXEL_DNS64_RESOLV_CONF}' > /etc/resolv.conf; } 2>/dev/null || printf '${BLAXEL_DNS64_RESOLV_CONF}' | sudo tee /etc/resolv.conf >/dev/null;`,
+	'if resolves github.com; then echo "dns: ok via DNS64";',
+	'else echo "dns: still failing after DNS64 — sandbox has no working egress"; (env | grep -i proxy) || echo "no proxy env"; exit 1; fi; fi',
+].join(" ");
 export const BLAXEL_RECOVERY_CONFIRMATION_MS = 2_000;
 export const BLAXEL_RECOVERY_MAX_ATTEMPTS = 4;
 export const BLAXEL_READINESS = Object.freeze({ startup: "create-returns-ready" as const });
@@ -338,6 +364,20 @@ export async function prepareBlaxelSandbox(
 		failed(
 			"bash bootstrap result",
 			new Error("Blaxel sandbox has no bash and apk could not install it"),
+		);
+	}
+	// Fork-local: the network bootstrap only needs sh, so it is independent of the bash bootstrap
+	// above. Placed last so its log line sits next to the harness's first download in the step log.
+	const network = await attempt("network bootstrap", () =>
+		execBlaxelCommand(native, BLAXEL_NETWORK_BOOTSTRAP, options),
+	);
+	note(
+		`network bootstrap exit=${network.exitCode} stdout=${JSON.stringify(network.stdout.trim().slice(0, 300))} stderr=${JSON.stringify(network.stderr.slice(0, 200))}`,
+	);
+	if (network.exitCode !== 0) {
+		failed(
+			"network bootstrap result",
+			new Error("Blaxel sandbox cannot resolve github.com even via DNS64: no working egress"),
 		);
 	}
 	const capacityGb = Number(output) / 1024 / 1024;

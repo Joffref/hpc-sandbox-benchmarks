@@ -6,6 +6,7 @@ import { buildPipelineChartModel } from "@sandbox-benchmarks/figures";
 import {
 	aggregateExperiment,
 	benchmarkDataOf,
+	describeIncompleteExperiment,
 	evidenceDigest,
 	leaderboardFigures,
 	normalizeResultsTree,
@@ -605,7 +606,19 @@ test("partial aggregation retains proven metrics from incomplete suites and reje
 	const first = attempts[0];
 	if (!first) throw new Error("missing fixture attempt");
 	first.evidence.cleanup = "unresolved";
-	expect(aggregateExperiment(plan, attempts, { allowPartial: true }).run).toBeUndefined();
+	const blocked = aggregateExperiment(plan, attempts, { allowPartial: true });
+	expect(blocked.run).toBeUndefined();
+	expect(blocked.publicationBlockers).toContain(`unresolved cleanup: ${first.evidence.id}`);
+	// Without --allow-partial the same blockers say why partial publication would not help either,
+	// and they lead the report so a truncated metric shortfall cannot bury them.
+	const strict = aggregateExperiment(plan, attempts);
+	expect(strict.publicationBlockers).toEqual(blocked.publicationBlockers);
+	expect(describeIncompleteExperiment(strict)[0]).toBe(
+		`publication blocked: unresolved cleanup: ${first.evidence.id}`,
+	);
+	expect(aggregateExperiment(plan, attempts.slice(1)).publicationBlockers).toEqual([
+		"missing attempts: 1 cell(s)",
+	]);
 	first.evidence.cleanup = "confirmed";
 	first.evidence.planDigest = `sha256:${"b".repeat(64)}`;
 	expect(aggregateExperiment(plan, attempts, { allowPartial: true }).run).toBeUndefined();

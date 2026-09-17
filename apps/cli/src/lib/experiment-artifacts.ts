@@ -24,6 +24,7 @@ import {
 	executionReceiptSchema,
 	experimentAttemptSchema,
 	parseRun,
+	retainedAllocationSchema,
 } from "@sandbox-benchmarks/schema";
 
 /** Stable path-and-content binding; links cannot smuggle evidence from outside the raw tree. */
@@ -76,8 +77,16 @@ export function readExperimentAttempt(directory: string): AttemptWithRun {
 	) {
 		throw new Error(`raw digest mismatch: ${evidence.id}`);
 	}
+	const allocationFile = join(directory, "raw", "allocation.json");
 	return {
 		evidence,
+		...(evidence.rawDigest && existsSync(allocationFile)
+			? {
+					allocation: retainedAllocationSchema.assert(
+						JSON.parse(readFileSync(allocationFile, "utf8")),
+					),
+				}
+			: {}),
 		...(existsSync(join(directory, "cleanup-recovery.json"))
 			? {
 					cleanupRecovery: cleanupRecoverySchema.assert(

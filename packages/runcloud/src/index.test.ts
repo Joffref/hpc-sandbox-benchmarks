@@ -252,6 +252,29 @@ describe("run.cloud readiness and failed-create cleanup", () => {
 		expect(isRetryableDriverCreate(error)).toBe(true);
 	});
 
+	it("retains a failed boot's vendor detail before cleanup clears it, with credential redaction", async () => {
+		let removed = false;
+		const client = nativeClient({
+			create: async () => nativeSandbox("building_image"),
+			get: async () =>
+				nativeSandbox(removed ? "destroyed" : "interrupted", {
+					last_error: removed
+						? null
+						: `image upload digest mismatch ${context.env.RUN_CLOUD_API_KEY}`,
+				}),
+			destroy: async () => {
+				removed = true;
+			},
+		});
+		const error = await driver(client)
+			.create(request)
+			.catch((caught: unknown) => caught);
+		expect((error as Error).message).toContain("image upload digest mismatch");
+		expect((error as Error).message).not.toContain(context.env.RUN_CLOUD_API_KEY);
+		expect(removed).toBe(true);
+		expect(isRetryableDriverCreate(error)).toBe(true);
+	});
+
 	it("leaves a boot failure unmarked when teardown cannot be confirmed", async () => {
 		// destroy resolving is a request accepted, not a microVM removed; a control plane that keeps
 		// reporting `interrupted` has not established the "nothing is allocated" half of the mark.
@@ -325,7 +348,7 @@ describe("run.cloud readiness and failed-create cleanup", () => {
 		expect(destroyed).toEqual(["sb-test"]);
 	});
 
-	it("retries a transient cleanup, accepts a destroying confirmation, and surfaces exhaustion", async () => {
+	it("retries a transient cleanup, accepts a destroyed confirmation, and surfaces exhaustion", async () => {
 		let destroyCalls = 0;
 		const transient = nativeClient({
 			create: async () => nativeSandbox("building_image"),
@@ -349,7 +372,7 @@ describe("run.cloud readiness and failed-create cleanup", () => {
 			get: async () => {
 				getCalls++;
 				if (getCalls === 1) throw new Error("readiness failed");
-				return nativeSandbox("destroying");
+				return nativeSandbox("destroyed");
 			},
 			destroy: async () => {
 				destroyCalls++;
@@ -442,7 +465,7 @@ describe("run.cloud ambiguous-create reconciliation", () => {
 		}
 	});
 
-	it("marks a stalled create retryable only once absence is established, keeping the original error", async () => {
+	it("keeps a stalled create unresolved despite repeated empty lookups", async () => {
 		let listCalls = 0;
 		const client = nativeClient({
 			create: () => new Promise<Sandbox>(() => {}),
@@ -454,13 +477,35 @@ describe("run.cloud ambiguous-create reconciliation", () => {
 		const error = await driver(client, { controlPlaneTimeoutMs: 5, reconcileAttempts: 3 })
 			.create(request)
 			.catch((caught: unknown) => caught);
-		expect(error).toMatchObject({ code: "create-failed", provider: "runcloud" });
-		expect((error as Error).message).toContain("run.cloud create did not settle within 5ms");
-		expect((error as Error).message).not.toMatch(/manual cleanup/);
-		// A stall that allocated nothing is this control plane reporting saturation without a 429.
-		expect(isRetryableDriverCreate(error)).toBe(true);
+		expect(error).toBeInstanceOf(FailedCreateCleanupError);
+		expect((error as FailedCreateCleanupError).suppressed.message).toContain(
+			"run.cloud create did not settle within 5ms",
+		);
+		expect(isRetryableDriverCreate(error)).toBe(false);
 		// The module's window plus the bridge's own confirming lookups, never a replayed create.
 		expect(listCalls).toBeGreaterThanOrEqual(3);
+	});
+
+	it("keeps a timed-out create unresolved when empty lookups precede a late allocation", async () => {
+		let requestedName: string | undefined;
+		let visible = false;
+		const client = nativeClient({
+			create: (input) => {
+				requestedName = input?.name;
+				return new Promise<Sandbox>(() => {});
+			},
+			list: async () => (visible ? [nativeSandbox("running", { name: requestedName })] : []),
+		});
+		const error = await driver(client, { controlPlaneTimeoutMs: 5, reconcileAttempts: 1 })
+			.create(request)
+			.catch((error: unknown) => error);
+		visible = true;
+		expect(error).toBeInstanceOf(FailedCreateCleanupError);
+		expect(isRetryableDriverCreate(error)).toBe(false);
+		if (!(error instanceof FailedCreateCleanupError))
+			throw new Error("missing recoverable create failure");
+		await error.cleanup();
+		expect(await client.get("sb-test")).toMatchObject({ state: "destroyed" });
 	});
 
 	it("never marks a generic failure, a definitive rejection, or an unanswered window", async () => {
@@ -472,7 +517,10 @@ describe("run.cloud ambiguous-create reconciliation", () => {
 		const genericError = await driver(generic, { reconcileAttempts: 1 })
 			.create(request)
 			.catch((caught: unknown) => caught);
-		expect((genericError as Error).message).toContain("client serialization failed");
+		expect(genericError).toBeInstanceOf(FailedCreateCleanupError);
+		expect((genericError as FailedCreateCleanupError).suppressed.message).toContain(
+			"client serialization failed",
+		);
 		expect(isRetryableDriverCreate(genericError)).toBe(false);
 
 		let listCalls = 0;
@@ -557,13 +605,12 @@ describe("run.cloud ambiguous-create reconciliation", () => {
 			},
 			list: async () => [
 				nativeSandbox("destroyed", { id: "sb-tombstone", name: requestedName }),
-				nativeSandbox("destroying", { id: "sb-going", name: requestedName }),
 				nativeSandbox("running", { id: "sb-other", name: `${requestedName}-different` }),
 			],
 		});
-		await expect(driver(unrelated, { reconcileAttempts: 2 }).create(request)).rejects.toThrow(
-			/response lost after allocation/,
-		);
+		await expect(
+			driver(unrelated, { reconcileAttempts: 2 }).create(request),
+		).rejects.toBeInstanceOf(FailedCreateCleanupError);
 	});
 
 	it("exposes the module verdicts the bridge classifies from", () => {
@@ -583,7 +630,7 @@ describe("run.cloud ambiguous-create reconciliation", () => {
 		expect(recovery.isDefinitive?.(new RuncloudBootFailureError("sb", "failed", true, false))).toBe(
 			false,
 		);
-		expect(recovery.isRetryableCreate?.(new RuncloudCallTimeoutError("create", 5))).toBe(true);
+		expect(recovery.isRetryableCreate?.(new RuncloudCallTimeoutError("create", 5))).toBe(false);
 		expect(
 			recovery.isRetryableCreate?.(new RuncloudCallTimeoutError("destroy sandbox sb", 5)),
 		).toBe(false);
@@ -790,10 +837,36 @@ describe("run.cloud commands, lifecycle, and account inventory", () => {
 		expect(execCalls.at(-1)?.command).toBe("printf test");
 	});
 
+	it("does not release a destroying allocation that returns to running before removal", async () => {
+		const states = ["destroying", "running", "destroyed"];
+		let observations = 0;
+		const client = nativeClient({
+			get: async () => nativeSandbox(states[observations++] ?? "running"),
+		});
+		await driver(client).destroyById?.(sandboxRef("runcloud", "sb-revived"));
+		expect(observations).toBe(3);
+		expect(runcloudObservation("destroying")).toEqual({ state: "running" });
+	});
+
+	it("keeps pending deletions in inventory so admission cannot overlook them", async () => {
+		const client = nativeClient({
+			list: async () => [
+				nativeSandbox("destroying", {
+					id: "sb-pending",
+					name: `${RUNCLOUD_RECOVERY_NAME_PREFIX}-pending`,
+				}),
+			],
+		});
+		expect(await driver(client).inventory?.list()).toEqual({
+			owned: [sandboxRef("runcloud", "sb-pending")],
+			foreignCount: 0,
+		});
+	});
+
 	it("waits for an accepted DELETE to stop running and refuses unconfirmed removal", async () => {
 		let observations = 0;
 		const delayed = nativeClient({
-			get: async () => nativeSandbox(++observations < 3 ? "running" : "destroying"),
+			get: async () => nativeSandbox(++observations < 3 ? "destroying" : "destroyed"),
 		});
 		await driver(delayed).destroyById?.(sandboxRef("runcloud", "sb-delayed"));
 		expect(observations).toBe(3);
@@ -813,7 +886,7 @@ describe("run.cloud commands, lifecycle, and account inventory", () => {
 			},
 			get: async (id) => {
 				if (id === "sb-gone") throw new RunCloudError(404, "gone");
-				return nativeSandbox(id === "sb-tombstone" ? "destroyed" : "destroying", { id });
+				return nativeSandbox(id === "sb-going" ? "destroying" : "destroyed", { id });
 			},
 		});
 		const d = driver(client);
@@ -829,7 +902,7 @@ describe("run.cloud commands, lifecycle, and account inventory", () => {
 			state: "absent",
 		});
 		expect(await d.probes?.observe(sandboxRef("runcloud", "sb-going"))).toEqual({
-			state: "terminal",
+			state: "running",
 		});
 		expect(runcloudObservation("running")).toEqual({ state: "running" });
 		expect(runcloudObservation("building_image")).toEqual({ state: "running" });

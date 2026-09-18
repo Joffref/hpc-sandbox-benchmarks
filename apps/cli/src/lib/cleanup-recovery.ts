@@ -1,11 +1,22 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { SandboxDriver } from "@sandbox-benchmarks/driver";
-import { evidenceDigest, verifyCleanupRecovery } from "@sandbox-benchmarks/results";
+import {
+	evidenceDigest,
+	failedBeforeExecution,
+	originalSandboxId,
+	verifiedRetainedAllocation,
+	verifyCleanupRecovery,
+} from "@sandbox-benchmarks/results";
 import type { CleanupRecovery, ExperimentPlan, ProviderId } from "@sandbox-benchmarks/schema";
 import { cleanupRecoverySchema, MODAL_CREATED_REQUEST_REVISION } from "@sandbox-benchmarks/schema";
 import type { AccountJournal } from "./account-journal.ts";
-import { accountRecordSchema, confirmRemoval, withinSignal } from "./account-journal.ts";
+import {
+	accountRecordSchema,
+	confirmRemoval,
+	supplementalCleanupRecovery,
+	withinSignal,
+} from "./account-journal.ts";
 import { readExperimentAttempt, writeImmutableJson } from "./experiment-artifacts.ts";
 
 /** Explicit post-run ownership recovery. No original receipt or measurement is rewritten. */
@@ -36,12 +47,17 @@ export async function recoverExperimentCleanup(options: {
 		!attempt.run
 	)
 		throw new Error("recovery requires an original failed attempt with unresolved cleanup");
-	const records = (await options.journal.read(cell.quotaDomain)).filter(
-		(r) => r.attempt === evidence.id,
-	);
+	const readAttemptRecords = async () =>
+		(await options.journal.read(cell.quotaDomain)).filter((r) => r.attempt === evidence.id);
+	let records = await readAttemptRecords();
+	const assertJournalUnchanged = async () => {
+		if (evidenceDigest(await readAttemptRecords()) !== evidenceDigest(records))
+			throw new Error("journal changed during cleanup recovery");
+	};
 	const intent = records.find((r) => r.kind === "intent");
-	const allocation = records.find((r) => r.kind === "allocated");
+	let allocation = records.find((r) => r.kind === "allocated");
 	const release = records.find((r) => r.kind === "released");
+	const supplemental = supplementalCleanupRecovery(records);
 	if (
 		!intent ||
 		records.some(
@@ -53,15 +69,16 @@ export async function recoverExperimentCleanup(options: {
 	)
 		throw new Error("cleanup recovery journal provenance mismatch");
 	const previous =
-		release?.outcome === "absent"
+		supplemental ??
+		(release?.outcome === "absent"
 			? release.recovery
 			: release?.outcome === "reconciled" && release.evidence.kind === "post-run-cleanup"
 				? release.evidence
-				: undefined;
+				: undefined);
 	if (previous) {
 		if (
 			release?.outcome === "absent"
-				? records.length !== 3 ||
+				? records.length !== (supplemental ? 4 : 3) ||
 					!allocation ||
 					allocation.ref.id !== release.ref.id ||
 					allocation.ref.provider !== release.ref.provider ||
@@ -75,18 +92,32 @@ export async function recoverExperimentCleanup(options: {
 		persist(previous);
 		return previous;
 	}
-	if (release || records.length !== (allocation ? 2 : 1))
+	if (
+		records.length !== (allocation ? (release ? 3 : 2) : 1) ||
+		(release &&
+			(!allocation ||
+				release.outcome !== "absent" ||
+				release.ref.id !== allocation.ref.id ||
+				release.ref.provider !== allocation.ref.provider))
+	)
 		throw new Error("cleanup recovery requires matching unresolved journal records");
 	await options.assertQuiescent(evidence.workflowRun, evidence.sha);
+	if (!allocation && attempt.allocation) {
+		// The executor retained the identity but its journal append was lost: replay that append.
+		if (!failedBeforeExecution(attempt))
+			throw new Error("lost allocation append requires a pre-execution failure");
+		const retained = verifiedRetainedAllocation(options.plan, attempt);
+		await assertJournalUnchanged();
+		await withinSignal(options.signal, () => options.journal.append(retained));
+		allocation = retained;
+		records = [...records, retained];
+	}
 	let observation: CleanupRecovery["observation"];
 	if (allocation) {
-		const retained = accountRecordSchema.assert(
-			JSON.parse(readFileSync(join(options.directory, "raw", "allocation.json"), "utf8")),
-		);
 		if (
-			evidenceDigest(retained) !== evidenceDigest(allocation) ||
-			allocation.ref.provider !== cell.provider ||
-			attempt.execution?.sandboxId !== allocation.ref.id
+			evidenceDigest(verifiedRetainedAllocation(options.plan, attempt)) !==
+				evidenceDigest(allocation) ||
+			originalSandboxId(options.plan, attempt) !== allocation.ref.id
 		)
 			throw new Error("cleanup recovery allocation differs from original retained execution");
 		const driver = await withinSignal(options.signal, () => options.openDriver(cell.provider));
@@ -106,11 +137,8 @@ export async function recoverExperimentCleanup(options: {
 			cell.provider !== "modal-gvisor" ||
 			cell.quotaDomain !== "modal" ||
 			evidence.sha !== MODAL_CREATED_REQUEST_REVISION ||
-			evidence.measurementStarted ||
-			attempt.execution ||
-			attempt.cleanup ||
-			!options.modalAnchor ||
-			existsSync(join(options.directory, "raw", "allocation.json"))
+			!failedBeforeExecution(attempt) ||
+			!options.modalAnchor
 		)
 			throw new Error("identifier-free recovery requires the reviewed Modal post-create failure");
 		const anchor = options.modalAnchor;
@@ -131,18 +159,16 @@ export async function recoverExperimentCleanup(options: {
 	});
 	verifyCleanupRecovery(options.plan, { ...attempt, cleanupRecovery: recovery });
 	await options.assertQuiescent(evidence.workflowRun, evidence.sha);
-	const current = (await options.journal.read(cell.quotaDomain)).filter(
-		(r) => r.attempt === evidence.id,
-	);
-	if (evidenceDigest(current) !== evidenceDigest(records))
-		throw new Error("journal changed during cleanup recovery");
+	await assertJournalUnchanged();
 	options.signal.throwIfAborted();
 	await withinSignal(options.signal, () =>
 		options.journal.append(
 			accountRecordSchema.assert(
-				allocation
-					? { ...intent, kind: "released", outcome: "absent", ref: allocation.ref, recovery }
-					: { ...intent, kind: "released", outcome: "reconciled", evidence: recovery },
+				release
+					? { ...intent, kind: "cleanup-attested", recovery }
+					: allocation
+						? { ...intent, kind: "released", outcome: "absent", ref: allocation.ref, recovery }
+						: { ...intent, kind: "released", outcome: "reconciled", evidence: recovery },
 			),
 		),
 	);

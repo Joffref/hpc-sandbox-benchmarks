@@ -2,7 +2,7 @@ import type { ProviderId } from "@sandbox-benchmarks/driver";
 import { quotaDomain } from "@sandbox-benchmarks/schema";
 
 /**
- * Reviewed inventory scopes (ADR-0011), bound to the experiment's source revision.
+ * Reviewed inventory scopes (ADR-0011, ADR-0016), bound to the experiment's source revision.
  *
  * Fork-local deviation: `blaxel` is benchmark-scoped here, not account-scoped as upstream has it.
  * This fork benchmarks against a shared Blaxel dev workspace that also hosts unrelated sandboxes, so
@@ -12,7 +12,10 @@ import { quotaDomain } from "@sandbox-benchmarks/schema";
  */
 export function accountInventoryScope(id: ProviderId): "account" | "benchmark" {
 	const account = quotaDomain(id);
-	return account === "daytona" || account === "novita" || account === "blaxel"
+	return account === "daytona" ||
+		account === "novita" ||
+		account === "modal" ||
+		account === "blaxel"
 		? "benchmark"
 		: "account";
 }

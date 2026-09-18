@@ -5,6 +5,7 @@ import type {
 	ExecutionReceipt,
 	ExperimentAttempt,
 	ExperimentPlan,
+	RetainedAllocation,
 	Run,
 } from "@sandbox-benchmarks/schema";
 import {
@@ -183,6 +184,7 @@ export interface AttemptWithRun {
 	execution?: ExecutionReceipt;
 	cleanup?: CleanupReceipt;
 	cleanupRecovery?: CleanupRecovery;
+	allocation?: RetainedAllocation;
 	/** When present, raw verification takes precedence over a shard's declared sample origin. */
 	ptsTrials?: PtsTrialEvidence[];
 }
@@ -473,6 +475,8 @@ export function evaluateExperiment(
 
 export interface ExperimentAggregation {
 	coverage: CoverageReport;
+	/** Why an incomplete experiment cannot be published even partially; absent when nothing blocks. */
+	publicationBlockers?: string[];
 	/** Verified complete publication, or explicitly requested partial publication with frozen coverage. */
 	run?: Run;
 }
@@ -489,6 +493,44 @@ function isUnallocatedFailureWithoutRun(attempt: AttemptWithRun): boolean {
 		attempt.execution === undefined &&
 		attempt.cleanup === undefined
 	);
+}
+
+/** Blockers lead: a truncated metric shortfall must not bury why publication cannot proceed. */
+export function describeIncompleteExperiment({
+	coverage,
+	publicationBlockers = [],
+}: ExperimentAggregation): string[] {
+	return [
+		...publicationBlockers.map((reason) => `publication blocked: ${reason}`),
+		...describeCoverageShortfall(coverage),
+	];
+}
+
+/**
+ * Partial publication relaxes metric completeness only. Missing evidence, conflicting provenance
+ * and unresolved allocations still cannot be published.
+ */
+function partialPublicationBlockers(
+	coverage: CoverageReport,
+	attempts: readonly AttemptWithRun[],
+): string[] {
+	// Conflicts and missing cells are counted: the coverage shortfall already names them, bounded.
+	const blockers: string[] = [];
+	const missing = coverage.cells.filter((cell) => cell.status === "missing").length;
+	if (coverage.conflicts.length > 0)
+		blockers.push(`conflicting evidence: ${coverage.conflicts.length} conflict(s)`);
+	if (missing > 0) blockers.push(`missing attempts: ${missing} cell(s)`);
+	for (const attempt of attempts) {
+		const { id, rawDigest, cleanup } = attempt.evidence;
+		if (!attempt.run && !isUnallocatedFailureWithoutRun(attempt))
+			blockers.push(`missing Run: ${id}`);
+		if (!rawDigest) blockers.push(`missing raw digest: ${id}`);
+		if (cleanup === "unresolved" && !attempt.cleanupRecovery)
+			blockers.push(`unresolved cleanup: ${id}`);
+	}
+	if (!coverage.cells.some((cell) => (cell.retainedMetrics?.length ?? 0) > 0))
+		blockers.push("no verified measurements");
+	return blockers;
 }
 
 /**
@@ -518,22 +560,12 @@ export function aggregateExperiment(
 			throw new Error("Modal cleanup recovery anchor is missing from original experiment evidence");
 	}
 	const partial = !coverage.complete && options.allowPartial === true;
-	if (!coverage.complete && !partial) return { coverage };
-	// Partial publication relaxes metric completeness only. Missing evidence, conflicting provenance
-	// and unresolved allocations still cannot be published.
-	if (
-		partial &&
-		(coverage.conflicts.length > 0 ||
-			coverage.cells.some((cell) => cell.status === "missing") ||
-			attempts.some(
-				(attempt) =>
-					(!attempt.run && !isUnallocatedFailureWithoutRun(attempt)) ||
-					!attempt.evidence.rawDigest ||
-					(attempt.evidence.cleanup === "unresolved" && !attempt.cleanupRecovery),
-			) ||
-			!coverage.cells.some((cell) => (cell.retainedMetrics?.length ?? 0) > 0))
-	)
-		return { coverage };
+	if (!coverage.complete) {
+		// Reported for every incomplete experiment: they say whether --allow-partial could publish.
+		const publicationBlockers = partialPublicationBlockers(coverage, attempts);
+		if (!partial || publicationBlockers.length > 0)
+			return { coverage, ...(publicationBlockers.length > 0 ? { publicationBlockers } : {}) };
+	}
 	const selectedIds = partial
 		? coverage.cells.flatMap((cell) => (cell.attemptId ? [cell.attemptId] : []))
 		: coverage.selectedAttempts;
@@ -704,20 +736,59 @@ export function verifyCleanupRecovery(plan: ExperimentPlan, attempt: AttemptWith
 	if (recovery.observation.kind === "sandbox") {
 		if (
 			recovery.observation.provider !== cell.provider ||
-			attempt.execution?.sandboxId !== recovery.observation.sandboxId ||
-			attempt.execution?.provider !== cell.provider
+			originalSandboxId(plan, attempt) !== recovery.observation.sandboxId
 		)
 			throw new Error("cleanup recovery sandbox differs from original execution");
 	} else if (
 		cell.provider !== "modal-gvisor" ||
 		cell.quotaDomain !== "modal" ||
 		evidence.sha !== MODAL_CREATED_REQUEST_REVISION ||
-		evidence.measurementStarted ||
-		attempt.execution ||
-		attempt.cleanup ||
+		!failedBeforeExecution(attempt) ||
 		!evidence.diagnostic?.endsWith(
 			"modal-gvisor ComputeSDK created-request preparation and verification callback failed; cleanup failed: modal-gvisor ComputeSDK lifecycle destroy callback failed",
 		)
 	)
 		throw new Error("cleanup recovery is not the reviewed Modal post-create failure");
+}
+
+/** Nothing ran: no measurement began and the harness left neither receipt. */
+export function failedBeforeExecution(attempt: AttemptWithRun): boolean {
+	return !attempt.evidence.measurementStarted && !attempt.execution && !attempt.cleanup;
+}
+
+/**
+ * The one sandbox the original attempt proves it owned: the execution receipt's, or for a failure
+ * before execution the retained allocation's. Undefined when the evidence names no such sandbox.
+ */
+export function originalSandboxId(
+	plan: ExperimentPlan,
+	attempt: AttemptWithRun,
+): string | undefined {
+	const cell = plan.cells.find((cell) => cell.id === attempt.evidence.cellId);
+	if (attempt.execution)
+		return attempt.execution.provider === cell?.provider ? attempt.execution.sandboxId : undefined;
+	if (!failedBeforeExecution(attempt) || !attempt.allocation) return undefined;
+	return verifiedRetainedAllocation(plan, attempt).ref.id;
+}
+
+/** A retained identity is evidence only when bound to this original attempt and frozen account. */
+export function verifiedRetainedAllocation(
+	plan: ExperimentPlan,
+	attempt: AttemptWithRun,
+): RetainedAllocation {
+	const { allocation, evidence } = attempt;
+	const cell = plan.cells.find((cell) => cell.id === evidence.cellId);
+	if (
+		!allocation ||
+		!cell ||
+		!evidence.rawDigest ||
+		allocation.attempt !== evidence.id ||
+		allocation.cellId !== cell.id ||
+		allocation.planDigest !== plan.digest ||
+		allocation.planDigest !== evidence.planDigest ||
+		allocation.account !== cell.quotaDomain ||
+		allocation.ref.provider !== cell.provider
+	)
+		throw new Error("retained allocation does not bind the original attempt");
+	return allocation;
 }

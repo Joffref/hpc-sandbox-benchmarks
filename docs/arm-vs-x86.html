@@ -77,8 +77,8 @@
         <span><i class="sw slower"></i>ARM slower</span>
       </div>
       <span class="spacer"></span>
-      <button id="toggle-table" aria-controls="table-view" aria-expanded="false">Show table</button>
-      <button id="toggle-theme">Dark mode</button>
+      <button type="button" id="toggle-table" aria-controls="table-view" aria-expanded="false">Show table</button>
+      <button type="button" id="toggle-theme">Dark mode</button>
     </div>
     <div id="chart" style="position:relative"></div>
     <div class="tooltip" id="tooltip" role="tooltip"></div>
@@ -137,7 +137,7 @@
   for (const p of placed) {
     if (p.kind === "group") { svg += `<text class="group" x="8" y="${p.y + 19}">${esc(GROUP_LABEL[p.g])}</text>`; continue; }
     const r = p.r, cls = r.ratio >= 1 ? "faster" : "slower";
-    const xr = x(r.ratio), left = Math.min(x0, xr), width = Math.max(0, Math.abs(xr - x0));
+    const xr = x(r.ratio), width = Math.max(0, Math.abs(xr - x0));
     const by = p.y + (ROW - BAR) / 2, rr = Math.min(4, width);
     // 4px rounded data-end, square at the baseline; 2px surface gap comes from ROW - BAR air.
     let path;

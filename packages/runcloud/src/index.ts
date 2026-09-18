@@ -172,9 +172,8 @@ function timingOf(options: RuncloudSpecOptions): Timing {
 	};
 }
 
-/** A native call that did not settle within its bound. Only the CREATE call's stall is a capacity
- *  signal worth retrying (run.cloud reports saturation by not answering); a readiness or destroy
- *  stall proves nothing about the host. */
+/** A native call that did not settle within its bound. A create timeout leaves allocation
+ * uncertain even when the server is overloaded; it is not a definitive rejection. */
 export class RuncloudCallTimeoutError extends Error {
 	constructor(
 		readonly operation: string,
@@ -198,14 +197,17 @@ export class RuncloudBootFailureError extends Error {
 		readonly state: string,
 		readonly hostGaveUp: boolean,
 		readonly teardownConfirmed: boolean,
+		readonly vendorDetail?: string,
 	) {
-		super(`run.cloud sandbox ${sandboxId} entered terminal state "${state}" while booting`);
+		super(
+			`run.cloud sandbox ${sandboxId} entered terminal state "${state}" while booting${vendorDetail ? `: ${vendorDetail}` : ""}`,
+		);
 		this.name = "RuncloudBootFailureError";
 	}
 }
 
-/** The create failed ambiguously AND no reconciliation lookup ever answered, so absence was never
- *  established; the recovery name is what an operator or account sweep needs to find the sandbox. */
+/** No positive allocation or rejection verdict followed an ambiguous create. Empty lookups do not
+ * cancel an accepted POST; the recovery name remains necessary for later cleanup. */
 export class RuncloudAmbiguousCreateError extends AggregateError {
 	constructor(
 		readonly recoveryName: string,
@@ -214,8 +216,8 @@ export class RuncloudAmbiguousCreateError extends AggregateError {
 	) {
 		super(
 			[createError, lookupError],
-			`run.cloud create failed ambiguously (${errorMessage(createError)}) and every reconciliation ` +
-				`lookup also failed (${errorMessage(lookupError)}), so it is unknown whether a sandbox was ` +
+			`run.cloud create failed ambiguously (${errorMessage(createError)}) and reconciliation ` +
+				`could not establish its outcome (${errorMessage(lookupError)}), so it is unknown whether a sandbox was ` +
 				`allocated; if one was it carries the name ${recoveryName} and manual cleanup may be required`,
 		);
 		this.name = "RuncloudAmbiguousCreateError";
@@ -258,7 +260,7 @@ function isTerminalBootState(state: string): boolean {
 }
 
 function isTombstone(state: string): boolean {
-	return state === "destroyed" || state === "destroying";
+	return state === "destroyed";
 }
 
 /** Race one native call with a local deadline (and the caller's signal). Production's fetch signal
@@ -306,8 +308,11 @@ class BootTerminalState extends Error {
 	constructor(
 		readonly sandboxId: string,
 		readonly state: string,
+		readonly vendorDetail?: string,
 	) {
-		super(`run.cloud sandbox ${sandboxId} entered terminal state "${state}" while booting`);
+		super(
+			`run.cloud sandbox ${sandboxId} entered terminal state "${state}" while booting${vendorDetail ? `: ${vendorDetail}` : ""}`,
+		);
 	}
 }
 
@@ -327,7 +332,12 @@ async function waitUntilRunning(
 			signal,
 		);
 		if (last.state === "running") return last;
-		if (isTerminalBootState(last.state)) throw new BootTerminalState(sandboxId, last.state);
+		if (isTerminalBootState(last.state)) {
+			// Snapshot the failure before teardown changes the record. Diagnostic rendering redacts
+			// credentials before truncation; ignore malformed provider detail here.
+			const detail = typeof last.last_error === "string" ? last.last_error.trim() : undefined;
+			throw new BootTerminalState(sandboxId, last.state, detail);
+		}
 		await timing.sleep(timing.readyPollMs);
 		signal?.throwIfAborted();
 	}
@@ -356,20 +366,20 @@ async function destroySandbox(
 				timing,
 				signal,
 			);
-			if (runcloudObservation(current.state).state !== "running") return;
+			if (isTombstone(current.state)) return;
 		} catch (error) {
 			if (isNotFound(error)) return;
 			throw error;
 		}
 		if (attempt + 1 < timing.cleanupAttempts) await timing.sleep(timing.cleanupRetryMs);
 	}
-	throw new Error(`run.cloud sandbox ${sandboxId} is still running after destroy`);
+	throw new Error(`run.cloud sandbox ${sandboxId} has not confirmed removal after destroy`);
 }
 
 /**
- * Has the control plane confirmed this sandbox is gone, or committed to removing it? `destroying`
- * counts: the control plane owns the teardown from there. A read that cannot answer returns false;
- * the caller then does NOT claim the allocation is released.
+ * Only destroyed/404 confirms removal. A pending delete can race image preparation and return
+ * to running, so destroying must remain visible to inventory and cannot release an allocation.
+ * A read that cannot answer returns false; the caller does not claim the allocation is released.
  */
 async function teardownConfirmed(
 	sdk: RuncloudSandboxClient,
@@ -433,10 +443,9 @@ type ReconcileOutcome =
 
 /**
  * Resolve what a failed create actually DID by querying the control plane for the name stamped on
- * the request. A lookup that itself fails is not proof of absence, so it costs an attempt rather than
- * ending the search: "nothing was allocated" has to be earned by a lookup that answered. The overload
- * that makes a create ambiguous is the same overload that takes `list` down, so an unanswered window
- * is reported as such instead of collapsing into absence.
+ * the request. A failed lookup costs an attempt rather than ending the search. An answered empty
+ * window is distinguished from an unanswered window for diagnostics; neither cancels a POST that
+ * can still finish later. Only a matching allocation can be adopted here.
  */
 async function reconcileAmbiguousCreate(
 	sdk: RuncloudSandboxClient,
@@ -484,14 +493,18 @@ async function allocate(
 			definitive ? 1 : timing.reconcileAttempts,
 			signal,
 		);
-		// Nothing carries this name, so nothing leaked: the original error is the whole truth. (A
-		// stalled create that allocated nothing is retryable; the bridge marks it after its own lookup.)
-		if (reconciled.status === "absent") throw error;
-		if (reconciled.status === "unanswered") {
-			// A definitive rejection supplied its own verdict; an unanswered confirming lookup does not
-			// put it back in doubt. Anything else stays honestly unknown.
+		if (reconciled.status !== "adopted") {
+			// A definitive rejection supplied its own verdict; an empty or unanswered confirming lookup
+			// does not put it back in doubt. Anything else stays unknown: a lookup miss does not cancel
+			// a POST that may still finish on the server.
 			if (definitive) throw error;
-			throw new RuncloudAmbiguousCreateError(options.name, error, reconciled.lastError);
+			throw new RuncloudAmbiguousCreateError(
+				options.name,
+				error,
+				reconciled.status === "unanswered"
+					? reconciled.lastError
+					: new Error("no allocation visible during reconciliation"),
+			);
 		}
 		// The create SUCCEEDED and only its response was lost. Adopt it: destroying a healthy
 		// sandbox to honour a lost HTTP response would throw away a slow cold pull for no reason.
@@ -520,6 +533,7 @@ async function allocate(
 			error.state,
 			hostGaveUp(error.state),
 			await teardownConfirmed(sdk, created.id, timing, signal),
+			error.vendorDetail,
 		);
 	}
 }
@@ -543,12 +557,7 @@ async function execCommand(
  */
 export function runcloudObservation(state: string): SandboxObservation {
 	if (state === "destroyed") return { state: "absent" };
-	if (
-		state === "destroying" ||
-		state === "stopped" ||
-		state === "failed" ||
-		state === "interrupted"
-	)
+	if (state === "stopped" || state === "failed" || state === "interrupted")
 		return { state: "terminal" };
 	return { state: "running" };
 }
@@ -622,6 +631,9 @@ export function runcloudSpec(
 	options: RuncloudSpecOptions = {},
 ) {
 	const timing = timingOf(options);
+	// A timed-out POST can finish after every bounded lookup. Empty inventory cannot prove
+	// cancellation; retain uncertainty until a matching resource is positively removed.
+	const unresolvedCreates = new Set<string>();
 	let cached: RuncloudSandboxClient | undefined;
 	let nativeClient: Client | undefined;
 	const api = (): Client =>
@@ -651,6 +663,9 @@ export function runcloudSpec(
 			try {
 				return await allocate(sdk(), createOptions, timing, operation.signal);
 			} catch (error) {
+				// allocate() folds every non-definitive create failure, timeouts included, into this type.
+				if (error instanceof RuncloudAmbiguousCreateError)
+					unresolvedCreates.add(createOptions.name);
 				if (!(error instanceof RunCloudError)) throw error;
 				// The generic bridge deliberately does not infer vendor metadata. Preserve this SDK's
 				// typed status so account admission can distinguish quota refusal from other failures.
@@ -703,12 +718,17 @@ export function runcloudSpec(
 				isRuncloudDefinitiveCreateRejection(error) ||
 				(error instanceof RuncloudBootFailureError && error.teardownConfirmed),
 			isRetryableCreate: (error) =>
-				(error instanceof RuncloudCallTimeoutError && error.operation === "create") ||
 				runcloudCreateHttpStatus(error) === 429 ||
 				(error instanceof RuncloudBootFailureError && error.hostGaveUp && error.teardownConfirmed),
 			cleanup: async (_compute, locator, operation) => {
 				const matches = await liveSandboxesNamed(sdk(), locator.value, timing, operation.signal);
-				if (matches.length === 0) return { status: "absent" };
+				if (matches.length === 0) {
+					if (unresolvedCreates.has(locator.value))
+						throw new Error(
+							"timed-out create has no terminal allocation verdict; empty lookups cannot confirm cancellation",
+						);
+					return { status: "absent" };
+				}
 				for (const match of matches) {
 					await destroySandbox(sdk(), match.id, timing, operation.signal);
 				}
@@ -719,6 +739,7 @@ export function runcloudSpec(
 						);
 					}
 				}
+				unresolvedCreates.delete(locator.value);
 				return { status: "destroyed" };
 			},
 		},

@@ -1,0 +1,3078 @@
+{
+  "schemaVersion": "8",
+  "runId": "35312759151",
+  "sha": "0a361c3371e8955981b6d17a151b77fb0da60fee",
+  "generatedAt": "2026-09-18T07:21:21.173Z",
+  "targetSpec": {
+    "vcpus": 4,
+    "memoryGb": 8,
+    "diskGb": 40
+  },
+  "providers": [
+    {
+      "providerId": "blaxel",
+      "costEvidence": [],
+      "artifactEvidence": [
+        {
+          "cell": {
+            "runId": "35312759151",
+            "providerId": "blaxel",
+            "suite": "cpu-node",
+            "replicateIndex": 0
+          },
+          "sandboxId": "benchmark-7616eadf-fffb-4ae3-a76e-d097362e15c0",
+          "provenance": {
+            "source": "request-fallback",
+            "requested": {
+              "kind": "none"
+            }
+          }
+        },
+        {
+          "cell": {
+            "runId": "35312759151",
+            "providerId": "blaxel",
+            "suite": "disk",
+            "replicateIndex": 0
+          },
+          "sandboxId": "benchmark-3b586329-bf61-485e-98dd-d0cb71dd3d4b",
+          "provenance": {
+            "source": "request-fallback",
+            "requested": {
+              "kind": "none"
+            }
+          }
+        },
+        {
+          "cell": {
+            "runId": "35312759151",
+            "providerId": "blaxel",
+            "suite": "memory",
+            "replicateIndex": 0
+          },
+          "sandboxId": "benchmark-f54a3813-5f54-4a2d-ac54-6a4c8dd5bb3d",
+          "provenance": {
+            "source": "request-fallback",
+            "requested": {
+              "kind": "none"
+            }
+          }
+        },
+        {
+          "cell": {
+            "runId": "35312759151",
+            "providerId": "blaxel",
+            "suite": "network",
+            "replicateIndex": 0
+          },
+          "sandboxId": "benchmark-0c91fa88-608d-4159-b8da-f0d54ddfbef5",
+          "provenance": {
+            "source": "request-fallback",
+            "requested": {
+              "kind": "none"
+            }
+          }
+        },
+        {
+          "cell": {
+            "runId": "35312759151",
+            "providerId": "blaxel",
+            "suite": "pgbench",
+            "replicateIndex": 0
+          },
+          "sandboxId": "benchmark-477ae3fe-249e-437d-8dfd-b9c821884f9a",
+          "provenance": {
+            "source": "request-fallback",
+            "requested": {
+              "kind": "none"
+            }
+          }
+        },
+        {
+          "cell": {
+            "runId": "35312759151",
+            "providerId": "blaxel",
+            "suite": "realworld-better-auth",
+            "replicateIndex": 0
+          },
+          "sandboxId": "benchmark-98a6b471-0b16-47e2-b349-d9b6b5d3f6a8",
+          "provenance": {
+            "source": "request-fallback",
+            "requested": {
+              "kind": "none"
+            }
+          }
+        },
+        {
+          "cell": {
+            "runId": "35312759151",
+            "providerId": "blaxel",
+            "suite": "realworld-mastra",
+            "replicateIndex": 0
+          },
+          "sandboxId": "benchmark-482cea95-8cc6-4555-b3b2-4cbb06cf4689",
+          "provenance": {
+            "source": "request-fallback",
+            "requested": {
+              "kind": "none"
+            }
+          }
+        },
+        {
+          "cell": {
+            "runId": "35312759151",
+            "providerId": "blaxel",
+            "suite": "realworld-openclaw",
+            "replicateIndex": 0
+          },
+          "sandboxId": "benchmark-70e7165b-3873-4ea6-9cb1-9ebaeb23cd73",
+          "provenance": {
+            "source": "request-fallback",
+            "requested": {
+              "kind": "none"
+            }
+          }
+        },
+        {
+          "cell": {
+            "runId": "35312759151",
+            "providerId": "blaxel",
+            "suite": "system",
+            "replicateIndex": 0
+          },
+          "sandboxId": "benchmark-d04d0619-218b-4413-934a-ab37e79d4780",
+          "provenance": {
+            "source": "request-fallback",
+            "requested": {
+              "kind": "none"
+            }
+          }
+        }
+      ],
+      "validationStatus": "validated",
+      "specMatched": true,
+      "observedSpecs": {
+        "cpuModel": "ARMv8",
+        "detectedIsolation": "unknown",
+        "diskGb": 40.2,
+        "hostMemoryGb": 8,
+        "hostVcpus": 4,
+        "kernel": "6.1.166",
+        "memoryGb": 7.77,
+        "os": "Alpine Linux v3.21",
+        "vcpus": 4,
+        "virtualization": "unknown",
+        "asnSource": "ipinfo",
+        "city": "Ashburn",
+        "country": "US",
+        "egressAsn": "AS14618",
+        "egressOrg": "AS14618 Amazon.com, Inc.",
+        "egressOrgName": "Amazon.com, Inc.",
+        "geoSource": "ipinfo",
+        "location": "39.0437,-77.4875",
+        "region": "Virginia",
+        "timezone": "America/New_York"
+      },
+      "observedMixtures": {
+        "sandboxes": 9,
+        "hostHardware": {
+          "c40c24c78691c3e4": {
+            "count": 8,
+            "specs": {
+              "cpuModel": "ARMv8",
+              "detectedIsolation": "unknown",
+              "diskGb": 40.2,
+              "hostMemoryGb": 8,
+              "hostVcpus": 4,
+              "kernel": "6.1.166",
+              "memoryGb": 7.77,
+              "os": "Alpine Linux v3.21",
+              "vcpus": 4,
+              "virtualization": "unknown"
+            },
+            "specMatched": true
+          },
+          "d5c3aa5e8d3732b6": {
+            "count": 1,
+            "specs": {
+              "detectedIsolation": "unknown",
+              "diskGb": 40.2,
+              "kernel": "6.1.166",
+              "memoryGb": 7.77,
+              "os": "Alpine Linux v3.21",
+              "vcpus": 4,
+              "virtualization": "unknown"
+            },
+            "specMatched": true
+          }
+        },
+        "hostNetwork": {
+          "54dd4d9228a03fae": {
+            "count": 1,
+            "specs": {
+              "asnSource": "ipinfo",
+              "city": "Ashburn",
+              "country": "US",
+              "egressAsn": "AS14618",
+              "egressOrg": "AS14618 Amazon.com, Inc.",
+              "egressOrgName": "Amazon.com, Inc.",
+              "geoSource": "ipinfo",
+              "location": "39.0437,-77.4875",
+              "region": "Virginia",
+              "timezone": "America/New_York"
+            }
+          }
+        }
+      },
+      "hostMetadata": [
+        {
+          "source": "phoronix/result-file-to-json",
+          "sourceFile": "cpu-node/pts_node-web-tooling--metadata.json",
+          "fields": [
+            {
+              "path": "ci.client_version",
+              "value": "10.8.4"
+            },
+            {
+              "path": "ci.data.environment-variables",
+              "value": "BL_DEBUG_TELEMETRY=false"
+            },
+            {
+              "path": "ci.data.kernel-extra-details",
+              "value": "Transparent Huge Pages: always"
+            },
+            {
+              "path": "ci.data.security",
+              "value": "gather_data_sampling: Not affected + indirect_target_selection: Not affected + itlb_multihit: Not affected + l1tf: Not affected + mds: Not affected + meltdown: Not affected + mmio_stale_data: Not affected + reg_file_data_sampling: Not affected + retbleed: Not affected + spec_rstack_overflow: Not affected + spec_store_bypass: Mitigation of SSB disabled via prctl + spectre_v1: Mitigation of __user pointer sanitization + spectre_v2: Mitigation of CSV2 BHB + srbds: Not affected + tsa: Not affected + tsx_async_abort: Not affected + vmscape: Not affected"
+            },
+            {
+              "path": "ci.hardware.Disk",
+              "value": "41GB"
+            },
+            {
+              "path": "ci.hardware.Memory",
+              "value": "8GB"
+            },
+            {
+              "path": "ci.hardware.Processor",
+              "value": "ARMv8 (4 Cores)"
+            },
+            {
+              "path": "ci.identifier",
+              "value": "ci"
+            },
+            {
+              "path": "ci.software.Compiler",
+              "value": "GCC 14.2.0"
+            },
+            {
+              "path": "ci.software.File-System",
+              "value": "xfs"
+            },
+            {
+              "path": "ci.software.Kernel",
+              "value": "6.1.166 (aarch64)"
+            },
+            {
+              "path": "ci.software.OS",
+              "value": "Alpine Linux v3.21 3.21.5"
+            },
+            {
+              "path": "ci.timestamp",
+              "value": "2026-09-18 06:34:34"
+            },
+            {
+              "path": "ci.user",
+              "value": "root"
+            }
+          ],
+          "sandboxes": 1,
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "source": "phoronix/result-file-to-json",
+          "sourceFile": "disk/pts_fio-rand-read--metadata.json",
+          "fields": [
+            {
+              "path": "ci.client_version",
+              "value": "10.8.4"
+            },
+            {
+              "path": "ci.data.compiler-configuration",
+              "value": "--build=aarch64-alpine-linux-musl --disable-cet --disable-fixed-point --disable-libquadmath --disable-libsanitizer --disable-libssp --disable-libstdcxx-pch --disable-multilib --disable-nls --disable-symvers --disable-werror --enable-__cxa_atexit --enable-checking=release --enable-default-pie --enable-default-ssp --enable-languages=c,c++,d,objc,go,fortran,ada --enable-link-serialization=2 --enable-shared --enable-threads --enable-tls --host=aarch64-alpine-linux-musl --mandir=/usr/share/man --target=aarch64-alpine-linux-musl --with-abi=lp64 --with-arch=armv8-a --with-linker-hash-style=gnu"
+            },
+            {
+              "path": "ci.data.disk-details",
+              "value": "Block Size: 4096"
+            },
+            {
+              "path": "ci.data.disk-mount-options",
+              "value": "allocsize=64k,attr2,inode64,lazytime,logbsize=256k,logbufs=8,noatime,nodiratime,noquota,rw"
+            },
+            {
+              "path": "ci.data.disk-scheduler",
+              "value": "MQ-DEADLINE"
+            },
+            {
+              "path": "ci.data.environment-variables",
+              "value": "BL_DEBUG_TELEMETRY=false"
+            },
+            {
+              "path": "ci.data.kernel-extra-details",
+              "value": "Transparent Huge Pages: always"
+            },
+            {
+              "path": "ci.data.security",
+              "value": "gather_data_sampling: Not affected + indirect_target_selection: Not affected + itlb_multihit: Not affected + l1tf: Not affected + mds: Not affected + meltdown: Not affected + mmio_stale_data: Not affected + reg_file_data_sampling: Not affected + retbleed: Not affected + spec_rstack_overflow: Not affected + spec_store_bypass: Mitigation of SSB disabled via prctl + spectre_v1: Mitigation of __user pointer sanitization + spectre_v2: Mitigation of CSV2 BHB + srbds: Not affected + tsa: Not affected + tsx_async_abort: Not affected + vmscape: Not affected"
+            },
+            {
+              "path": "ci.hardware.Disk",
+              "value": "41GB"
+            },
+            {
+              "path": "ci.hardware.Memory",
+              "value": "8GB"
+            },
+            {
+              "path": "ci.hardware.Processor",
+              "value": "ARMv8 (4 Cores)"
+            },
+            {
+              "path": "ci.identifier",
+              "value": "ci"
+            },
+            {
+              "path": "ci.software.Compiler",
+              "value": "GCC 14.2.0"
+            },
+            {
+              "path": "ci.software.File-System",
+              "value": "xfs"
+            },
+            {
+              "path": "ci.software.Kernel",
+              "value": "6.1.166 (aarch64)"
+            },
+            {
+              "path": "ci.software.OS",
+              "value": "Alpine Linux v3.21 3.21.5"
+            },
+            {
+              "path": "ci.timestamp",
+              "value": "2026-09-18 06:04:07"
+            },
+            {
+              "path": "ci.user",
+              "value": "root"
+            }
+          ],
+          "sandboxes": 1,
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "source": "phoronix/result-file-to-json",
+          "sourceFile": "disk/pts_fio-rand-write--metadata.json",
+          "fields": [
+            {
+              "path": "ci.client_version",
+              "value": "10.8.4"
+            },
+            {
+              "path": "ci.data.compiler-configuration",
+              "value": "--build=aarch64-alpine-linux-musl --disable-cet --disable-fixed-point --disable-libquadmath --disable-libsanitizer --disable-libssp --disable-libstdcxx-pch --disable-multilib --disable-nls --disable-symvers --disable-werror --enable-__cxa_atexit --enable-checking=release --enable-default-pie --enable-default-ssp --enable-languages=c,c++,d,objc,go,fortran,ada --enable-link-serialization=2 --enable-shared --enable-threads --enable-tls --host=aarch64-alpine-linux-musl --mandir=/usr/share/man --target=aarch64-alpine-linux-musl --with-abi=lp64 --with-arch=armv8-a --with-linker-hash-style=gnu"
+            },
+            {
+              "path": "ci.data.disk-details",
+              "value": "Block Size: 4096"
+            },
+            {
+              "path": "ci.data.disk-mount-options",
+              "value": "allocsize=64k,attr2,inode64,lazytime,logbsize=256k,logbufs=8,noatime,nodiratime,noquota,rw"
+            },
+            {
+              "path": "ci.data.disk-scheduler",
+              "value": "MQ-DEADLINE"
+            },
+            {
+              "path": "ci.data.environment-variables",
+              "value": "BL_DEBUG_TELEMETRY=false"
+            },
+            {
+              "path": "ci.data.kernel-extra-details",
+              "value": "Transparent Huge Pages: always"
+            },
+            {
+              "path": "ci.data.security",
+              "value": "gather_data_sampling: Not affected + indirect_target_selection: Not affected + itlb_multihit: Not affected + l1tf: Not affected + mds: Not affected + meltdown: Not affected + mmio_stale_data: Not affected + reg_file_data_sampling: Not affected + retbleed: Not affected + spec_rstack_overflow: Not affected + spec_store_bypass: Mitigation of SSB disabled via prctl + spectre_v1: Mitigation of __user pointer sanitization + spectre_v2: Mitigation of CSV2 BHB + srbds: Not affected + tsa: Not affected + tsx_async_abort: Not affected + vmscape: Not affected"
+            },
+            {
+              "path": "ci.hardware.Disk",
+              "value": "41GB"
+            },
+            {
+              "path": "ci.hardware.Memory",
+              "value": "8GB"
+            },
+            {
+              "path": "ci.hardware.Processor",
+              "value": "ARMv8 (4 Cores)"
+            },
+            {
+              "path": "ci.identifier",
+              "value": "ci"
+            },
+            {
+              "path": "ci.software.Compiler",
+              "value": "GCC 14.2.0"
+            },
+            {
+              "path": "ci.software.File-System",
+              "value": "xfs"
+            },
+            {
+              "path": "ci.software.Kernel",
+              "value": "6.1.166 (aarch64)"
+            },
+            {
+              "path": "ci.software.OS",
+              "value": "Alpine Linux v3.21 3.21.5"
+            },
+            {
+              "path": "ci.timestamp",
+              "value": "2026-09-18 06:07:19"
+            },
+            {
+              "path": "ci.user",
+              "value": "root"
+            }
+          ],
+          "sandboxes": 1,
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "source": "phoronix/result-file-to-json",
+          "sourceFile": "disk/pts_fio-seq-read--metadata.json",
+          "fields": [
+            {
+              "path": "ci.client_version",
+              "value": "10.8.4"
+            },
+            {
+              "path": "ci.data.compiler-configuration",
+              "value": "--build=aarch64-alpine-linux-musl --disable-cet --disable-fixed-point --disable-libquadmath --disable-libsanitizer --disable-libssp --disable-libstdcxx-pch --disable-multilib --disable-nls --disable-symvers --disable-werror --enable-__cxa_atexit --enable-checking=release --enable-default-pie --enable-default-ssp --enable-languages=c,c++,d,objc,go,fortran,ada --enable-link-serialization=2 --enable-shared --enable-threads --enable-tls --host=aarch64-alpine-linux-musl --mandir=/usr/share/man --target=aarch64-alpine-linux-musl --with-abi=lp64 --with-arch=armv8-a --with-linker-hash-style=gnu"
+            },
+            {
+              "path": "ci.data.disk-details",
+              "value": "Block Size: 4096"
+            },
+            {
+              "path": "ci.data.disk-mount-options",
+              "value": "allocsize=64k,attr2,inode64,lazytime,logbsize=256k,logbufs=8,noatime,nodiratime,noquota,rw"
+            },
+            {
+              "path": "ci.data.disk-scheduler",
+              "value": "MQ-DEADLINE"
+            },
+            {
+              "path": "ci.data.environment-variables",
+              "value": "BL_DEBUG_TELEMETRY=false"
+            },
+            {
+              "path": "ci.data.kernel-extra-details",
+              "value": "Transparent Huge Pages: always"
+            },
+            {
+              "path": "ci.data.security",
+              "value": "gather_data_sampling: Not affected + indirect_target_selection: Not affected + itlb_multihit: Not affected + l1tf: Not affected + mds: Not affected + meltdown: Not affected + mmio_stale_data: Not affected + reg_file_data_sampling: Not affected + retbleed: Not affected + spec_rstack_overflow: Not affected + spec_store_bypass: Mitigation of SSB disabled via prctl + spectre_v1: Mitigation of __user pointer sanitization + spectre_v2: Mitigation of CSV2 BHB + srbds: Not affected + tsa: Not affected + tsx_async_abort: Not affected + vmscape: Not affected"
+            },
+            {
+              "path": "ci.hardware.Disk",
+              "value": "41GB"
+            },
+            {
+              "path": "ci.hardware.Memory",
+              "value": "8GB"
+            },
+            {
+              "path": "ci.hardware.Processor",
+              "value": "ARMv8 (4 Cores)"
+            },
+            {
+              "path": "ci.identifier",
+              "value": "ci"
+            },
+            {
+              "path": "ci.software.Compiler",
+              "value": "GCC 14.2.0"
+            },
+            {
+              "path": "ci.software.File-System",
+              "value": "xfs"
+            },
+            {
+              "path": "ci.software.Kernel",
+              "value": "6.1.166 (aarch64)"
+            },
+            {
+              "path": "ci.software.OS",
+              "value": "Alpine Linux v3.21 3.21.5"
+            },
+            {
+              "path": "ci.timestamp",
+              "value": "2026-09-18 05:57:45"
+            },
+            {
+              "path": "ci.user",
+              "value": "root"
+            }
+          ],
+          "sandboxes": 1,
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "source": "phoronix/result-file-to-json",
+          "sourceFile": "disk/pts_fio-seq-write--metadata.json",
+          "fields": [
+            {
+              "path": "ci.client_version",
+              "value": "10.8.4"
+            },
+            {
+              "path": "ci.data.compiler-configuration",
+              "value": "--build=aarch64-alpine-linux-musl --disable-cet --disable-fixed-point --disable-libquadmath --disable-libsanitizer --disable-libssp --disable-libstdcxx-pch --disable-multilib --disable-nls --disable-symvers --disable-werror --enable-__cxa_atexit --enable-checking=release --enable-default-pie --enable-default-ssp --enable-languages=c,c++,d,objc,go,fortran,ada --enable-link-serialization=2 --enable-shared --enable-threads --enable-tls --host=aarch64-alpine-linux-musl --mandir=/usr/share/man --target=aarch64-alpine-linux-musl --with-abi=lp64 --with-arch=armv8-a --with-linker-hash-style=gnu"
+            },
+            {
+              "path": "ci.data.disk-details",
+              "value": "Block Size: 4096"
+            },
+            {
+              "path": "ci.data.disk-mount-options",
+              "value": "allocsize=64k,attr2,inode64,lazytime,logbsize=256k,logbufs=8,noatime,nodiratime,noquota,rw"
+            },
+            {
+              "path": "ci.data.disk-scheduler",
+              "value": "MQ-DEADLINE"
+            },
+            {
+              "path": "ci.data.environment-variables",
+              "value": "BL_DEBUG_TELEMETRY=false"
+            },
+            {
+              "path": "ci.data.kernel-extra-details",
+              "value": "Transparent Huge Pages: always"
+            },
+            {
+              "path": "ci.data.security",
+              "value": "gather_data_sampling: Not affected + indirect_target_selection: Not affected + itlb_multihit: Not affected + l1tf: Not affected + mds: Not affected + meltdown: Not affected + mmio_stale_data: Not affected + reg_file_data_sampling: Not affected + retbleed: Not affected + spec_rstack_overflow: Not affected + spec_store_bypass: Mitigation of SSB disabled via prctl + spectre_v1: Mitigation of __user pointer sanitization + spectre_v2: Mitigation of CSV2 BHB + srbds: Not affected + tsa: Not affected + tsx_async_abort: Not affected + vmscape: Not affected"
+            },
+            {
+              "path": "ci.hardware.Disk",
+              "value": "41GB"
+            },
+            {
+              "path": "ci.hardware.Memory",
+              "value": "8GB"
+            },
+            {
+              "path": "ci.hardware.Processor",
+              "value": "ARMv8 (4 Cores)"
+            },
+            {
+              "path": "ci.identifier",
+              "value": "ci"
+            },
+            {
+              "path": "ci.software.Compiler",
+              "value": "GCC 14.2.0"
+            },
+            {
+              "path": "ci.software.File-System",
+              "value": "xfs"
+            },
+            {
+              "path": "ci.software.Kernel",
+              "value": "6.1.166 (aarch64)"
+            },
+            {
+              "path": "ci.software.OS",
+              "value": "Alpine Linux v3.21 3.21.5"
+            },
+            {
+              "path": "ci.timestamp",
+              "value": "2026-09-18 06:00:56"
+            },
+            {
+              "path": "ci.user",
+              "value": "root"
+            }
+          ],
+          "sandboxes": 1,
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "source": "phoronix/result-file-to-json",
+          "sourceFile": "disk/pts_hardlink--metadata.json",
+          "fields": [
+            {
+              "path": "ci.client_version",
+              "value": "10.8.4"
+            },
+            {
+              "path": "ci.data.compiler-configuration",
+              "value": "--build=aarch64-alpine-linux-musl --disable-cet --disable-fixed-point --disable-libquadmath --disable-libsanitizer --disable-libssp --disable-libstdcxx-pch --disable-multilib --disable-nls --disable-symvers --disable-werror --enable-__cxa_atexit --enable-checking=release --enable-default-pie --enable-default-ssp --enable-languages=c,c++,d,objc,go,fortran,ada --enable-link-serialization=2 --enable-shared --enable-threads --enable-tls --host=aarch64-alpine-linux-musl --mandir=/usr/share/man --target=aarch64-alpine-linux-musl --with-abi=lp64 --with-arch=armv8-a --with-linker-hash-style=gnu"
+            },
+            {
+              "path": "ci.data.disk-details",
+              "value": "Block Size: 4096"
+            },
+            {
+              "path": "ci.data.disk-mount-options",
+              "value": "allocsize=64k,attr2,inode64,lazytime,logbsize=256k,logbufs=8,noatime,nodiratime,noquota,rw"
+            },
+            {
+              "path": "ci.data.disk-scheduler",
+              "value": "MQ-DEADLINE"
+            },
+            {
+              "path": "ci.data.environment-variables",
+              "value": "BL_DEBUG_TELEMETRY=false"
+            },
+            {
+              "path": "ci.data.kernel-extra-details",
+              "value": "Transparent Huge Pages: always"
+            },
+            {
+              "path": "ci.data.security",
+              "value": "gather_data_sampling: Not affected + indirect_target_selection: Not affected + itlb_multihit: Not affected + l1tf: Not affected + mds: Not affected + meltdown: Not affected + mmio_stale_data: Not affected + reg_file_data_sampling: Not affected + retbleed: Not affected + spec_rstack_overflow: Not affected + spec_store_bypass: Mitigation of SSB disabled via prctl + spectre_v1: Mitigation of __user pointer sanitization + spectre_v2: Mitigation of CSV2 BHB + srbds: Not affected + tsa: Not affected + tsx_async_abort: Not affected + vmscape: Not affected"
+            },
+            {
+              "path": "ci.hardware.Disk",
+              "value": "41GB"
+            },
+            {
+              "path": "ci.hardware.Memory",
+              "value": "8GB"
+            },
+            {
+              "path": "ci.hardware.Processor",
+              "value": "ARMv8 (4 Cores)"
+            },
+            {
+              "path": "ci.identifier",
+              "value": "ci"
+            },
+            {
+              "path": "ci.software.Compiler",
+              "value": "GCC 14.2.0"
+            },
+            {
+              "path": "ci.software.File-System",
+              "value": "xfs"
+            },
+            {
+              "path": "ci.software.Kernel",
+              "value": "6.1.166 (aarch64)"
+            },
+            {
+              "path": "ci.software.OS",
+              "value": "Alpine Linux v3.21 3.21.5"
+            },
+            {
+              "path": "ci.timestamp",
+              "value": "2026-09-18 06:10:30"
+            },
+            {
+              "path": "ci.user",
+              "value": "root"
+            }
+          ],
+          "sandboxes": 1,
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "source": "phoronix/result-file-to-json",
+          "sourceFile": "memory/pts_stream--metadata.json",
+          "fields": [
+            {
+              "path": "ci.client_version",
+              "value": "10.8.4"
+            },
+            {
+              "path": "ci.data.compiler-configuration",
+              "value": "--build=aarch64-alpine-linux-musl --disable-cet --disable-fixed-point --disable-libquadmath --disable-libsanitizer --disable-libssp --disable-libstdcxx-pch --disable-multilib --disable-nls --disable-symvers --disable-werror --enable-__cxa_atexit --enable-checking=release --enable-default-pie --enable-default-ssp --enable-languages=c,c++,d,objc,go,fortran,ada --enable-link-serialization=2 --enable-shared --enable-threads --enable-tls --host=aarch64-alpine-linux-musl --mandir=/usr/share/man --target=aarch64-alpine-linux-musl --with-abi=lp64 --with-arch=armv8-a --with-linker-hash-style=gnu"
+            },
+            {
+              "path": "ci.data.environment-variables",
+              "value": "CFLAGS_OVERRIDE=\"-O3 -march=native -DSTREAM_ARRAY_SIZE=150000000\" BL_DEBUG_TELEMETRY=false"
+            },
+            {
+              "path": "ci.data.kernel-extra-details",
+              "value": "Transparent Huge Pages: always"
+            },
+            {
+              "path": "ci.data.security",
+              "value": "gather_data_sampling: Not affected + indirect_target_selection: Not affected + itlb_multihit: Not affected + l1tf: Not affected + mds: Not affected + meltdown: Not affected + mmio_stale_data: Not affected + reg_file_data_sampling: Not affected + retbleed: Not affected + spec_rstack_overflow: Not affected + spec_store_bypass: Mitigation of SSB disabled via prctl + spectre_v1: Mitigation of __user pointer sanitization + spectre_v2: Mitigation of CSV2 BHB + srbds: Not affected + tsa: Not affected + tsx_async_abort: Not affected + vmscape: Not affected"
+            },
+            {
+              "path": "ci.hardware.Disk",
+              "value": "41GB"
+            },
+            {
+              "path": "ci.hardware.Memory",
+              "value": "8GB"
+            },
+            {
+              "path": "ci.hardware.Processor",
+              "value": "ARMv8 (4 Cores)"
+            },
+            {
+              "path": "ci.identifier",
+              "value": "ci"
+            },
+            {
+              "path": "ci.software.Compiler",
+              "value": "GCC 14.2.0"
+            },
+            {
+              "path": "ci.software.File-System",
+              "value": "xfs"
+            },
+            {
+              "path": "ci.software.Kernel",
+              "value": "6.1.166 (aarch64)"
+            },
+            {
+              "path": "ci.software.OS",
+              "value": "Alpine Linux v3.21 3.21.5"
+            },
+            {
+              "path": "ci.timestamp",
+              "value": "2026-09-18 06:32:21"
+            },
+            {
+              "path": "ci.user",
+              "value": "root"
+            }
+          ],
+          "sandboxes": 1,
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "source": "phoronix/result-file-to-json",
+          "sourceFile": "network/pts_iperf-tcp-p1--metadata.json",
+          "fields": [
+            {
+              "path": "ci.client_version",
+              "value": "10.8.4"
+            },
+            {
+              "path": "ci.data.compiler-configuration",
+              "value": "--build=aarch64-alpine-linux-musl --disable-cet --disable-fixed-point --disable-libquadmath --disable-libsanitizer --disable-libssp --disable-libstdcxx-pch --disable-multilib --disable-nls --disable-symvers --disable-werror --enable-__cxa_atexit --enable-checking=release --enable-default-pie --enable-default-ssp --enable-languages=c,c++,d,objc,go,fortran,ada --enable-link-serialization=2 --enable-shared --enable-threads --enable-tls --host=aarch64-alpine-linux-musl --mandir=/usr/share/man --target=aarch64-alpine-linux-musl --with-abi=lp64 --with-arch=armv8-a --with-linker-hash-style=gnu"
+            },
+            {
+              "path": "ci.data.environment-variables",
+              "value": "BL_DEBUG_TELEMETRY=false"
+            },
+            {
+              "path": "ci.data.kernel-extra-details",
+              "value": "Transparent Huge Pages: always"
+            },
+            {
+              "path": "ci.data.security",
+              "value": "gather_data_sampling: Not affected + indirect_target_selection: Not affected + itlb_multihit: Not affected + l1tf: Not affected + mds: Not affected + meltdown: Not affected + mmio_stale_data: Not affected + reg_file_data_sampling: Not affected + retbleed: Not affected + spec_rstack_overflow: Not affected + spec_store_bypass: Mitigation of SSB disabled via prctl + spectre_v1: Mitigation of __user pointer sanitization + spectre_v2: Mitigation of CSV2 BHB + srbds: Not affected + tsa: Not affected + tsx_async_abort: Not affected + vmscape: Not affected"
+            },
+            {
+              "path": "ci.hardware.Disk",
+              "value": "41GB"
+            },
+            {
+              "path": "ci.hardware.Memory",
+              "value": "8GB"
+            },
+            {
+              "path": "ci.hardware.Processor",
+              "value": "ARMv8 (4 Cores)"
+            },
+            {
+              "path": "ci.identifier",
+              "value": "ci"
+            },
+            {
+              "path": "ci.software.Compiler",
+              "value": "GCC 14.2.0"
+            },
+            {
+              "path": "ci.software.File-System",
+              "value": "xfs"
+            },
+            {
+              "path": "ci.software.Kernel",
+              "value": "6.1.166 (aarch64)"
+            },
+            {
+              "path": "ci.software.OS",
+              "value": "Alpine Linux v3.21 3.21.5"
+            },
+            {
+              "path": "ci.timestamp",
+              "value": "2026-09-18 06:12:36"
+            },
+            {
+              "path": "ci.user",
+              "value": "root"
+            }
+          ],
+          "sandboxes": 1,
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "source": "phoronix/result-file-to-json",
+          "sourceFile": "network/pts_iperf-tcp-p10--metadata.json",
+          "fields": [
+            {
+              "path": "ci.client_version",
+              "value": "10.8.4"
+            },
+            {
+              "path": "ci.data.compiler-configuration",
+              "value": "--build=aarch64-alpine-linux-musl --disable-cet --disable-fixed-point --disable-libquadmath --disable-libsanitizer --disable-libssp --disable-libstdcxx-pch --disable-multilib --disable-nls --disable-symvers --disable-werror --enable-__cxa_atexit --enable-checking=release --enable-default-pie --enable-default-ssp --enable-languages=c,c++,d,objc,go,fortran,ada --enable-link-serialization=2 --enable-shared --enable-threads --enable-tls --host=aarch64-alpine-linux-musl --mandir=/usr/share/man --target=aarch64-alpine-linux-musl --with-abi=lp64 --with-arch=armv8-a --with-linker-hash-style=gnu"
+            },
+            {
+              "path": "ci.data.environment-variables",
+              "value": "BL_DEBUG_TELEMETRY=false"
+            },
+            {
+              "path": "ci.data.kernel-extra-details",
+              "value": "Transparent Huge Pages: always"
+            },
+            {
+              "path": "ci.data.security",
+              "value": "gather_data_sampling: Not affected + indirect_target_selection: Not affected + itlb_multihit: Not affected + l1tf: Not affected + mds: Not affected + meltdown: Not affected + mmio_stale_data: Not affected + reg_file_data_sampling: Not affected + retbleed: Not affected + spec_rstack_overflow: Not affected + spec_store_bypass: Mitigation of SSB disabled via prctl + spectre_v1: Mitigation of __user pointer sanitization + spectre_v2: Mitigation of CSV2 BHB + srbds: Not affected + tsa: Not affected + tsx_async_abort: Not affected + vmscape: Not affected"
+            },
+            {
+              "path": "ci.hardware.Disk",
+              "value": "41GB"
+            },
+            {
+              "path": "ci.hardware.Memory",
+              "value": "8GB"
+            },
+            {
+              "path": "ci.hardware.Processor",
+              "value": "ARMv8 (4 Cores)"
+            },
+            {
+              "path": "ci.identifier",
+              "value": "ci"
+            },
+            {
+              "path": "ci.software.Compiler",
+              "value": "GCC 14.2.0"
+            },
+            {
+              "path": "ci.software.File-System",
+              "value": "xfs"
+            },
+            {
+              "path": "ci.software.Kernel",
+              "value": "6.1.166 (aarch64)"
+            },
+            {
+              "path": "ci.software.OS",
+              "value": "Alpine Linux v3.21 3.21.5"
+            },
+            {
+              "path": "ci.timestamp",
+              "value": "2026-09-18 06:13:14"
+            },
+            {
+              "path": "ci.user",
+              "value": "root"
+            }
+          ],
+          "sandboxes": 1,
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "source": "phoronix/result-file-to-json",
+          "sourceFile": "network/pts_iperf-udp-10g--metadata.json",
+          "fields": [
+            {
+              "path": "ci.client_version",
+              "value": "10.8.4"
+            },
+            {
+              "path": "ci.data.compiler-configuration",
+              "value": "--build=aarch64-alpine-linux-musl --disable-cet --disable-fixed-point --disable-libquadmath --disable-libsanitizer --disable-libssp --disable-libstdcxx-pch --disable-multilib --disable-nls --disable-symvers --disable-werror --enable-__cxa_atexit --enable-checking=release --enable-default-pie --enable-default-ssp --enable-languages=c,c++,d,objc,go,fortran,ada --enable-link-serialization=2 --enable-shared --enable-threads --enable-tls --host=aarch64-alpine-linux-musl --mandir=/usr/share/man --target=aarch64-alpine-linux-musl --with-abi=lp64 --with-arch=armv8-a --with-linker-hash-style=gnu"
+            },
+            {
+              "path": "ci.data.environment-variables",
+              "value": "BL_DEBUG_TELEMETRY=false"
+            },
+            {
+              "path": "ci.data.kernel-extra-details",
+              "value": "Transparent Huge Pages: always"
+            },
+            {
+              "path": "ci.data.security",
+              "value": "gather_data_sampling: Not affected + indirect_target_selection: Not affected + itlb_multihit: Not affected + l1tf: Not affected + mds: Not affected + meltdown: Not affected + mmio_stale_data: Not affected + reg_file_data_sampling: Not affected + retbleed: Not affected + spec_rstack_overflow: Not affected + spec_store_bypass: Mitigation of SSB disabled via prctl + spectre_v1: Mitigation of __user pointer sanitization + spectre_v2: Mitigation of CSV2 BHB + srbds: Not affected + tsa: Not affected + tsx_async_abort: Not affected + vmscape: Not affected"
+            },
+            {
+              "path": "ci.hardware.Disk",
+              "value": "41GB"
+            },
+            {
+              "path": "ci.hardware.Memory",
+              "value": "8GB"
+            },
+            {
+              "path": "ci.hardware.Processor",
+              "value": "ARMv8 (4 Cores)"
+            },
+            {
+              "path": "ci.identifier",
+              "value": "ci"
+            },
+            {
+              "path": "ci.software.Compiler",
+              "value": "GCC 14.2.0"
+            },
+            {
+              "path": "ci.software.File-System",
+              "value": "xfs"
+            },
+            {
+              "path": "ci.software.Kernel",
+              "value": "6.1.166 (aarch64)"
+            },
+            {
+              "path": "ci.software.OS",
+              "value": "Alpine Linux v3.21 3.21.5"
+            },
+            {
+              "path": "ci.timestamp",
+              "value": "2026-09-18 06:13:52"
+            },
+            {
+              "path": "ci.user",
+              "value": "root"
+            }
+          ],
+          "sandboxes": 1,
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "source": "phoronix/result-file-to-json",
+          "sourceFile": "network/pts_iperf-wan-download--metadata.json",
+          "fields": [
+            {
+              "path": "ci.client_version",
+              "value": "10.8.4"
+            },
+            {
+              "path": "ci.data.compiler-configuration",
+              "value": "--build=aarch64-alpine-linux-musl --disable-cet --disable-fixed-point --disable-libquadmath --disable-libsanitizer --disable-libssp --disable-libstdcxx-pch --disable-multilib --disable-nls --disable-symvers --disable-werror --enable-__cxa_atexit --enable-checking=release --enable-default-pie --enable-default-ssp --enable-languages=c,c++,d,objc,go,fortran,ada --enable-link-serialization=2 --enable-shared --enable-threads --enable-tls --host=aarch64-alpine-linux-musl --mandir=/usr/share/man --target=aarch64-alpine-linux-musl --with-abi=lp64 --with-arch=armv8-a --with-linker-hash-style=gnu"
+            },
+            {
+              "path": "ci.data.environment-variables",
+              "value": "BL_DEBUG_TELEMETRY=false"
+            },
+            {
+              "path": "ci.data.kernel-extra-details",
+              "value": "Transparent Huge Pages: always"
+            },
+            {
+              "path": "ci.data.security",
+              "value": "gather_data_sampling: Not affected + indirect_target_selection: Not affected + itlb_multihit: Not affected + l1tf: Not affected + mds: Not affected + meltdown: Not affected + mmio_stale_data: Not affected + reg_file_data_sampling: Not affected + retbleed: Not affected + spec_rstack_overflow: Not affected + spec_store_bypass: Mitigation of SSB disabled via prctl + spectre_v1: Mitigation of __user pointer sanitization + spectre_v2: Mitigation of CSV2 BHB + srbds: Not affected + tsa: Not affected + tsx_async_abort: Not affected + vmscape: Not affected"
+            },
+            {
+              "path": "ci.hardware.Disk",
+              "value": "41GB"
+            },
+            {
+              "path": "ci.hardware.Memory",
+              "value": "8GB"
+            },
+            {
+              "path": "ci.hardware.Processor",
+              "value": "ARMv8 (4 Cores)"
+            },
+            {
+              "path": "ci.identifier",
+              "value": "ci"
+            },
+            {
+              "path": "ci.software.Compiler",
+              "value": "GCC 14.2.0"
+            },
+            {
+              "path": "ci.software.File-System",
+              "value": "xfs"
+            },
+            {
+              "path": "ci.software.Kernel",
+              "value": "6.1.166 (aarch64)"
+            },
+            {
+              "path": "ci.software.OS",
+              "value": "Alpine Linux v3.21 3.21.5"
+            },
+            {
+              "path": "ci.timestamp",
+              "value": "2026-09-18 06:14:40"
+            },
+            {
+              "path": "ci.user",
+              "value": "root"
+            }
+          ],
+          "sandboxes": 1,
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "source": "phoronix/result-file-to-json",
+          "sourceFile": "network/pts_iperf-wan-upload--metadata.json",
+          "fields": [
+            {
+              "path": "ci.client_version",
+              "value": "10.8.4"
+            },
+            {
+              "path": "ci.data.compiler-configuration",
+              "value": "--build=aarch64-alpine-linux-musl --disable-cet --disable-fixed-point --disable-libquadmath --disable-libsanitizer --disable-libssp --disable-libstdcxx-pch --disable-multilib --disable-nls --disable-symvers --disable-werror --enable-__cxa_atexit --enable-checking=release --enable-default-pie --enable-default-ssp --enable-languages=c,c++,d,objc,go,fortran,ada --enable-link-serialization=2 --enable-shared --enable-threads --enable-tls --host=aarch64-alpine-linux-musl --mandir=/usr/share/man --target=aarch64-alpine-linux-musl --with-abi=lp64 --with-arch=armv8-a --with-linker-hash-style=gnu"
+            },
+            {
+              "path": "ci.data.environment-variables",
+              "value": "BL_DEBUG_TELEMETRY=false"
+            },
+            {
+              "path": "ci.data.kernel-extra-details",
+              "value": "Transparent Huge Pages: always"
+            },
+            {
+              "path": "ci.data.security",
+              "value": "gather_data_sampling: Not affected + indirect_target_selection: Not affected + itlb_multihit: Not affected + l1tf: Not affected + mds: Not affected + meltdown: Not affected + mmio_stale_data: Not affected + reg_file_data_sampling: Not affected + retbleed: Not affected + spec_rstack_overflow: Not affected + spec_store_bypass: Mitigation of SSB disabled via prctl + spectre_v1: Mitigation of __user pointer sanitization + spectre_v2: Mitigation of CSV2 BHB + srbds: Not affected + tsa: Not affected + tsx_async_abort: Not affected + vmscape: Not affected"
+            },
+            {
+              "path": "ci.hardware.Disk",
+              "value": "41GB"
+            },
+            {
+              "path": "ci.hardware.Memory",
+              "value": "8GB"
+            },
+            {
+              "path": "ci.hardware.Processor",
+              "value": "ARMv8 (4 Cores)"
+            },
+            {
+              "path": "ci.identifier",
+              "value": "ci"
+            },
+            {
+              "path": "ci.software.Compiler",
+              "value": "GCC 14.2.0"
+            },
+            {
+              "path": "ci.software.File-System",
+              "value": "xfs"
+            },
+            {
+              "path": "ci.software.Kernel",
+              "value": "6.1.166 (aarch64)"
+            },
+            {
+              "path": "ci.software.OS",
+              "value": "Alpine Linux v3.21 3.21.5"
+            },
+            {
+              "path": "ci.timestamp",
+              "value": "2026-09-18 06:16:08"
+            },
+            {
+              "path": "ci.user",
+              "value": "root"
+            }
+          ],
+          "sandboxes": 1,
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "source": "phoronix/result-file-to-json",
+          "sourceFile": "pgbench/pts_pgbench-read-only--metadata.json",
+          "fields": [
+            {
+              "path": "ci.client_version",
+              "value": "10.8.4"
+            },
+            {
+              "path": "ci.data.compiler-configuration",
+              "value": "--build=aarch64-alpine-linux-musl --disable-cet --disable-fixed-point --disable-libquadmath --disable-libsanitizer --disable-libssp --disable-libstdcxx-pch --disable-multilib --disable-nls --disable-symvers --disable-werror --enable-__cxa_atexit --enable-checking=release --enable-default-pie --enable-default-ssp --enable-languages=c,c++,d,objc,go,fortran,ada --enable-link-serialization=2 --enable-shared --enable-threads --enable-tls --host=aarch64-alpine-linux-musl --mandir=/usr/share/man --target=aarch64-alpine-linux-musl --with-abi=lp64 --with-arch=armv8-a --with-linker-hash-style=gnu"
+            },
+            {
+              "path": "ci.data.environment-variables",
+              "value": "BL_DEBUG_TELEMETRY=false"
+            },
+            {
+              "path": "ci.data.kernel-extra-details",
+              "value": "Transparent Huge Pages: always"
+            },
+            {
+              "path": "ci.data.security",
+              "value": "gather_data_sampling: Not affected + indirect_target_selection: Not affected + itlb_multihit: Not affected + l1tf: Not affected + mds: Not affected + meltdown: Not affected + mmio_stale_data: Not affected + reg_file_data_sampling: Not affected + retbleed: Not affected + spec_rstack_overflow: Not affected + spec_store_bypass: Mitigation of SSB disabled via prctl + spectre_v1: Mitigation of __user pointer sanitization + spectre_v2: Mitigation of CSV2 BHB + srbds: Not affected + tsa: Not affected + tsx_async_abort: Not affected + vmscape: Not affected"
+            },
+            {
+              "path": "ci.hardware.Disk",
+              "value": "41GB"
+            },
+            {
+              "path": "ci.hardware.Memory",
+              "value": "8GB"
+            },
+            {
+              "path": "ci.hardware.Processor",
+              "value": "ARMv8 (4 Cores)"
+            },
+            {
+              "path": "ci.identifier",
+              "value": "ci"
+            },
+            {
+              "path": "ci.software.Compiler",
+              "value": "GCC 14.2.0"
+            },
+            {
+              "path": "ci.software.File-System",
+              "value": "xfs"
+            },
+            {
+              "path": "ci.software.Kernel",
+              "value": "6.1.166 (aarch64)"
+            },
+            {
+              "path": "ci.software.OS",
+              "value": "Alpine Linux v3.21 3.21.5"
+            },
+            {
+              "path": "ci.timestamp",
+              "value": "2026-09-18 06:21:54"
+            },
+            {
+              "path": "ci.user",
+              "value": "root"
+            }
+          ],
+          "sandboxes": 1,
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "source": "phoronix/result-file-to-json",
+          "sourceFile": "pgbench/pts_pgbench-read-write--metadata.json",
+          "fields": [
+            {
+              "path": "ci.client_version",
+              "value": "10.8.4"
+            },
+            {
+              "path": "ci.data.compiler-configuration",
+              "value": "--build=aarch64-alpine-linux-musl --disable-cet --disable-fixed-point --disable-libquadmath --disable-libsanitizer --disable-libssp --disable-libstdcxx-pch --disable-multilib --disable-nls --disable-symvers --disable-werror --enable-__cxa_atexit --enable-checking=release --enable-default-pie --enable-default-ssp --enable-languages=c,c++,d,objc,go,fortran,ada --enable-link-serialization=2 --enable-shared --enable-threads --enable-tls --host=aarch64-alpine-linux-musl --mandir=/usr/share/man --target=aarch64-alpine-linux-musl --with-abi=lp64 --with-arch=armv8-a --with-linker-hash-style=gnu"
+            },
+            {
+              "path": "ci.data.environment-variables",
+              "value": "BL_DEBUG_TELEMETRY=false"
+            },
+            {
+              "path": "ci.data.kernel-extra-details",
+              "value": "Transparent Huge Pages: always"
+            },
+            {
+              "path": "ci.data.security",
+              "value": "gather_data_sampling: Not affected + indirect_target_selection: Not affected + itlb_multihit: Not affected + l1tf: Not affected + mds: Not affected + meltdown: Not affected + mmio_stale_data: Not affected + reg_file_data_sampling: Not affected + retbleed: Not affected + spec_rstack_overflow: Not affected + spec_store_bypass: Mitigation of SSB disabled via prctl + spectre_v1: Mitigation of __user pointer sanitization + spectre_v2: Mitigation of CSV2 BHB + srbds: Not affected + tsa: Not affected + tsx_async_abort: Not affected + vmscape: Not affected"
+            },
+            {
+              "path": "ci.hardware.Disk",
+              "value": "41GB"
+            },
+            {
+              "path": "ci.hardware.Memory",
+              "value": "8GB"
+            },
+            {
+              "path": "ci.hardware.Processor",
+              "value": "ARMv8 (4 Cores)"
+            },
+            {
+              "path": "ci.identifier",
+              "value": "ci"
+            },
+            {
+              "path": "ci.software.Compiler",
+              "value": "GCC 14.2.0"
+            },
+            {
+              "path": "ci.software.File-System",
+              "value": "xfs"
+            },
+            {
+              "path": "ci.software.Kernel",
+              "value": "6.1.166 (aarch64)"
+            },
+            {
+              "path": "ci.software.OS",
+              "value": "Alpine Linux v3.21 3.21.5"
+            },
+            {
+              "path": "ci.timestamp",
+              "value": "2026-09-18 06:26:46"
+            },
+            {
+              "path": "ci.user",
+              "value": "root"
+            }
+          ],
+          "sandboxes": 1,
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "source": "phoronix/result-file-to-json",
+          "sourceFile": "realworld-better-auth/pts_realworld-better-auth--metadata.json",
+          "fields": [
+            {
+              "path": "ci.client_version",
+              "value": "10.8.4"
+            },
+            {
+              "path": "ci.data.environment-variables",
+              "value": "BL_DEBUG_TELEMETRY=false"
+            },
+            {
+              "path": "ci.data.kernel-extra-details",
+              "value": "Transparent Huge Pages: always"
+            },
+            {
+              "path": "ci.data.security",
+              "value": "gather_data_sampling: Not affected + indirect_target_selection: Not affected + itlb_multihit: Not affected + l1tf: Not affected + mds: Not affected + meltdown: Not affected + mmio_stale_data: Not affected + reg_file_data_sampling: Not affected + retbleed: Not affected + spec_rstack_overflow: Not affected + spec_store_bypass: Mitigation of SSB disabled via prctl + spectre_v1: Mitigation of __user pointer sanitization + spectre_v2: Mitigation of CSV2 BHB + srbds: Not affected + tsa: Not affected + tsx_async_abort: Not affected + vmscape: Not affected"
+            },
+            {
+              "path": "ci.hardware.Disk",
+              "value": "41GB"
+            },
+            {
+              "path": "ci.hardware.Memory",
+              "value": "8GB"
+            },
+            {
+              "path": "ci.hardware.Processor",
+              "value": "ARMv8 (4 Cores)"
+            },
+            {
+              "path": "ci.identifier",
+              "value": "ci"
+            },
+            {
+              "path": "ci.software.Compiler",
+              "value": "GCC 14.2.0"
+            },
+            {
+              "path": "ci.software.File-System",
+              "value": "xfs"
+            },
+            {
+              "path": "ci.software.Kernel",
+              "value": "6.1.166 (aarch64)"
+            },
+            {
+              "path": "ci.software.OS",
+              "value": "Alpine Linux v3.21 3.21.5"
+            },
+            {
+              "path": "ci.timestamp",
+              "value": "2026-09-18 07:11:39"
+            },
+            {
+              "path": "ci.user",
+              "value": "root"
+            }
+          ],
+          "sandboxes": 1,
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "source": "phoronix/result-file-to-json",
+          "sourceFile": "realworld-mastra/pts_realworld-mastra--metadata.json",
+          "fields": [
+            {
+              "path": "ci.client_version",
+              "value": "10.8.4"
+            },
+            {
+              "path": "ci.data.environment-variables",
+              "value": "BL_DEBUG_TELEMETRY=false"
+            },
+            {
+              "path": "ci.data.kernel-extra-details",
+              "value": "Transparent Huge Pages: always"
+            },
+            {
+              "path": "ci.data.security",
+              "value": "gather_data_sampling: Not affected + indirect_target_selection: Not affected + itlb_multihit: Not affected + l1tf: Not affected + mds: Not affected + meltdown: Not affected + mmio_stale_data: Not affected + reg_file_data_sampling: Not affected + retbleed: Not affected + spec_rstack_overflow: Not affected + spec_store_bypass: Mitigation of SSB disabled via prctl + spectre_v1: Mitigation of __user pointer sanitization + spectre_v2: Mitigation of CSV2 BHB + srbds: Not affected + tsa: Not affected + tsx_async_abort: Not affected + vmscape: Not affected"
+            },
+            {
+              "path": "ci.hardware.Disk",
+              "value": "41GB"
+            },
+            {
+              "path": "ci.hardware.Memory",
+              "value": "8GB"
+            },
+            {
+              "path": "ci.hardware.Processor",
+              "value": "ARMv8 (4 Cores)"
+            },
+            {
+              "path": "ci.identifier",
+              "value": "ci"
+            },
+            {
+              "path": "ci.software.Compiler",
+              "value": "GCC 14.2.0"
+            },
+            {
+              "path": "ci.software.File-System",
+              "value": "xfs"
+            },
+            {
+              "path": "ci.software.Kernel",
+              "value": "6.1.166 (aarch64)"
+            },
+            {
+              "path": "ci.software.OS",
+              "value": "Alpine Linux v3.21 3.21.5"
+            },
+            {
+              "path": "ci.timestamp",
+              "value": "2026-09-18 06:45:40"
+            },
+            {
+              "path": "ci.user",
+              "value": "root"
+            }
+          ],
+          "sandboxes": 1,
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "source": "phoronix/result-file-to-json",
+          "sourceFile": "system/pts_git--metadata.json",
+          "fields": [
+            {
+              "path": "ci.client_version",
+              "value": "10.8.4"
+            },
+            {
+              "path": "ci.data.environment-variables",
+              "value": "BL_DEBUG_TELEMETRY=false"
+            },
+            {
+              "path": "ci.data.kernel-extra-details",
+              "value": "Transparent Huge Pages: always"
+            },
+            {
+              "path": "ci.data.security",
+              "value": "gather_data_sampling: Not affected + indirect_target_selection: Not affected + itlb_multihit: Not affected + l1tf: Not affected + mds: Not affected + meltdown: Not affected + mmio_stale_data: Not affected + reg_file_data_sampling: Not affected + retbleed: Not affected + spec_rstack_overflow: Not affected + spec_store_bypass: Mitigation of SSB disabled via prctl + spectre_v1: Mitigation of __user pointer sanitization + spectre_v2: Mitigation of CSV2 BHB + srbds: Not affected + tsa: Not affected + tsx_async_abort: Not affected + vmscape: Not affected"
+            },
+            {
+              "path": "ci.hardware.Disk",
+              "value": "41GB"
+            },
+            {
+              "path": "ci.hardware.Memory",
+              "value": "8GB"
+            },
+            {
+              "path": "ci.hardware.Processor",
+              "value": "ARMv8 (4 Cores)"
+            },
+            {
+              "path": "ci.identifier",
+              "value": "ci"
+            },
+            {
+              "path": "ci.software.Compiler",
+              "value": "GCC 14.2.0"
+            },
+            {
+              "path": "ci.software.File-System",
+              "value": "xfs"
+            },
+            {
+              "path": "ci.software.Kernel",
+              "value": "6.1.166 (aarch64)"
+            },
+            {
+              "path": "ci.software.OS",
+              "value": "Alpine Linux v3.21 3.21.5"
+            },
+            {
+              "path": "ci.timestamp",
+              "value": "2026-09-18 06:41:11"
+            },
+            {
+              "path": "ci.user",
+              "value": "root"
+            }
+          ],
+          "sandboxes": 1,
+          "hostHardwareId": "c40c24c78691c3e4",
+          "hostNetworkId": "54dd4d9228a03fae"
+        },
+        {
+          "source": "phoronix/result-file-to-json",
+          "sourceFile": "system/pts_pybench--metadata.json",
+          "fields": [
+            {
+              "path": "ci.client_version",
+              "value": "10.8.4"
+            },
+            {
+              "path": "ci.data.environment-variables",
+              "value": "BL_DEBUG_TELEMETRY=false"
+            },
+            {
+              "path": "ci.data.kernel-extra-details",
+              "value": "Transparent Huge Pages: always"
+            },
+            {
+              "path": "ci.data.python",
+              "value": "Python 3.12.14"
+            },
+            {
+              "path": "ci.data.security",
+              "value": "gather_data_sampling: Not affected + indirect_target_selection: Not affected + itlb_multihit: Not affected + l1tf: Not affected + mds: Not affected + meltdown: Not affected + mmio_stale_data: Not affected + reg_file_data_sampling: Not affected + retbleed: Not affected + spec_rstack_overflow: Not affected + spec_store_bypass: Mitigation of SSB disabled via prctl + spectre_v1: Mitigation of __user pointer sanitization + spectre_v2: Mitigation of CSV2 BHB + srbds: Not affected + tsa: Not affected + tsx_async_abort: Not affected + vmscape: Not affected"
+            },
+            {
+              "path": "ci.hardware.Disk",
+              "value": "41GB"
+            },
+            {
+              "path": "ci.hardware.Memory",
+              "value": "8GB"
+            },
+            {
+              "path": "ci.hardware.Processor",
+              "value": "ARMv8 (4 Cores)"
+            },
+            {
+              "path": "ci.identifier",
+              "value": "ci"
+            },
+            {
+              "path": "ci.software.Compiler",
+              "value": "GCC 14.2.0"
+            },
+            {
+              "path": "ci.software.File-System",
+              "value": "xfs"
+            },
+            {
+              "path": "ci.software.Kernel",
+              "value": "6.1.166 (aarch64)"
+            },
+            {
+              "path": "ci.software.OS",
+              "value": "Alpine Linux v3.21 3.21.5"
+            },
+            {
+              "path": "ci.timestamp",
+              "value": "2026-09-18 06:37:17"
+            },
+            {
+              "path": "ci.user",
+              "value": "root"
+            }
+          ],
+          "sandboxes": 1,
+          "hostHardwareId": "c40c24c78691c3e4",
+          "hostNetworkId": "54dd4d9228a03fae"
+        },
+        {
+          "source": "phoronix/result-file-to-json",
+          "sourceFile": "system/pts_sqlite-speedtest--metadata.json",
+          "fields": [
+            {
+              "path": "ci.client_version",
+              "value": "10.8.4"
+            },
+            {
+              "path": "ci.data.compiler-configuration",
+              "value": "--build=aarch64-alpine-linux-musl --disable-cet --disable-fixed-point --disable-libquadmath --disable-libsanitizer --disable-libssp --disable-libstdcxx-pch --disable-multilib --disable-nls --disable-symvers --disable-werror --enable-__cxa_atexit --enable-checking=release --enable-default-pie --enable-default-ssp --enable-languages=c,c++,d,objc,go,fortran,ada --enable-link-serialization=2 --enable-shared --enable-threads --enable-tls --host=aarch64-alpine-linux-musl --mandir=/usr/share/man --target=aarch64-alpine-linux-musl --with-abi=lp64 --with-arch=armv8-a --with-linker-hash-style=gnu"
+            },
+            {
+              "path": "ci.data.environment-variables",
+              "value": "BL_DEBUG_TELEMETRY=false"
+            },
+            {
+              "path": "ci.data.kernel-extra-details",
+              "value": "Transparent Huge Pages: always"
+            },
+            {
+              "path": "ci.data.security",
+              "value": "gather_data_sampling: Not affected + indirect_target_selection: Not affected + itlb_multihit: Not affected + l1tf: Not affected + mds: Not affected + meltdown: Not affected + mmio_stale_data: Not affected + reg_file_data_sampling: Not affected + retbleed: Not affected + spec_rstack_overflow: Not affected + spec_store_bypass: Mitigation of SSB disabled via prctl + spectre_v1: Mitigation of __user pointer sanitization + spectre_v2: Mitigation of CSV2 BHB + srbds: Not affected + tsa: Not affected + tsx_async_abort: Not affected + vmscape: Not affected"
+            },
+            {
+              "path": "ci.hardware.Disk",
+              "value": "41GB"
+            },
+            {
+              "path": "ci.hardware.Memory",
+              "value": "8GB"
+            },
+            {
+              "path": "ci.hardware.Processor",
+              "value": "ARMv8 (4 Cores)"
+            },
+            {
+              "path": "ci.identifier",
+              "value": "ci"
+            },
+            {
+              "path": "ci.software.Compiler",
+              "value": "GCC 14.2.0"
+            },
+            {
+              "path": "ci.software.File-System",
+              "value": "xfs"
+            },
+            {
+              "path": "ci.software.Kernel",
+              "value": "6.1.166 (aarch64)"
+            },
+            {
+              "path": "ci.software.OS",
+              "value": "Alpine Linux v3.21 3.21.5"
+            },
+            {
+              "path": "ci.timestamp",
+              "value": "2026-09-18 06:38:39"
+            },
+            {
+              "path": "ci.user",
+              "value": "root"
+            }
+          ],
+          "sandboxes": 1,
+          "hostHardwareId": "c40c24c78691c3e4",
+          "hostNetworkId": "54dd4d9228a03fae"
+        },
+        {
+          "source": "mise/system-provider",
+          "sourceFile": "system/system-provider.json",
+          "fields": [
+            {
+              "path": "acpi_creator",
+              "value": ""
+            },
+            {
+              "path": "acpi_oem",
+              "value": ""
+            },
+            {
+              "path": "acpi_oem_table",
+              "value": ""
+            },
+            {
+              "path": "asn",
+              "value": "AS14618"
+            },
+            {
+              "path": "asn_source",
+              "value": "ipinfo"
+            },
+            {
+              "path": "bios_vendor",
+              "value": ""
+            },
+            {
+              "path": "block_devices",
+              "value": "loop0,loop1,loop2,loop3,loop4,loop5,loop6,loop7,vda,vdb"
+            },
+            {
+              "path": "bootlog_names_gvisor",
+              "value": "false"
+            },
+            {
+              "path": "cap_sys_admin",
+              "value": "true"
+            },
+            {
+              "path": "cgroup_engine",
+              "value": ""
+            },
+            {
+              "path": "cgroup_root_writable",
+              "value": "true"
+            },
+            {
+              "path": "city",
+              "value": "Ashburn"
+            },
+            {
+              "path": "confidential_computing",
+              "value": ""
+            },
+            {
+              "path": "container_candidates.0.id",
+              "value": "oci-container"
+            },
+            {
+              "path": "container_candidates.0.reasons.0",
+              "value": "the root filesystem is an overlay (20)"
+            },
+            {
+              "path": "container_candidates.0.score",
+              "value": "20"
+            },
+            {
+              "path": "container_confidence",
+              "value": "none"
+            },
+            {
+              "path": "container_markers",
+              "value": ""
+            },
+            {
+              "path": "container_runner_up_score",
+              "value": "0"
+            },
+            {
+              "path": "container_runtime",
+              "value": "none"
+            },
+            {
+              "path": "container_score",
+              "value": "0"
+            },
+            {
+              "path": "country",
+              "value": "US"
+            },
+            {
+              "path": "cpu_hypervisor",
+              "value": ""
+            },
+            {
+              "path": "cpu_is_uml",
+              "value": "false"
+            },
+            {
+              "path": "cpuinfo_flags",
+              "value": "false"
+            },
+            {
+              "path": "detected_virt",
+              "value": ""
+            },
+            {
+              "path": "detected_virt_container",
+              "value": ""
+            },
+            {
+              "path": "detected_virt_vm",
+              "value": ""
+            },
+            {
+              "path": "detected_virt_what",
+              "value": ""
+            },
+            {
+              "path": "dind_mode",
+              "value": "unavailable"
+            },
+            {
+              "path": "dind_readiness",
+              "value": "blocked"
+            },
+            {
+              "path": "dind_reasons",
+              "value": "no a dockerd or podman binary"
+            },
+            {
+              "path": "docker_cli",
+              "value": "false"
+            },
+            {
+              "path": "docker_reachable",
+              "value": "false"
+            },
+            {
+              "path": "docker_server_version",
+              "value": ""
+            },
+            {
+              "path": "docker_socket",
+              "value": "false"
+            },
+            {
+              "path": "docker_storage_driver",
+              "value": ""
+            },
+            {
+              "path": "dockerd_binary",
+              "value": "false"
+            },
+            {
+              "path": "geo_source",
+              "value": "ipinfo"
+            },
+            {
+              "path": "has_acpi",
+              "value": "false"
+            },
+            {
+              "path": "has_fuse",
+              "value": "true"
+            },
+            {
+              "path": "has_hvc0",
+              "value": "false"
+            },
+            {
+              "path": "has_kvm",
+              "value": "false"
+            },
+            {
+              "path": "has_smbios",
+              "value": "false"
+            },
+            {
+              "path": "has_veth",
+              "value": "false"
+            },
+            {
+              "path": "has_virtiofs",
+              "value": "false"
+            },
+            {
+              "path": "has_vmbus",
+              "value": "false"
+            },
+            {
+              "path": "has_vsock",
+              "value": "true"
+            },
+            {
+              "path": "has_xen_node",
+              "value": "false"
+            },
+            {
+              "path": "hypervisor_flag",
+              "value": "false"
+            },
+            {
+              "path": "is_root",
+              "value": "true"
+            },
+            {
+              "path": "isolation_class",
+              "value": "microvm"
+            },
+            {
+              "path": "isolation_confidence",
+              "value": "likely"
+            },
+            {
+              "path": "isolation_runtime",
+              "value": "firecracker"
+            },
+            {
+              "path": "isolation_why",
+              "value": "pci=off, Firecracker's default (30)|console on an emulated 8250 (15)"
+            },
+            {
+              "path": "kernel_build",
+              "value": "Linux version 6.1.166 (runner@depot-machine) (gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0, GNU ld (GNU Binutils for Ubuntu) 2.42) #1 SMP Tue Sep 15 00:09:33 UTC 2026"
+            },
+            {
+              "path": "kernel_cmdline_markers",
+              "value": "panic=-1,pci=off,console=ttyS0"
+            },
+            {
+              "path": "kernel_names_gvisor",
+              "value": "false"
+            },
+            {
+              "path": "loc",
+              "value": "39.0437,-77.4875"
+            },
+            {
+              "path": "lsm_profile",
+              "value": ""
+            },
+            {
+              "path": "machine_candidates.0.id",
+              "value": "firecracker"
+            },
+            {
+              "path": "machine_candidates.0.reasons.0",
+              "value": "pci=off, Firecracker's default (30)"
+            },
+            {
+              "path": "machine_candidates.0.reasons.1",
+              "value": "console on an emulated 8250 (15)"
+            },
+            {
+              "path": "machine_candidates.0.score",
+              "value": "45"
+            },
+            {
+              "path": "machine_confidence",
+              "value": "likely"
+            },
+            {
+              "path": "machine_runner_up_score",
+              "value": "0"
+            },
+            {
+              "path": "machine_score",
+              "value": "45"
+            },
+            {
+              "path": "machine_vmm",
+              "value": "firecracker"
+            },
+            {
+              "path": "manufacturer",
+              "value": ""
+            },
+            {
+              "path": "masked_proc",
+              "value": "false"
+            },
+            {
+              "path": "mount_fstypes",
+              "value": "cgroup2,devpts,devtmpfs,erofs,fuse,overlay,proc,sysfs,tmpfs,xfs"
+            },
+            {
+              "path": "net_drivers",
+              "value": "virtio_net"
+            },
+            {
+              "path": "net_ifaces",
+              "value": "eth0"
+            },
+            {
+              "path": "org",
+              "value": "AS14618 Amazon.com, Inc."
+            },
+            {
+              "path": "org_name",
+              "value": "Amazon.com, Inc."
+            },
+            {
+              "path": "overlay_engine",
+              "value": ""
+            },
+            {
+              "path": "overlayfs_supported",
+              "value": "true"
+            },
+            {
+              "path": "pci_vendors",
+              "value": ""
+            },
+            {
+              "path": "podman_binary",
+              "value": "false"
+            },
+            {
+              "path": "prefix",
+              "value": ""
+            },
+            {
+              "path": "product_name",
+              "value": ""
+            },
+            {
+              "path": "public_ip",
+              "value": "2600:1f18:7c8b:5005:a5bd:1:0:113"
+            },
+            {
+              "path": "region",
+              "value": "Virginia"
+            },
+            {
+              "path": "reverse_dns",
+              "value": "ec2-54-235-210-8.compute-1.amazonaws.com"
+            },
+            {
+              "path": "root_fstype",
+              "value": "overlay"
+            },
+            {
+              "path": "schema_version",
+              "value": "2.0"
+            },
+            {
+              "path": "timezone",
+              "value": "America/New_York"
+            },
+            {
+              "path": "userns_mapped",
+              "value": "false"
+            },
+            {
+              "path": "virtio_devices",
+              "value": "blk,net,vsock"
+            },
+            {
+              "path": "virtio_transport",
+              "value": "mmio"
+            }
+          ],
+          "sandboxes": 1,
+          "hostHardwareId": "c40c24c78691c3e4",
+          "hostNetworkId": "54dd4d9228a03fae"
+        }
+      ],
+      "metrics": [
+        {
+          "metricId": "fio_type_random_read_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_iops",
+          "samples": [57700, 57300],
+          "aggregates": {
+            "p50": 57500,
+            "p95": 57680,
+            "mean": 57500,
+            "stdev": 282.842712474619,
+            "min": 57300,
+            "max": 57700,
+            "n": 2
+          },
+          "sourceFile": "disk/pts_fio-rand-read.xml",
+          "ptsSampleSource": "raw-string",
+          "appVersion": "3.36",
+          "arguments": "randread libaio 0 4k 1",
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "metricId": "fio_type_random_read_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_mb_per_s",
+          "samples": [235.9296, 234.881024],
+          "aggregates": {
+            "p50": 235.40531199999998,
+            "p95": 235.8771712,
+            "mean": 235.40531199999998,
+            "stdev": 0.7414552001894733,
+            "min": 234.881024,
+            "max": 235.9296,
+            "n": 2
+          },
+          "sourceFile": "disk/pts_fio-rand-read.xml",
+          "ptsSampleSource": "raw-string",
+          "appVersion": "3.36",
+          "arguments": "randread libaio 0 4k 1",
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "metricId": "fio_type_random_write_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_iops",
+          "samples": [293000, 293000],
+          "aggregates": {
+            "p50": 293000,
+            "p95": 293000,
+            "mean": 293000,
+            "stdev": 0,
+            "min": 293000,
+            "max": 293000,
+            "n": 2
+          },
+          "sourceFile": "disk/pts_fio-rand-write.xml",
+          "ptsSampleSource": "raw-string",
+          "appVersion": "3.36",
+          "arguments": "randwrite libaio 0 4k 1",
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "metricId": "fio_type_random_write_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_mb_per_s",
+          "samples": [1200.61952, 1198.522368],
+          "aggregates": {
+            "p50": 1199.570944,
+            "p95": 1200.5146624,
+            "mean": 1199.570944,
+            "stdev": 1.4829104003788862,
+            "min": 1198.522368,
+            "max": 1200.61952,
+            "n": 2
+          },
+          "sourceFile": "disk/pts_fio-rand-write.xml",
+          "ptsSampleSource": "raw-string",
+          "appVersion": "3.36",
+          "arguments": "randwrite libaio 0 4k 1",
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "metricId": "fio_type_sequential_read_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_iops",
+          "samples": [11400, 11500],
+          "aggregates": {
+            "p50": 11450,
+            "p95": 11495,
+            "mean": 11450,
+            "stdev": 70.71067811865476,
+            "min": 11400,
+            "max": 11500,
+            "n": 2
+          },
+          "sourceFile": "disk/pts_fio-seq-read.xml",
+          "ptsSampleSource": "raw-string",
+          "appVersion": "3.36",
+          "arguments": "read libaio 0 1m 1",
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "metricId": "fio_type_sequential_read_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_mb_per_s",
+          "samples": [12025.9084288, 12025.9084288],
+          "aggregates": {
+            "p50": 12025.9084288,
+            "p95": 12025.9084288,
+            "mean": 12025.9084288,
+            "stdev": 0,
+            "min": 12025.9084288,
+            "max": 12025.9084288,
+            "n": 2
+          },
+          "sourceFile": "disk/pts_fio-seq-read.xml",
+          "ptsSampleSource": "raw-string",
+          "appVersion": "3.36",
+          "arguments": "read libaio 0 1m 1",
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "metricId": "fio_type_sequential_write_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_iops",
+          "samples": [2018, 2010],
+          "aggregates": {
+            "p50": 2014,
+            "p95": 2017.6,
+            "mean": 2014,
+            "stdev": 5.656854249492381,
+            "min": 2010,
+            "max": 2018,
+            "n": 2
+          },
+          "sourceFile": "disk/pts_fio-seq-write.xml",
+          "ptsSampleSource": "raw-string",
+          "appVersion": "3.36",
+          "arguments": "write libaio 0 1m 1",
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "metricId": "fio_type_sequential_write_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_mb_per_s",
+          "samples": [2117.074944, 2109.734912],
+          "aggregates": {
+            "p50": 2113.404928,
+            "p95": 2116.7079424,
+            "mean": 2113.404928,
+            "stdev": 5.190186401326303,
+            "min": 2109.734912,
+            "max": 2117.074944,
+            "n": 2
+          },
+          "sourceFile": "disk/pts_fio-seq-write.xml",
+          "ptsSampleSource": "raw-string",
+          "appVersion": "3.36",
+          "arguments": "write libaio 0 1m 1",
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "metricId": "git_seconds",
+          "samples": [60.731, 60.643],
+          "aggregates": {
+            "p50": 60.687,
+            "p95": 60.726600000000005,
+            "mean": 60.687,
+            "stdev": 0.062225396744419376,
+            "min": 60.643,
+            "max": 60.731,
+            "n": 2
+          },
+          "sourceFile": "system/pts_git.xml",
+          "ptsSampleSource": "raw-string",
+          "hostHardwareId": "c40c24c78691c3e4",
+          "hostNetworkId": "54dd4d9228a03fae"
+        },
+        {
+          "metricId": "hardlink_bogo_ops_per_s",
+          "samples": [13.53, 13.5],
+          "aggregates": {
+            "p50": 13.515,
+            "p95": 13.5285,
+            "mean": 13.515,
+            "stdev": 0.021213203435595344,
+            "min": 13.5,
+            "max": 13.53,
+            "n": 2
+          },
+          "sourceFile": "disk/pts_hardlink.xml",
+          "ptsSampleSource": "raw-string",
+          "appVersion": "0.16",
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "metricId": "iperf_server_address_localhost_server_port_5201_duration_10_seconds_test_tcp_parallel_1",
+          "samples": [93504, 92501],
+          "aggregates": {
+            "p50": 93002.5,
+            "p95": 93453.85,
+            "mean": 93002.5,
+            "stdev": 709.2281015301072,
+            "min": 92501,
+            "max": 93504,
+            "n": 2
+          },
+          "sourceFile": "network/pts_iperf-tcp-p1.xml",
+          "ptsSampleSource": "raw-string",
+          "appVersion": "3.14",
+          "arguments": "-c localhost -p 5201 -t 10  -P 1",
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "metricId": "iperf_server_address_localhost_server_port_5201_duration_10_seconds_test_tcp_parallel_10",
+          "samples": [64665, 64228],
+          "aggregates": {
+            "p50": 64446.5,
+            "p95": 64643.15,
+            "mean": 64446.5,
+            "stdev": 309.00566337852126,
+            "min": 64228,
+            "max": 64665,
+            "n": 2
+          },
+          "sourceFile": "network/pts_iperf-tcp-p10.xml",
+          "ptsSampleSource": "raw-string",
+          "appVersion": "3.14",
+          "arguments": "-c localhost -p 5201 -t 10  -P 10",
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "metricId": "iperf_server_address_localhost_server_port_5201_duration_10_seconds_test_udp_10000mbit_objective_parallel_1",
+          "samples": [9999, 9999],
+          "aggregates": {
+            "p50": 9999,
+            "p95": 9999,
+            "mean": 9999,
+            "stdev": 0,
+            "min": 9999,
+            "max": 9999,
+            "n": 2
+          },
+          "sourceFile": "network/pts_iperf-udp-10g.xml",
+          "ptsSampleSource": "raw-string",
+          "appVersion": "3.14",
+          "arguments": "-c localhost -p 5201 -t 10 -u -b 10000m -P 1",
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "metricId": "iperf_wan_direction_download",
+          "samples": [4011.85, 3459.32],
+          "aggregates": {
+            "p50": 3735.585,
+            "p95": 3984.2235,
+            "mean": 3735.585,
+            "stdev": 390.6977098090029,
+            "min": 3459.32,
+            "max": 4011.85,
+            "n": 2
+          },
+          "sourceFile": "network/pts_iperf-wan-download.xml",
+          "ptsSampleSource": "raw-string",
+          "appVersion": "3.14",
+          "arguments": "-R",
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "metricId": "iperf_wan_direction_upload",
+          "samples": [5856.54, 6016.65],
+          "aggregates": {
+            "p50": 5936.594999999999,
+            "p95": 6008.644499999999,
+            "mean": 5936.594999999999,
+            "stdev": 113.21486673577822,
+            "min": 5856.54,
+            "max": 6016.65,
+            "n": 2
+          },
+          "sourceFile": "network/pts_iperf-wan-upload.xml",
+          "ptsSampleSource": "raw-string",
+          "appVersion": "3.14",
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "metricId": "node_web_tooling_runs_per_s",
+          "samples": [24.68, 24.8],
+          "aggregates": {
+            "p50": 24.740000000000002,
+            "p95": 24.794,
+            "mean": 24.740000000000002,
+            "stdev": 0.08485281374238515,
+            "min": 24.68,
+            "max": 24.8,
+            "n": 2
+          },
+          "sourceFile": "cpu-node/pts_node-web-tooling.xml",
+          "ptsSampleSource": "raw-string",
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "metricId": "pgbench_scaling_factor_100_clients_50_mode_read_only",
+          "samples": [130087.922729, 133996.962822],
+          "aggregates": {
+            "p50": 132042.4427755,
+            "p95": 133801.51081735,
+            "mean": 132042.4427755,
+            "stdev": 2764.1087576903897,
+            "min": 130087.922729,
+            "max": 133996.962822,
+            "n": 2
+          },
+          "sourceFile": "pgbench/pts_pgbench-read-only.xml",
+          "ptsSampleSource": "raw-string",
+          "appVersion": "17",
+          "arguments": "-s 100 -c 50 -S",
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "metricId": "pgbench_scaling_factor_100_clients_50_mode_read_only_average_latency",
+          "samples": [0.384, 0.373],
+          "aggregates": {
+            "p50": 0.3785,
+            "p95": 0.38345,
+            "mean": 0.3785,
+            "stdev": 0.00777817459305203,
+            "min": 0.373,
+            "max": 0.384,
+            "n": 2
+          },
+          "sourceFile": "pgbench/pts_pgbench-read-only.xml",
+          "ptsSampleSource": "raw-string",
+          "appVersion": "17",
+          "arguments": "-s 100 -c 50 -S",
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "metricId": "pgbench_scaling_factor_100_clients_50_mode_read_write",
+          "samples": [14202.422291, 14328.931916],
+          "aggregates": {
+            "p50": 14265.6771035,
+            "p95": 14322.60643475,
+            "mean": 14265.6771035,
+            "stdev": 89.45581372286632,
+            "min": 14202.422291,
+            "max": 14328.931916,
+            "n": 2
+          },
+          "sourceFile": "pgbench/pts_pgbench-read-write.xml",
+          "ptsSampleSource": "raw-string",
+          "appVersion": "17",
+          "arguments": "-s 100 -c 50",
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "metricId": "pgbench_scaling_factor_100_clients_50_mode_read_write_average_latency",
+          "samples": [3.521, 3.489],
+          "aggregates": {
+            "p50": 3.505,
+            "p95": 3.5194,
+            "mean": 3.505,
+            "stdev": 0.02262741699796954,
+            "min": 3.489,
+            "max": 3.521,
+            "n": 2
+          },
+          "sourceFile": "pgbench/pts_pgbench-read-write.xml",
+          "ptsSampleSource": "raw-string",
+          "appVersion": "17",
+          "arguments": "-s 100 -c 50",
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "metricId": "pybench_milliseconds",
+          "samples": [669, 667],
+          "aggregates": {
+            "p50": 668,
+            "p95": 668.9,
+            "mean": 668,
+            "stdev": 1.4142135623730951,
+            "min": 667,
+            "max": 669,
+            "n": 2
+          },
+          "sourceFile": "system/pts_pybench.xml",
+          "ptsSampleSource": "raw-string",
+          "appVersion": "2018-02-16",
+          "hostHardwareId": "c40c24c78691c3e4",
+          "hostNetworkId": "54dd4d9228a03fae"
+        },
+        {
+          "metricId": "realworld_better_auth_task_build",
+          "samples": [56.368],
+          "aggregates": {
+            "p50": 56.368,
+            "p95": 56.368,
+            "mean": 56.368,
+            "stdev": 0,
+            "min": 56.368,
+            "max": 56.368,
+            "n": 1
+          },
+          "sourceFile": "realworld-better-auth/pts_realworld-better-auth.xml",
+          "ptsSampleSource": "aggregate-value",
+          "appVersion": "6f3ba45639579da152b69e8e5342e02f28288670",
+          "arguments": "build",
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "metricId": "realworld_better_auth_task_cold_install",
+          "samples": [13.699],
+          "aggregates": {
+            "p50": 13.699,
+            "p95": 13.699,
+            "mean": 13.699,
+            "stdev": 0,
+            "min": 13.699,
+            "max": 13.699,
+            "n": 1
+          },
+          "sourceFile": "realworld-better-auth/pts_realworld-better-auth.xml",
+          "ptsSampleSource": "aggregate-value",
+          "appVersion": "6f3ba45639579da152b69e8e5342e02f28288670",
+          "arguments": "cold_install",
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "metricId": "realworld_better_auth_task_git_clone",
+          "samples": [3.197],
+          "aggregates": {
+            "p50": 3.197,
+            "p95": 3.197,
+            "mean": 3.197,
+            "stdev": 0,
+            "min": 3.197,
+            "max": 3.197,
+            "n": 1
+          },
+          "sourceFile": "realworld-better-auth/pts_realworld-better-auth.xml",
+          "ptsSampleSource": "aggregate-value",
+          "appVersion": "6f3ba45639579da152b69e8e5342e02f28288670",
+          "arguments": "git_clone",
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "metricId": "realworld_better_auth_task_lint_biome",
+          "samples": [46.733],
+          "aggregates": {
+            "p50": 46.733,
+            "p95": 46.733,
+            "mean": 46.733,
+            "stdev": 0,
+            "min": 46.733,
+            "max": 46.733,
+            "n": 1
+          },
+          "sourceFile": "realworld-better-auth/pts_realworld-better-auth.xml",
+          "ptsSampleSource": "aggregate-value",
+          "appVersion": "6f3ba45639579da152b69e8e5342e02f28288670",
+          "arguments": "lint_biome",
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "metricId": "realworld_better_auth_task_lint_deps_knip",
+          "samples": [9.765],
+          "aggregates": {
+            "p50": 9.765,
+            "p95": 9.765,
+            "mean": 9.765,
+            "stdev": 0,
+            "min": 9.765,
+            "max": 9.765,
+            "n": 1
+          },
+          "sourceFile": "realworld-better-auth/pts_realworld-better-auth.xml",
+          "ptsSampleSource": "aggregate-value",
+          "appVersion": "6f3ba45639579da152b69e8e5342e02f28288670",
+          "arguments": "lint_deps",
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "metricId": "realworld_better_auth_task_lint_format",
+          "samples": [3.324],
+          "aggregates": {
+            "p50": 3.324,
+            "p95": 3.324,
+            "mean": 3.324,
+            "stdev": 0,
+            "min": 3.324,
+            "max": 3.324,
+            "n": 1
+          },
+          "sourceFile": "realworld-better-auth/pts_realworld-better-auth.xml",
+          "ptsSampleSource": "aggregate-value",
+          "appVersion": "6f3ba45639579da152b69e8e5342e02f28288670",
+          "arguments": "lint_format",
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "metricId": "realworld_better_auth_task_lint_packages",
+          "samples": [3.058],
+          "aggregates": {
+            "p50": 3.058,
+            "p95": 3.058,
+            "mean": 3.058,
+            "stdev": 0,
+            "min": 3.058,
+            "max": 3.058,
+            "n": 1
+          },
+          "sourceFile": "realworld-better-auth/pts_realworld-better-auth.xml",
+          "ptsSampleSource": "aggregate-value",
+          "appVersion": "6f3ba45639579da152b69e8e5342e02f28288670",
+          "arguments": "lint_packages",
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "metricId": "realworld_better_auth_task_lint_spell",
+          "samples": [7.52],
+          "aggregates": {
+            "p50": 7.52,
+            "p95": 7.52,
+            "mean": 7.52,
+            "stdev": 0,
+            "min": 7.52,
+            "max": 7.52,
+            "n": 1
+          },
+          "sourceFile": "realworld-better-auth/pts_realworld-better-auth.xml",
+          "ptsSampleSource": "aggregate-value",
+          "appVersion": "6f3ba45639579da152b69e8e5342e02f28288670",
+          "arguments": "lint_spell",
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "metricId": "realworld_better_auth_task_lint_types",
+          "samples": [28.001],
+          "aggregates": {
+            "p50": 28.001,
+            "p95": 28.001,
+            "mean": 28.001,
+            "stdev": 0,
+            "min": 28.001,
+            "max": 28.001,
+            "n": 1
+          },
+          "sourceFile": "realworld-better-auth/pts_realworld-better-auth.xml",
+          "ptsSampleSource": "aggregate-value",
+          "appVersion": "6f3ba45639579da152b69e8e5342e02f28288670",
+          "arguments": "lint_types",
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "metricId": "realworld_better_auth_task_typecheck",
+          "samples": [40.409],
+          "aggregates": {
+            "p50": 40.409,
+            "p95": 40.409,
+            "mean": 40.409,
+            "stdev": 0,
+            "min": 40.409,
+            "max": 40.409,
+            "n": 1
+          },
+          "sourceFile": "realworld-better-auth/pts_realworld-better-auth.xml",
+          "ptsSampleSource": "aggregate-value",
+          "appVersion": "6f3ba45639579da152b69e8e5342e02f28288670",
+          "arguments": "typecheck",
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "metricId": "realworld_mastra_task_build_core",
+          "samples": [74.204],
+          "aggregates": {
+            "p50": 74.204,
+            "p95": 74.204,
+            "mean": 74.204,
+            "stdev": 0,
+            "min": 74.204,
+            "max": 74.204,
+            "n": 1
+          },
+          "sourceFile": "realworld-mastra/pts_realworld-mastra.xml",
+          "ptsSampleSource": "aggregate-value",
+          "appVersion": "b6eeb9d08ebeaf27bc6fd16b6b88087040aaf767",
+          "arguments": "build_core",
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "metricId": "realworld_mastra_task_cold_install",
+          "samples": [41.522],
+          "aggregates": {
+            "p50": 41.522,
+            "p95": 41.522,
+            "mean": 41.522,
+            "stdev": 0,
+            "min": 41.522,
+            "max": 41.522,
+            "n": 1
+          },
+          "sourceFile": "realworld-mastra/pts_realworld-mastra.xml",
+          "ptsSampleSource": "aggregate-value",
+          "appVersion": "b6eeb9d08ebeaf27bc6fd16b6b88087040aaf767",
+          "arguments": "cold_install",
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "metricId": "realworld_mastra_task_git_clone",
+          "samples": [6.002],
+          "aggregates": {
+            "p50": 6.002,
+            "p95": 6.002,
+            "mean": 6.002,
+            "stdev": 0,
+            "min": 6.002,
+            "max": 6.002,
+            "n": 1
+          },
+          "sourceFile": "realworld-mastra/pts_realworld-mastra.xml",
+          "ptsSampleSource": "aggregate-value",
+          "appVersion": "b6eeb9d08ebeaf27bc6fd16b6b88087040aaf767",
+          "arguments": "git_clone",
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "metricId": "realworld_mastra_task_lint_format",
+          "samples": [87.076],
+          "aggregates": {
+            "p50": 87.076,
+            "p95": 87.076,
+            "mean": 87.076,
+            "stdev": 0,
+            "min": 87.076,
+            "max": 87.076,
+            "n": 1
+          },
+          "sourceFile": "realworld-mastra/pts_realworld-mastra.xml",
+          "ptsSampleSource": "aggregate-value",
+          "appVersion": "b6eeb9d08ebeaf27bc6fd16b6b88087040aaf767",
+          "arguments": "lint_format",
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "metricId": "realworld_mastra_task_test_core",
+          "samples": [1057.31],
+          "aggregates": {
+            "p50": 1057.31,
+            "p95": 1057.31,
+            "mean": 1057.31,
+            "stdev": 0,
+            "min": 1057.31,
+            "max": 1057.31,
+            "n": 1
+          },
+          "sourceFile": "realworld-mastra/pts_realworld-mastra.xml",
+          "ptsSampleSource": "aggregate-value",
+          "appVersion": "b6eeb9d08ebeaf27bc6fd16b6b88087040aaf767",
+          "arguments": "test_core",
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "metricId": "sqlite_speedtest_seconds",
+          "samples": [51.591, 51.208],
+          "aggregates": {
+            "p50": 51.3995,
+            "p95": 51.57185,
+            "mean": 51.3995,
+            "stdev": 0.27082189719444705,
+            "min": 51.208,
+            "max": 51.591,
+            "n": 2
+          },
+          "sourceFile": "system/pts_sqlite-speedtest.xml",
+          "ptsSampleSource": "raw-string",
+          "appVersion": "3.30",
+          "hostHardwareId": "c40c24c78691c3e4",
+          "hostNetworkId": "54dd4d9228a03fae"
+        },
+        {
+          "metricId": "stream_type_add",
+          "samples": [140323.4, 140434.3],
+          "aggregates": {
+            "p50": 140378.84999999998,
+            "p95": 140428.75499999998,
+            "mean": 140378.84999999998,
+            "stdev": 78.4181420335943,
+            "min": 140323.4,
+            "max": 140434.3,
+            "n": 2
+          },
+          "sourceFile": "memory/pts_stream.xml",
+          "ptsSampleSource": "raw-string",
+          "appVersion": "2013-01-17",
+          "arguments": "Add",
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "metricId": "stream_type_copy",
+          "samples": [140275.8, 140293.4],
+          "aggregates": {
+            "p50": 140284.59999999998,
+            "p95": 140292.52,
+            "mean": 140284.59999999998,
+            "stdev": 12.445079348897643,
+            "min": 140275.8,
+            "max": 140293.4,
+            "n": 2
+          },
+          "sourceFile": "memory/pts_stream.xml",
+          "ptsSampleSource": "raw-string",
+          "appVersion": "2013-01-17",
+          "arguments": "Copy",
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "metricId": "stream_type_scale",
+          "samples": [139998.7, 140098.1],
+          "aggregates": {
+            "p50": 140048.40000000002,
+            "p95": 140093.13,
+            "mean": 140048.40000000002,
+            "stdev": 70.28641404992841,
+            "min": 139998.7,
+            "max": 140098.1,
+            "n": 2
+          },
+          "sourceFile": "memory/pts_stream.xml",
+          "ptsSampleSource": "raw-string",
+          "appVersion": "2013-01-17",
+          "arguments": "Scale",
+          "hostHardwareId": "c40c24c78691c3e4"
+        },
+        {
+          "metricId": "stream_type_triad",
+          "samples": [140345.5, 140427.8],
+          "aggregates": {
+            "p50": 140386.65,
+            "p95": 140423.685,
+            "mean": 140386.65,
+            "stdev": 58.19488809164463,
+            "min": 140345.5,
+            "max": 140427.8,
+            "n": 2
+          },
+          "sourceFile": "memory/pts_stream.xml",
+          "ptsSampleSource": "raw-string",
+          "appVersion": "2013-01-17",
+          "arguments": "Triad",
+          "hostHardwareId": "c40c24c78691c3e4"
+        }
+      ],
+      "suitesCovered": [
+        "cpu-node",
+        "disk",
+        "memory",
+        "network",
+        "pgbench",
+        "realworld-better-auth",
+        "realworld-mastra",
+        "system"
+      ],
+      "gaps": [
+        {
+          "scope": "suite",
+          "id": "realworld-openclaw",
+          "outcome": "skipped",
+          "reason": "pts_realworld-openclaw: PTS install of local/realworld-openclaw-1.0.0 failed (exit 0, not in list-installed-tests)"
+        },
+        {
+          "scope": "suite",
+          "id": "realworld-openclaw",
+          "outcome": "failed",
+          "reason": "Suite \"realworld-openclaw\" on blaxel produced no pts_*.xml — PTS likely failed silently"
+        },
+        {
+          "scope": "suite",
+          "id": "realworld-openclaw",
+          "outcome": "failed",
+          "reason": "Partial publication withheld unverified measurements: realworld_openclaw_task_git_clone, realworld_openclaw_task_cold_install, realworld_openclaw_task_lint_oxlint, realworld_openclaw_task_lint_extensions_all, realworld_openclaw_task_typecheck, realworld_openclaw_task_test_types"
+        }
+      ],
+      "uncatalogued": []
+    },
+    {
+      "providerId": "daytona-container",
+      "costEvidence": [],
+      "artifactEvidence": [],
+      "validationStatus": "pending",
+      "observedSpecs": {},
+      "metrics": [],
+      "suitesCovered": [],
+      "gaps": [],
+      "uncatalogued": []
+    },
+    {
+      "providerId": "daytona-vm",
+      "costEvidence": [],
+      "artifactEvidence": [],
+      "validationStatus": "pending",
+      "observedSpecs": {},
+      "metrics": [],
+      "suitesCovered": [],
+      "gaps": [],
+      "uncatalogued": []
+    },
+    {
+      "providerId": "e2b",
+      "costEvidence": [],
+      "artifactEvidence": [],
+      "validationStatus": "pending",
+      "observedSpecs": {},
+      "metrics": [],
+      "suitesCovered": [],
+      "gaps": [],
+      "uncatalogued": []
+    },
+    {
+      "providerId": "microsandbox-cloud",
+      "costEvidence": [],
+      "artifactEvidence": [],
+      "validationStatus": "pending",
+      "observedSpecs": {},
+      "metrics": [],
+      "suitesCovered": [],
+      "gaps": [],
+      "uncatalogued": []
+    },
+    {
+      "providerId": "modal-gvisor",
+      "costEvidence": [],
+      "artifactEvidence": [],
+      "validationStatus": "pending",
+      "observedSpecs": {},
+      "metrics": [],
+      "suitesCovered": [],
+      "gaps": [],
+      "uncatalogued": []
+    },
+    {
+      "providerId": "modal-vm",
+      "costEvidence": [],
+      "artifactEvidence": [],
+      "validationStatus": "pending",
+      "observedSpecs": {},
+      "metrics": [],
+      "suitesCovered": [],
+      "gaps": [],
+      "uncatalogued": []
+    },
+    {
+      "providerId": "namespace",
+      "costEvidence": [],
+      "artifactEvidence": [],
+      "validationStatus": "pending",
+      "observedSpecs": {},
+      "metrics": [],
+      "suitesCovered": [],
+      "gaps": [],
+      "uncatalogued": []
+    },
+    {
+      "providerId": "novita",
+      "costEvidence": [],
+      "artifactEvidence": [],
+      "validationStatus": "pending",
+      "observedSpecs": {},
+      "metrics": [],
+      "suitesCovered": [],
+      "gaps": [],
+      "uncatalogued": []
+    },
+    {
+      "providerId": "runcloud",
+      "costEvidence": [],
+      "artifactEvidence": [],
+      "validationStatus": "pending",
+      "observedSpecs": {},
+      "metrics": [],
+      "suitesCovered": [],
+      "gaps": [],
+      "uncatalogued": []
+    },
+    {
+      "providerId": "runloop",
+      "costEvidence": [],
+      "artifactEvidence": [],
+      "validationStatus": "pending",
+      "observedSpecs": {},
+      "metrics": [],
+      "suitesCovered": [],
+      "gaps": [],
+      "uncatalogued": []
+    },
+    {
+      "providerId": "tama",
+      "costEvidence": [],
+      "artifactEvidence": [],
+      "validationStatus": "pending",
+      "observedSpecs": {},
+      "metrics": [],
+      "suitesCovered": [],
+      "gaps": [],
+      "uncatalogued": []
+    },
+    {
+      "providerId": "vercel",
+      "costEvidence": [],
+      "artifactEvidence": [],
+      "validationStatus": "pending",
+      "observedSpecs": {},
+      "metrics": [],
+      "suitesCovered": [],
+      "gaps": [],
+      "uncatalogued": []
+    }
+  ],
+  "experiment": {
+    "planDigest": "sha256:427562317294c15935dd7f9e98c58285e1ddea8d55eeecd809cf3405f0b91e40",
+    "cohortDigest": "sha256:b2a09c033bf2e7dab42c4e6bee9deb0d48ec816542776e0393a60618783c30d0",
+    "attemptIds": [
+      "blaxel-cpu-node-r0-a1-b00c723d-d343-4e90-9af1-31283be5a98d",
+      "blaxel-system-r0-a1-c20506fb-cb56-4fc9-a7df-033aba2bb214",
+      "blaxel-pgbench-r0-a1-5d5300df-1aee-4a1c-ab4a-f21231a62712",
+      "blaxel-memory-r0-a1-5d549b4e-ea59-424c-84e2-c7f2c842b2f0",
+      "blaxel-disk-r0-a1-696c7e9c-314c-44ac-9187-42121e8c4fae",
+      "blaxel-network-r0-a1-fb8365ef-51a4-414d-b6d5-400fda7aa0e2",
+      "blaxel-realworld-mastra-r0-a1-611415f5-7a5f-48ff-ab53-dcbc981ddd94",
+      "blaxel-realworld-better-auth-r0-a1-7dc18be6-67c5-46b8-8f78-c31c98aad0f0",
+      "blaxel-realworld-openclaw-r0-a1-45c39290-66c8-4c56-8028-b09c78457a66"
+    ],
+    "partial": {
+      "status": "partial",
+      "planned": 9,
+      "complete": 8,
+      "incomplete": 1,
+      "excluded": 0,
+      "cells": [
+        {
+          "id": "blaxel-cpu-node-r0",
+          "status": "complete",
+          "missingMetrics": [],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-cpu-node-r0-a1-b00c723d-d343-4e90-9af1-31283be5a98d",
+          "retainedMetrics": ["node_web_tooling_runs_per_s"],
+          "provider": "blaxel",
+          "suite": "cpu-node",
+          "replicate": 0,
+          "plannedMetrics": ["node_web_tooling_runs_per_s"],
+          "passes": 2
+        },
+        {
+          "id": "blaxel-system-r0",
+          "status": "complete",
+          "missingMetrics": [],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-system-r0-a1-c20506fb-cb56-4fc9-a7df-033aba2bb214",
+          "retainedMetrics": ["pybench_milliseconds", "sqlite_speedtest_seconds", "git_seconds"],
+          "provider": "blaxel",
+          "suite": "system",
+          "replicate": 0,
+          "plannedMetrics": ["pybench_milliseconds", "sqlite_speedtest_seconds", "git_seconds"],
+          "passes": 2
+        },
+        {
+          "id": "blaxel-pgbench-r0",
+          "status": "complete",
+          "missingMetrics": [],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-pgbench-r0-a1-5d5300df-1aee-4a1c-ab4a-f21231a62712",
+          "retainedMetrics": [
+            "pgbench_scaling_factor_100_clients_50_mode_read_only",
+            "pgbench_scaling_factor_100_clients_50_mode_read_only_average_latency",
+            "pgbench_scaling_factor_100_clients_50_mode_read_write",
+            "pgbench_scaling_factor_100_clients_50_mode_read_write_average_latency"
+          ],
+          "provider": "blaxel",
+          "suite": "pgbench",
+          "replicate": 0,
+          "plannedMetrics": [
+            "pgbench_scaling_factor_100_clients_50_mode_read_only",
+            "pgbench_scaling_factor_100_clients_50_mode_read_only_average_latency",
+            "pgbench_scaling_factor_100_clients_50_mode_read_write",
+            "pgbench_scaling_factor_100_clients_50_mode_read_write_average_latency"
+          ],
+          "passes": 2
+        },
+        {
+          "id": "blaxel-memory-r0",
+          "status": "complete",
+          "missingMetrics": [],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-memory-r0-a1-5d549b4e-ea59-424c-84e2-c7f2c842b2f0",
+          "retainedMetrics": [
+            "stream_type_copy",
+            "stream_type_scale",
+            "stream_type_add",
+            "stream_type_triad"
+          ],
+          "provider": "blaxel",
+          "suite": "memory",
+          "replicate": 0,
+          "plannedMetrics": [
+            "stream_type_copy",
+            "stream_type_scale",
+            "stream_type_add",
+            "stream_type_triad"
+          ],
+          "passes": 2
+        },
+        {
+          "id": "blaxel-disk-r0",
+          "status": "complete",
+          "missingMetrics": [],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-disk-r0-a1-696c7e9c-314c-44ac-9187-42121e8c4fae",
+          "retainedMetrics": [
+            "hardlink_bogo_ops_per_s",
+            "fio_type_sequential_read_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_mb_per_s",
+            "fio_type_sequential_read_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_iops",
+            "fio_type_sequential_write_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_mb_per_s",
+            "fio_type_sequential_write_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_iops",
+            "fio_type_random_read_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_mb_per_s",
+            "fio_type_random_read_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_iops",
+            "fio_type_random_write_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_mb_per_s",
+            "fio_type_random_write_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_iops"
+          ],
+          "provider": "blaxel",
+          "suite": "disk",
+          "replicate": 0,
+          "plannedMetrics": [
+            "hardlink_bogo_ops_per_s",
+            "fio_type_sequential_read_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_mb_per_s",
+            "fio_type_sequential_read_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_iops",
+            "fio_type_sequential_write_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_mb_per_s",
+            "fio_type_sequential_write_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_iops",
+            "fio_type_random_read_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_mb_per_s",
+            "fio_type_random_read_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_iops",
+            "fio_type_random_write_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_mb_per_s",
+            "fio_type_random_write_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_iops"
+          ],
+          "passes": 2
+        },
+        {
+          "id": "blaxel-network-r0",
+          "status": "complete",
+          "missingMetrics": [],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-network-r0-a1-fb8365ef-51a4-414d-b6d5-400fda7aa0e2",
+          "retainedMetrics": [
+            "iperf_server_address_localhost_server_port_5201_duration_10_seconds_test_tcp_parallel_1",
+            "iperf_server_address_localhost_server_port_5201_duration_10_seconds_test_tcp_parallel_10",
+            "iperf_server_address_localhost_server_port_5201_duration_10_seconds_test_udp_10000mbit_objective_parallel_1",
+            "iperf_wan_direction_download",
+            "iperf_wan_direction_upload"
+          ],
+          "provider": "blaxel",
+          "suite": "network",
+          "replicate": 0,
+          "plannedMetrics": [
+            "iperf_server_address_localhost_server_port_5201_duration_10_seconds_test_tcp_parallel_1",
+            "iperf_server_address_localhost_server_port_5201_duration_10_seconds_test_tcp_parallel_10",
+            "iperf_server_address_localhost_server_port_5201_duration_10_seconds_test_udp_10000mbit_objective_parallel_1",
+            "iperf_wan_direction_download",
+            "iperf_wan_direction_upload"
+          ],
+          "passes": 2
+        },
+        {
+          "id": "blaxel-realworld-mastra-r0",
+          "status": "complete",
+          "missingMetrics": [],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-realworld-mastra-r0-a1-611415f5-7a5f-48ff-ab53-dcbc981ddd94",
+          "retainedMetrics": [
+            "realworld_mastra_task_git_clone",
+            "realworld_mastra_task_cold_install",
+            "realworld_mastra_task_lint_format",
+            "realworld_mastra_task_build_core",
+            "realworld_mastra_task_test_core"
+          ],
+          "provider": "blaxel",
+          "suite": "realworld-mastra",
+          "replicate": 0,
+          "plannedMetrics": [
+            "realworld_mastra_task_git_clone",
+            "realworld_mastra_task_cold_install",
+            "realworld_mastra_task_lint_format",
+            "realworld_mastra_task_build_core",
+            "realworld_mastra_task_test_core"
+          ],
+          "passes": 1
+        },
+        {
+          "id": "blaxel-realworld-better-auth-r0",
+          "status": "complete",
+          "missingMetrics": [],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-realworld-better-auth-r0-a1-7dc18be6-67c5-46b8-8f78-c31c98aad0f0",
+          "retainedMetrics": [
+            "realworld_better_auth_task_git_clone",
+            "realworld_better_auth_task_cold_install",
+            "realworld_better_auth_task_lint_biome",
+            "realworld_better_auth_task_lint_deps_knip",
+            "realworld_better_auth_task_lint_format",
+            "realworld_better_auth_task_lint_spell",
+            "realworld_better_auth_task_lint_types",
+            "realworld_better_auth_task_lint_packages",
+            "realworld_better_auth_task_typecheck",
+            "realworld_better_auth_task_build"
+          ],
+          "provider": "blaxel",
+          "suite": "realworld-better-auth",
+          "replicate": 0,
+          "plannedMetrics": [
+            "realworld_better_auth_task_git_clone",
+            "realworld_better_auth_task_cold_install",
+            "realworld_better_auth_task_lint_biome",
+            "realworld_better_auth_task_lint_deps_knip",
+            "realworld_better_auth_task_lint_format",
+            "realworld_better_auth_task_lint_spell",
+            "realworld_better_auth_task_lint_types",
+            "realworld_better_auth_task_lint_packages",
+            "realworld_better_auth_task_typecheck",
+            "realworld_better_auth_task_build"
+          ],
+          "passes": 1
+        },
+        {
+          "id": "blaxel-realworld-openclaw-r0",
+          "status": "failed",
+          "missingMetrics": [
+            "realworld_openclaw_task_git_clone",
+            "realworld_openclaw_task_cold_install",
+            "realworld_openclaw_task_lint_oxlint",
+            "realworld_openclaw_task_lint_extensions_all",
+            "realworld_openclaw_task_typecheck",
+            "realworld_openclaw_task_test_types"
+          ],
+          "excludedMetrics": [],
+          "attemptId": "blaxel-realworld-openclaw-r0-a1-45c39290-66c8-4c56-8028-b09c78457a66",
+          "retainedMetrics": [],
+          "provider": "blaxel",
+          "suite": "realworld-openclaw",
+          "replicate": 0,
+          "plannedMetrics": [
+            "realworld_openclaw_task_git_clone",
+            "realworld_openclaw_task_cold_install",
+            "realworld_openclaw_task_lint_oxlint",
+            "realworld_openclaw_task_lint_extensions_all",
+            "realworld_openclaw_task_typecheck",
+            "realworld_openclaw_task_test_types"
+          ],
+          "passes": 1
+        }
+      ]
+    }
+  }
+}

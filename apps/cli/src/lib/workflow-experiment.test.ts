@@ -33,6 +33,22 @@ test("workflow planning preserves samples and defaults shared accounts to one sa
 		...Array.from({ length: 12 }, (_, i) => i),
 	]);
 });
+test("fork-local unrunnable cells are dropped at planning for the listed provider only", () => {
+	const both = workflowExperiment(
+		{ ...env, BENCH_PROVIDERS: "blaxel,e2b", BENCH_SUITES: "system,realworld-openclaw" },
+		"2026-09-18",
+	);
+	const suitesFor = (provider: string) =>
+		[...new Set(both.cells.filter((c) => c.provider === provider).map((c) => c.suite))].sort();
+	expect(suitesFor("blaxel")).toEqual(["system"]);
+	expect(suitesFor("e2b")).toEqual(["realworld-openclaw", "system"]);
+	expect(() =>
+		workflowExperiment(
+			{ ...env, BENCH_PROVIDERS: "blaxel", BENCH_SUITES: "realworld-openclaw" },
+			"2026-09-18",
+		),
+	).toThrow("no runnable cells");
+});
 test("convergence and implicit per-cell quota overrides fail admission", () => {
 	expect(() =>
 		workflowExperiment(

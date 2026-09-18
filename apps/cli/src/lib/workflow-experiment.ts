@@ -18,6 +18,27 @@ import { planReplicateMap, selectProviders, selectSuites } from "./matrix.ts";
 
 const workerProvidersSchema = providerIdSchema.array().atLeastLength(1);
 
+/**
+ * Fork-local: (provider, suite) pairs this fork's fleet cannot run, dropped at planning so the
+ * matrix does not carry a cell that is known to fail. Blaxel here boots the Alpine base image on
+ * arm64, and realworld-openclaw's cold install dies in `@matrix-org/matrix-sdk-crypto-nodejs`'s
+ * postinstall ("Linux for arm64 musl isn't support at the moment") on every run (35247716410,
+ * 35300489795, 35312759151) — a dependency of the openclaw project, not of this benchmark. Remove
+ * the entry once that package ships an arm64-musl build. Upstream plans every suite for every
+ * provider; this is the one deliberate divergence in the matrix definition.
+ */
+export const FORK_UNRUNNABLE_CELLS: ReadonlyArray<{
+	readonly provider: string;
+	readonly suite: string;
+	readonly reason: string;
+}> = Object.freeze([
+	{
+		provider: "blaxel",
+		suite: "realworld-openclaw",
+		reason: "@matrix-org/matrix-sdk-crypto-nodejs has no arm64-musl build (Alpine base image)",
+	},
+]);
+
 /** The credential scope and Actions account queue must match every cell in the frozen batch. */
 export function workflowBatch(
 	plan: ExperimentPlan,
@@ -71,6 +92,15 @@ export function workflowExperiment(env: NodeJS.ProcessEnv, createdOn: string): E
 					: {},
 		);
 		for (const suiteName of selectSuites(env.BENCH_SUITES)) {
+			const unrunnable = FORK_UNRUNNABLE_CELLS.find(
+				(entry) => entry.provider === provider && entry.suite === suiteName,
+			);
+			if (unrunnable) {
+				console.error(
+					`plan: dropping ${provider} × ${suiteName} — fork-local unrunnable cell: ${unrunnable.reason}`,
+				);
+				continue;
+			}
 			const suite = SUITES[suiteName];
 			if (passOverride === "converge")
 				throw new Error(
@@ -99,6 +129,10 @@ export function workflowExperiment(env: NodeJS.ProcessEnv, createdOn: string): E
 				});
 		}
 	}
+	if (cells.length === 0)
+		throw new Error(
+			"no runnable cells: every selected (provider, suite) pair is listed in FORK_UNRUNNABLE_CELLS",
+		);
 	const plan = planExperiment({ id, sha, createdOn, cells }, capacity);
 	workflowAxes(plan);
 	for (const account of plan.accounts) {

@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Blaxel sandbox: ARM (Alpine) vs x86 (Debian)</title>
+<style>
+  .viz-root {
+    color-scheme: light;
+    --surface-1: #fcfcfb; --page: #f9f9f7;
+    --text-primary: #0b0b0b; --text-secondary: #52514e; --text-muted: #898781;
+    --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11,11,11,0.10);
+    --faster: #2a78d6; --slower: #e34948; --mid: #f0efec;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      color-scheme: dark;
+      --surface-1: #1a1a19; --page: #0d0d0d;
+      --text-primary: #ffffff; --text-secondary: #c3c2b7; --text-muted: #898781;
+      --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
+      --faster: #3987e5; --slower: #e66767; --mid: #383835;
+    }
+  }
+  :root[data-theme="dark"] .viz-root {
+    color-scheme: dark;
+    --surface-1: #1a1a19; --page: #0d0d0d;
+    --text-primary: #ffffff; --text-secondary: #c3c2b7; --text-muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
+    --faster: #3987e5; --slower: #e66767; --mid: #383835;
+  }
+  html, body { margin: 0; background: var(--page); }
+  body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--text-primary); }
+  .viz-root { background: var(--page); min-height: 100vh; padding: 32px 24px 48px; }
+  .card { max-width: 1040px; margin: 0 auto; background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 28px 32px 24px; }
+  h1 { font-size: 20px; font-weight: 600; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .sub { color: var(--text-secondary); margin: 0 0 18px; }
+  .toolbar { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; margin: 0 0 12px; color: var(--text-secondary); }
+  .legend { display: flex; gap: 18px; align-items: center; }
+  .legend span { display: inline-flex; align-items: center; gap: 8px; }
+  .sw { width: 14px; height: 10px; border-radius: 2px; display: inline-block; }
+  .sw.faster { background: var(--faster); } .sw.slower { background: var(--slower); }
+  .spacer { flex: 1; }
+  button { font: inherit; color: var(--text-primary); background: transparent; border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+  button:hover { background: var(--mid); }
+  svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .grid line { stroke: var(--grid); stroke-width: 1; }
+  .baseline { stroke: var(--axis); stroke-width: 1; }
+  .tick { fill: var(--text-muted); font-size: 12px; }
+  .group { fill: var(--text-primary); font-size: 13px; font-weight: 600; }
+  .metric { fill: var(--text-secondary); font-size: 12.5px; }
+  .vlabel { fill: var(--text-secondary); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .bar.faster { fill: var(--faster); } .bar.slower { fill: var(--slower); }
+  .hit { fill: transparent; cursor: default; }
+  .row:hover .bar, .row:focus-within .bar, .row:focus .bar { filter: brightness(0.9); }
+  .row:hover .metric, .row:focus .metric { fill: var(--text-primary); }
+  .tooltip { position: absolute; pointer-events: none; background: var(--surface-1); color: var(--text-primary); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 12.5px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); max-width: 300px; opacity: 0; transition: opacity 80ms; }
+  .tooltip b { font-weight: 600; } .tooltip .k { color: var(--text-secondary); }
+  .tooltip table { border-collapse: collapse; margin-top: 4px; } .tooltip td { padding: 1px 8px 1px 0; font-variant-numeric: tabular-nums; }
+  .note { color: var(--text-muted); font-size: 12px; margin: 16px 0 0; line-height: 1.5; }
+  table.data { width: 100%; border-collapse: collapse; margin-top: 18px; font-size: 13px; }
+  table.data th, table.data td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--grid); }
+  table.data th { color: var(--text-secondary); font-weight: 600; }
+  table.data td.num, table.data th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.data tr.g td { color: var(--text-primary); font-weight: 600; padding-top: 12px; border-bottom: none; }
+  .hidden { display: none; }
+  .sr { position: absolute; left: -9999px; }
+</style>
+</head>
+<body>
+<div class="viz-root" data-palette="#2a78d6,#e34948" data-mode="light">
+  <div class="card">
+    <h1>Blaxel sandbox: ARM (Alpine) vs x86 (Debian)</h1>
+    <p class="sub" id="subtitle"></p>
+    <div class="toolbar">
+      <div class="legend" aria-label="Legend">
+        <span><i class="sw faster"></i>ARM faster</span>
+        <span><i class="sw slower"></i>ARM slower</span>
+      </div>
+      <span class="spacer"></span>
+      <button id="toggle-table" aria-controls="table-view" aria-expanded="false">Show table</button>
+      <button id="toggle-theme">Dark mode</button>
+    </div>
+    <div id="chart" style="position:relative"></div>
+    <div class="tooltip" id="tooltip" role="tooltip"></div>
+    <p class="note" id="note"></p>
+    <div id="table-view" class="hidden"></div>
+  </div>
+</div>
+
+<script id="data" type="application/json">{"rows":[{"id":"node_web_tooling_runs_per_s","dimension":"cpu","label":"Node.js web tooling","unit":"runs/s","direction":"HIB","arm":24.795,"x86":20.22,"nArm":4,"nX86":6,"ratio":1.2262611275964392,"pct":22.626112759643924},{"id":"fio_type_sequential_read_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_iops","dimension":"disk","label":"fio seq read 1MB, buffered (IOPS)","unit":"IOPS","direction":"HIB","arm":11700,"x86":7469.5,"nArm":2,"nX86":6,"ratio":1.5663699042773946,"pct":56.63699042773946},{"id":"fio_type_sequential_read_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_mb_per_s","dimension":"disk","label":"fio seq read 1MB, buffered (MB/s)","unit":"MB/s","direction":"HIB","arm":12240.6567936,"x86":7834.435584000001,"nArm":2,"nX86":6,"ratio":1.5624171853041555,"pct":56.241718530415554},{"id":"fio_type_random_write_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_iops","dimension":"disk","label":"fio rand write 4KB, buffered (IOPS)","unit":"IOPS","direction":"HIB","arm":273000,"x86":298000,"nArm":2,"nX86":6,"ratio":0.9161073825503355,"pct":-8.389261744966447},{"id":"fio_type_random_write_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_mb_per_s","dimension":"disk","label":"fio rand write 4KB, buffered (MB/s)","unit":"MB/s","direction":"HIB","arm":1116.73344,"x86":1221.0667520000002,"nArm":2,"nX86":6,"ratio":0.914555603263203,"pct":-8.544439673679705},{"id":"fio_type_random_read_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_iops","dimension":"disk","label":"fio rand read 4KB, buffered (IOPS)","unit":"IOPS","direction":"HIB","arm":52450,"x86":57800,"nArm":2,"nX86":6,"ratio":0.907439446366782,"pct":-9.256055363321803},{"id":"fio_type_random_read_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_mb_per_s","dimension":"disk","label":"fio rand read 4KB, buffered (MB/s)","unit":"MB/s","direction":"HIB","arm":214.95808,"x86":236.97817600000002,"nArm":2,"nX86":6,"ratio":0.907079646017699,"pct":-9.292035398230103},{"id":"hardlink_bogo_ops_per_s","dimension":"disk","label":"Hardlink throughput","unit":"bogo ops/s","direction":"HIB","arm":12.79,"x86":20.27,"nArm":2,"nX86":6,"ratio":0.6309817464232856,"pct":-36.901825357671434},{"id":"fio_type_sequential_write_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_mb_per_s","dimension":"disk","label":"fio seq write 1MB, buffered (MB/s)","unit":"MB/s","direction":"HIB","arm":1947.72992,"x86":3489.6609280000002,"nArm":2,"nX86":6,"ratio":0.5581430288461539,"pct":-44.18569711538461},{"id":"fio_type_sequential_write_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_iops","dimension":"disk","label":"fio seq write 1MB, buffered (IOPS)","unit":"IOPS","direction":"HIB","arm":1856,"x86":3326,"nArm":2,"nX86":6,"ratio":0.5580276608538786,"pct":-44.19723391461214},{"id":"stream_type_scale","dimension":"memory","label":"STREAM Scale","unit":"MB/s","direction":"HIB","arm":137756.25,"x86":75752.85,"nArm":4,"nX86":6,"ratio":1.8184959377765983,"pct":81.84959377765983},{"id":"stream_type_add","dimension":"memory","label":"STREAM Add","unit":"MB/s","direction":"HIB","arm":140072.15000000002,"x86":81589.65,"nArm":4,"nX86":6,"ratio":1.7167882200744828,"pct":71.67882200744829},{"id":"stream_type_triad","dimension":"memory","label":"STREAM Triad","unit":"MB/s","direction":"HIB","arm":140028.65000000002,"x86":82211.5,"nArm":4,"nX86":6,"ratio":1.703273264689247,"pct":70.3273264689247},{"id":"stream_type_copy","dimension":"memory","label":"STREAM Copy","unit":"MB/s","direction":"HIB","arm":138765.55,"x86":94423.04999999999,"nArm":4,"nX86":6,"ratio":1.4696152051855982,"pct":46.961520518559816},{"id":"iperf_wan_direction_upload","dimension":"network","label":"iperf3 WAN upload","unit":"Mbits/sec","direction":"HIB","arm":6447.9400000000005,"x86":2250.645,"nArm":4,"nX86":6,"ratio":2.86492983122616,"pct":186.492983122616},{"id":"iperf_wan_direction_download","dimension":"network","label":"iperf3 WAN download","unit":"Mbits/sec","direction":"HIB","arm":3896.505,"x86":1877.52,"nArm":4,"nX86":6,"ratio":2.075346733989518,"pct":107.53467339895182},{"id":"iperf_server_address_localhost_server_port_5201_duration_10_seconds_test_tcp_parallel_1","dimension":"network","label":"iperf3 loopback TCP, 1 stream","unit":"Mbits/sec","direction":"HIB","arm":92958.5,"x86":86368,"nArm":4,"nX86":6,"ratio":1.0763071971100409,"pct":7.630719711004086},{"id":"iperf_server_address_localhost_server_port_5201_duration_10_seconds_test_udp_10000mbit_objective_parallel_1","dimension":"network","label":"iperf3 loopback UDP, 10G objective","unit":"Mbits/sec","direction":"HIB","arm":9999,"x86":9999,"nArm":4,"nX86":6,"ratio":1,"pct":0},{"id":"iperf_server_address_localhost_server_port_5201_duration_10_seconds_test_tcp_parallel_10","dimension":"network","label":"iperf3 loopback TCP, 10 streams","unit":"Mbits/sec","direction":"HIB","arm":66917,"x86":103996.5,"nArm":4,"nX86":6,"ratio":0.643454347021294,"pct":-35.6545652978706},{"id":"realworld_better_auth_task_build","dimension":"realworld","label":"Better-Auth: build","unit":"Seconds","direction":"LIB","arm":58.342,"x86":76.38149999999999,"nArm":2,"nX86":12,"ratio":1.3092026327517052,"pct":30.920263275170523},{"id":"realworld_better_auth_task_lint_types","dimension":"realworld","label":"Better-Auth: lint types","unit":"Seconds","direction":"LIB","arm":29.746499999999997,"x86":36.855999999999995,"nArm":2,"nX86":12,"ratio":1.2390029079051317,"pct":23.900290790513168},{"id":"realworld_better_auth_task_typecheck","dimension":"realworld","label":"Better-Auth: typecheck","unit":"Seconds","direction":"LIB","arm":42.5235,"x86":50.1205,"nArm":2,"nX86":12,"ratio":1.1786541559373054,"pct":17.86541559373054},{"id":"realworld_better_auth_task_lint_deps_knip","dimension":"realworld","label":"Better-Auth: lint deps (Knip)","unit":"Seconds","direction":"LIB","arm":10.133500000000002,"x86":11.1785,"nArm":2,"nX86":12,"ratio":1.103123303893028,"pct":10.312330389302794},{"id":"realworld_mastra_task_lint_format","dimension":"realworld","label":"Mastra: lint:format","unit":"Seconds","direction":"LIB","arm":87.0995,"x86":94.27250000000001,"nArm":2,"nX86":12,"ratio":1.0823540892886871,"pct":8.235408928868715},{"id":"realworld_mastra_task_build_core","dimension":"realworld","label":"Mastra: build:core","unit":"Seconds","direction":"LIB","arm":72.5695,"x86":75.985,"nArm":2,"nX86":12,"ratio":1.0470652271270988,"pct":4.706522712709882},{"id":"realworld_better_auth_task_lint_spell","dimension":"realworld","label":"Better-Auth: lint spell","unit":"Seconds","direction":"LIB","arm":7.73,"x86":7.577999999999999,"nArm":2,"nX86":12,"ratio":0.9803363518758084,"pct":-1.9663648124191635},{"id":"realworld_mastra_task_cold_install","dimension":"realworld","label":"Mastra: cold install","unit":"Seconds","direction":"LIB","arm":41.8275,"x86":40.8705,"nArm":2,"nX86":12,"ratio":0.977120315581854,"pct":-2.287968441814603},{"id":"realworld_better_auth_task_lint_format","dimension":"realworld","label":"Better-Auth: lint format","unit":"Seconds","direction":"LIB","arm":3.318,"x86":3.218,"nArm":2,"nX86":12,"ratio":0.9698613622664255,"pct":-3.0138637733574503},{"id":"realworld_better_auth_task_cold_install","dimension":"realworld","label":"Better-Auth: cold install","unit":"Seconds","direction":"LIB","arm":14.564,"x86":13.283,"nArm":2,"nX86":12,"ratio":0.9120433946717934,"pct":-8.795660532820659},{"id":"realworld_mastra_task_test_core","dimension":"realworld","label":"Mastra: test:core","unit":"Seconds","direction":"LIB","arm":1067.901,"x86":938.6735,"nArm":2,"nX86":12,"ratio":0.8789892508762516,"pct":-12.101074912374843},{"id":"realworld_better_auth_task_lint_packages","dimension":"realworld","label":"Better-Auth: lint packages","unit":"Seconds","direction":"LIB","arm":3.25,"x86":2.7635,"nArm":2,"nX86":12,"ratio":0.8503076923076923,"pct":-14.969230769230768},{"id":"realworld_mastra_task_git_clone","dimension":"realworld","label":"Mastra: git clone","unit":"Seconds","direction":"LIB","arm":5.9725,"x86":2.595,"nArm":2,"nX86":12,"ratio":0.4344914190037673,"pct":-56.55085809962327},{"id":"realworld_better_auth_task_git_clone","dimension":"realworld","label":"Better-Auth: git clone","unit":"Seconds","direction":"LIB","arm":3.2085,"x86":0.7685,"nArm":2,"nX86":12,"ratio":0.23952002493376967,"pct":-76.04799750662303},{"id":"realworld_better_auth_task_lint_biome","dimension":"realworld","label":"Better-Auth: lint (Biome)","unit":"Seconds","direction":"LIB","arm":56.6875,"x86":3.4065000000000003,"nArm":2,"nX86":12,"ratio":0.06009261300992283,"pct":-93.99073869900772},{"id":"sqlite_speedtest_seconds","dimension":"system","label":"SQLite Speedtest","unit":"Seconds","direction":"LIB","arm":52.3055,"x86":40.1845,"nArm":4,"nX86":6,"ratio":0.7682652875892593,"pct":-23.173471241074072},{"id":"pybench_milliseconds","dimension":"system","label":"PyBench","unit":"Milliseconds","direction":"LIB","arm":668,"x86":473.5,"nArm":4,"nX86":6,"ratio":0.7088323353293413,"pct":-29.11676646706587},{"id":"git_seconds","dimension":"system","label":"Git common operations","unit":"Seconds","direction":"LIB","arm":61.471000000000004,"x86":41.0995,"nArm":4,"nX86":6,"ratio":0.6685998275609637,"pct":-33.14001724390363},{"id":"pgbench_scaling_factor_100_clients_50_mode_read_write","dimension":"system","label":"pgbench RW (s100, 50c)","unit":"TPS","direction":"HIB","arm":15382.6655245,"x86":25073.764670999997,"nArm":4,"nX86":6,"ratio":0.6134964464387511,"pct":-38.65035535612489},{"id":"pgbench_scaling_factor_100_clients_50_mode_read_write_average_latency","dimension":"system","label":"pgbench RW latency (s100, 50c)","unit":"ms","direction":"LIB","arm":3.2515,"x86":1.9945,"nArm":4,"nX86":6,"ratio":0.613409195755805,"pct":-38.6590804244195},{"id":"pgbench_scaling_factor_100_clients_50_mode_read_only","dimension":"system","label":"pgbench RO (s100, 50c)","unit":"TPS","direction":"HIB","arm":137940.54658249998,"x86":324321.7702985,"nArm":4,"nX86":6,"ratio":0.4253200346542939,"pct":-57.46799653457061},{"id":"pgbench_scaling_factor_100_clients_50_mode_read_only_average_latency","dimension":"system","label":"pgbench RO latency (s100, 50c)","unit":"ms","direction":"LIB","arm":0.363,"x86":0.154,"nArm":4,"nX86":6,"ratio":0.42424242424242425,"pct":-57.57575757575757}],"armSpec":{"cpuModel":"ARMv8","detectedIsolation":"unknown","diskGb":40.2,"hostMemoryGb":8,"hostVcpus":4,"kernel":"6.1.166","memoryGb":7.77,"os":"Alpine Linux v3.21","vcpus":4,"virtualization":"unknown","asnSource":"ipinfo","city":"Ashburn","country":"US","egressAsn":"AS14618","egressOrg":"AS14618 Amazon.com, Inc.","egressOrgName":"Amazon.com, Inc.","geoSource":"ipinfo","location":"39.0437,-77.4875","region":"Virginia","timezone":"America/New_York"},"x86Spec":{"cpuModel":"AMD EPYC","detectedIsolation":"vm","diskGb":40.2,"hostMemoryGb":8,"hostVcpus":4,"kernel":"6.1.166","memoryGb":7.78,"os":"Debian GNU/Linux 12 (bookworm)","vcpus":4,"virtualization":"kvm","asnSource":"cymru","city":"Ashburn","country":"US","egressAsn":"AS396356","egressOrg":"AS396356 Latitude.sh","egressOrgName":"Latitude.sh","geoSource":"ipinfo","location":"39.0437,-77.4875","networkPrefix":"2605:6440:d000::/36","region":"Virginia","timezone":"America/New_York"}}</script>
+<script>
+(() => {
+  const DATA = JSON.parse(document.getElementById("data").textContent);
+  const rows = DATA.rows;
+  const GROUP_LABEL = { cpu: "CPU (Node)", memory: "Memory (STREAM)", disk: "Disk (fio, hardlink)", network: "Network (iperf3)", realworld: "Real-world pipelines", system: "System (pgbench, SQLite, git, PyBench)" };
+  const groups = ["cpu", "memory", "disk", "network", "realworld", "system"].filter(g => rows.some(r => r.dimension === g));
+
+  // ---- layout ---------------------------------------------------------------
+  const W = 976, ML = 268, MR = 96, MT = 34, MB = 30;
+  const ROW = 26, BAR = 16, GROUP_HEAD = 30, GROUP_GAP = 14;
+  const plotW = W - ML - MR;
+  const lg = v => Math.log2(v);
+  const maxAbs = Math.max(...rows.map(r => Math.abs(lg(r.ratio))));
+  const dom = Math.ceil(maxAbs * 2) / 2;               // symmetric, in log2 units (e.g. 2 => 0.25x .. 4x)
+  const x = v => ML + ((lg(v) + dom) / (2 * dom)) * plotW;
+  const x0 = x(1);
+
+  let y = MT; const placed = [];
+  for (const g of groups) {
+    placed.push({ kind: "group", g, y });
+    y += GROUP_HEAD;
+    const list = rows.filter(r => r.dimension === g);
+    const ext = list.length > 2 ? new Set([list[0].id, list[list.length - 1].id]) : new Set(list.map(r => r.id));
+    for (const r of list) { placed.push({ kind: "row", r, y, label: ext.has(r.id) }); y += ROW; }
+    y += GROUP_GAP;
+  }
+  const H = y + MB;
+
+  // Axis ticks at whole log2 steps only, written as multipliers (1/4×, 1/2×, 1×, 2×, 4×) so the
+  // symmetric scale reads as symmetric; half steps drew too many crowded labels.
+  const fmtX = v => v >= 1 ? `${Math.round(v)}×` : `1/${Math.round(1 / v)}×`;
+  const fmtRel = ratio => ratio >= 1 ? `${(+ratio.toFixed(ratio >= 10 ? 0 : 2)).toString().replace(/\.?0+$/, "")}× faster` : `${(+(1 / ratio).toFixed(2)).toString().replace(/\.?0+$/, "")}× slower`;
+  const fmtVal = v => v >= 1000 ? Math.round(v).toLocaleString("en-US") : +v.toPrecision(3);
+
+  const ticks = []; for (let t = -Math.floor(dom); t <= Math.floor(dom) + 1e-9; t += 1) ticks.push(t);
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-labelledby="chart-title chart-desc">`;
+  svg += `<title id="chart-title">ARM relative to x86 per metric</title><desc id="chart-desc">Diverging bars on a log scale; bars right of 1× mean ARM was faster, left mean slower. Table view below carries every value.</desc>`;
+  svg += `<g class="grid">`;
+  for (const t of ticks) { const tx = ML + ((t + dom) / (2 * dom)) * plotW; svg += `<line x1="${tx}" x2="${tx}" y1="${MT - 8}" y2="${H - MB}"/>`; }
+  svg += `</g>`;
+  svg += `<line class="baseline" x1="${x0}" x2="${x0}" y1="${MT - 12}" y2="${H - MB + 4}"/>`;
+  for (const t of ticks) { const tx = ML + ((t + dom) / (2 * dom)) * plotW; svg += `<text class="tick" x="${tx}" y="${MT - 14}" text-anchor="middle">${fmtX(2 ** t)}</text>`; }
+  svg += `<text class="tick" x="${ML}" y="${H - 8}" text-anchor="start">← ARM slower</text><text class="tick" x="${ML + plotW}" y="${H - 8}" text-anchor="end">ARM faster →</text>`;
+
+  for (const p of placed) {
+    if (p.kind === "group") { svg += `<text class="group" x="8" y="${p.y + 19}">${esc(GROUP_LABEL[p.g])}</text>`; continue; }
+    const r = p.r, cls = r.ratio >= 1 ? "faster" : "slower";
+    const xr = x(r.ratio), left = Math.min(x0, xr), width = Math.max(0, Math.abs(xr - x0));
+    const by = p.y + (ROW - BAR) / 2, rr = Math.min(4, width);
+    // 4px rounded data-end, square at the baseline; 2px surface gap comes from ROW - BAR air.
+    let path;
+    if (width < 0.5) path = `M${x0 - 0.5},${by} h1 v${BAR} h-1 z`;
+    else if (r.ratio >= 1) path = `M${x0},${by} h${width - rr} a${rr},${rr} 0 0 1 ${rr},${rr} v${BAR - 2 * rr} a${rr},${rr} 0 0 1 -${rr},${rr} h-${width - rr} z`;
+    else path = `M${x0},${by} h-${width - rr} a${rr},${rr} 0 0 0 -${rr},${rr} v${BAR - 2 * rr} a${rr},${rr} 0 0 0 ${rr},${rr} h${width - rr} z`;
+    svg += `<g class="row" tabindex="0" data-id="${esc(r.id)}" aria-label="${esc(r.label)}: ${esc(fmtRel(r.ratio))}">`;
+    svg += `<text class="metric" x="${ML - 12}" y="${p.y + 17}" text-anchor="end">${esc(r.label)}</text>`;
+    svg += `<path class="bar ${cls}" d="${path}"/>`;
+    if (p.label) {
+      // Value label rides at the bar's data-end. A "slower" bar that reaches the left margin has no
+      // room outside its end without colliding with the metric name, so its label moves to the
+      // empty side of the baseline instead of being clipped or overlapping.
+      const text = fmtRel(r.ratio), approxW = text.length * 6.6;
+      let tx = r.ratio >= 1 ? xr + 8 : xr - 8, anchor = r.ratio >= 1 ? "start" : "end";
+      if (r.ratio < 1 && xr - 8 - approxW < ML + 4) { tx = x0 + 8; anchor = "start"; }
+      svg += `<text class="vlabel" x="${tx}" y="${p.y + 17}" text-anchor="${anchor}">${esc(text)}</text>`;
+    }
+    svg += `<rect class="hit" x="${ML - 260}" y="${p.y}" width="${plotW + 260 + MR}" height="${ROW}"/>`;
+    svg += `</g>`;
+  }
+  svg += `</svg>`;
+  const chart = document.getElementById("chart");
+  chart.innerHTML = svg;
+
+  // ---- subtitle / note ---------------------------------------------------------
+  const a = DATA.armSpec, b = DATA.x86Spec;
+  const faster = rows.filter(r => r.ratio > 1.02).length, slower = rows.filter(r => r.ratio < 0.98).length;
+  document.getElementById("subtitle").textContent =
+    `Median of each metric, ARM relative to x86 on a log scale. ${rows.length} metrics: ARM faster on ${faster}, slower on ${slower}, within 2% on ${rows.length - faster - slower}.`;
+  document.getElementById("note").innerHTML =
+    `ARM: ${esc(a.cpuModel)}, ${a.vcpus} vCPU, ${a.memoryGb} GiB, ${esc(a.os)}; runs 35247716410 and 35300489795 pooled (2 sandboxes, 2 PTS passes each; real-world tasks 1 pass each). ` +
+    `x86: ${esc(b.cpuModel)}, ${b.vcpus} vCPU, ${b.memoryGb} GiB, ${esc(b.os)}; upstream run 34853816482 (6 replicates; real-world 12). ` +
+    `Both on Blaxel, same 40 GB ephemeral volume. Every value is the p50 median of that side's samples; "faster" is the better-direction ratio (time metrics inverted). ` +
+    `fio runs with Direct=No on both sides, so its numbers reflect the page cache, not the volume. ` +
+    `Not shown: realworld-openclaw (no arm64-musl build of a dependency), fast-cli (glibc-only Chrome). ` +
+    `Treat the ARM side as indicative until more replicates land.`;
+
+  // ---- tooltip -------------------------------------------------------------------
+  const tip = document.getElementById("tooltip"); const byId = new Map(rows.map(r => [r.id, r]));
+  const show = (el, ev) => {
+    const r = byId.get(el.dataset.id); if (!r) return;
+    tip.innerHTML = `<b>${esc(r.label)}</b><div class="k">${esc(GROUP_LABEL[r.dimension])} · ${esc(fmtRel(r.ratio))}</div>` +
+      `<table><tr><td class="k">ARM</td><td>${fmtVal(r.arm)} ${esc(r.unit)}</td><td class="k">n=${r.nArm}</td></tr>` +
+      `<tr><td class="k">x86</td><td>${fmtVal(r.x86)} ${esc(r.unit)}</td><td class="k">n=${r.nX86}</td></tr></table>` +
+      `<div class="k">${r.direction === "LIB" ? "lower is better" : "higher is better"}</div>`;
+    tip.style.opacity = "1";
+    const rect = chart.getBoundingClientRect();
+    const px = ev ? ev.clientX - rect.left : rect.width / 2, py = ev ? ev.clientY - rect.top : 0;
+    const tw = tip.offsetWidth, th = tip.offsetHeight;
+    tip.style.left = `${Math.min(px + 14, rect.width - tw - 8)}px`;
+    tip.style.top = `${Math.max(0, py - th - 12)}px`;
+  };
+  const hide = () => { tip.style.opacity = "0"; };
+  for (const el of chart.querySelectorAll(".row")) {
+    el.addEventListener("mousemove", ev => show(el, ev));
+    el.addEventListener("mouseleave", hide);
+    el.addEventListener("focus", () => show(el, null));
+    el.addEventListener("blur", hide);
+  }
+
+  // ---- table view ----------------------------------------------------------------
+  const tv = document.getElementById("table-view");
+  let html = `<table class="data"><thead><tr><th>Metric</th><th>Unit</th><th>Better</th><th class="num">ARM</th><th class="num">x86</th><th class="num">ARM vs x86</th></tr></thead><tbody>`;
+  for (const g of groups) {
+    html += `<tr class="g"><td colspan="6">${esc(GROUP_LABEL[g])}</td></tr>`;
+    for (const r of rows.filter(r => r.dimension === g)) {
+      html += `<tr><td>${esc(r.label)}</td><td>${esc(r.unit)}</td><td>${r.direction === "LIB" ? "lower" : "higher"}</td><td class="num">${fmtVal(r.arm)}</td><td class="num">${fmtVal(r.x86)}</td><td class="num">${esc(fmtRel(r.ratio))}</td></tr>`;
+    }
+  }
+  html += `</tbody></table>`;
+  tv.innerHTML = html;
+  const tbtn = document.getElementById("toggle-table");
+  tbtn.addEventListener("click", () => { const open = tv.classList.toggle("hidden") === false; tbtn.textContent = open ? "Hide table" : "Show table"; tbtn.setAttribute("aria-expanded", String(open)); });
+
+  // ---- theme toggle ----------------------------------------------------------------
+  const root = document.documentElement, thbtn = document.getElementById("toggle-theme");
+  const isDark = () => root.dataset.theme === "dark" || (!root.dataset.theme && matchMedia("(prefers-color-scheme: dark)").matches);
+  const paint = () => { thbtn.textContent = isDark() ? "Light mode" : "Dark mode"; };
+  thbtn.addEventListener("click", () => { root.dataset.theme = isDark() ? "light" : "dark"; paint(); });
+  paint();
+})();
+</script>
+</body>
+</html>

@@ -235,13 +235,69 @@ function blaxelFilesystem(native: SandboxInstance) {
 	};
 }
 
+/** Fork-local: how many placements a create may try before giving up on a fleet without egress. */
+export const BLAXEL_PLACEMENT_ATTEMPTS = 3;
+
+/**
+ * Fork-local: create, then prove the sandbox can reach the network before handing it to the bridge.
+ * The dev fleet schedules the base image onto whichever pool has room, and one of those pools
+ * (arm64, runs 35195449393 / 35414884805 / 35415293749) comes up with an address and a default route
+ * but no working egress at all. Nothing later can succeed there, so a dead placement is deleted and
+ * a fresh create (new benchmark-<uuid> name so ownership labels stay exact) gets another roll of the
+ * scheduler, up to BLAXEL_PLACEMENT_ATTEMPTS. Each discarded sandbox is deleted here; should that
+ * delete fail, it still carries the benchmark ownership label and the next admission's
+ * reconciliation removes it. The bridge sees exactly one create with the surviving instance.
+ */
+export async function createBlaxelSandboxWithEgress(
+	options: BlaxelCreateOptions,
+	operation: { readonly signal?: AbortSignal },
+): Promise<SandboxInstance> {
+	for (let placement = 1; ; placement++) {
+		operation.signal?.throwIfAborted();
+		const name = placement === 1 ? options.name : `benchmark-${randomUUID()}`;
+		const labels =
+			placement === 1 ? options.labels : { ...options.labels, [BLAXEL_ATTEMPT_LABEL]: name };
+		const instance = await SandboxInstance.create({ ...options, name, labels });
+		// Tear down by the name the control plane actually recorded, not the one requested.
+		const actual =
+			typeof instance.metadata?.name === "string" && instance.metadata.name.length > 0
+				? instance.metadata.name
+				: name;
+		const probe = await execBlaxelCommand(instance, BLAXEL_NETWORK_BOOTSTRAP).catch(
+			(caught: unknown) => ({
+				exitCode: undefined,
+				stdout: "",
+				stderr: caught instanceof Error ? caught.message : String(caught),
+			}),
+		);
+		if (probe.exitCode === 0) {
+			if (placement > 1)
+				console.error(`[blaxel create ${actual}] placement ${placement}: egress ok`);
+			return instance;
+		}
+		const last = probe.stdout.trim().split("\n").pop() || probe.stderr.slice(0, 200);
+		console.error(
+			`[blaxel create ${actual}] placement ${placement}/${BLAXEL_PLACEMENT_ATTEMPTS}: no egress (${last}); ${placement < BLAXEL_PLACEMENT_ATTEMPTS ? "deleting and re-creating" : "giving up"}`,
+		);
+		try {
+			await SandboxInstance.delete(actual);
+		} catch (caught) {
+			if (!isBlaxelNotFound(caught))
+				console.error(
+					`[blaxel create ${actual}] delete after dead placement threw; reconciliation will remove it`,
+				);
+		}
+		if (placement >= BLAXEL_PLACEMENT_ATTEMPTS)
+			throw new Error(
+				`Blaxel: ${BLAXEL_PLACEMENT_ATTEMPTS} placements in a row produced sandboxes without egress`,
+			);
+	}
+}
+
 /** Allocate with the pinned SDK so the control plane's structured refusals survive to recovery. */
 export function nativeBlaxelCompute() {
 	return nativeSdkCompute(
-		(options: BlaxelCreateOptions, operation) => {
-			operation.signal?.throwIfAborted();
-			return SandboxInstance.create(options);
-		},
+		(options: BlaxelCreateOptions, operation) => createBlaxelSandboxWithEgress(options, operation),
 		(native) => ({
 			sandboxId: native.metadata.name,
 			runCommand: (command, options) => execBlaxelCommand(native, command, options),

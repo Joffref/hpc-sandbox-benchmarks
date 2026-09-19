@@ -48,6 +48,8 @@ function fakeInstance(
 		readonly status?: string;
 		readonly labels?: Record<string, string>;
 		readonly keepaliveStatus?: string;
+		/** Fork-local: make the egress probe fail, as on a placement without network. */
+		readonly noEgress?: boolean;
 	} = {},
 ) {
 	const processCalls: ProcessCall[] = [];
@@ -63,6 +65,16 @@ function fakeInstance(
 			exec: async (call: ProcessCall) => {
 				processCalls.push(call);
 				const base = { pid: "1234", name: call.name ?? "cmd", logs: "", stderr: "" };
+				if (call.command.includes("resolves github.com")) {
+					return options.noEgress
+						? {
+								...base,
+								status: "completed",
+								exitCode: 1,
+								stdout: "dns: still failing after DNS64 — sandbox has no working egress\n",
+							}
+						: { ...base, status: "completed", exitCode: 0, stdout: "dns: ok\n" };
+				}
 				if (call.command.startsWith("df -Pk")) {
 					return {
 						...base,
@@ -183,14 +195,16 @@ describe("Blaxel lifecycle", () => {
 					},
 				],
 			});
-			expect(fake.processCalls[0]).toMatchObject({
+			// Fork-local: the create adapter probes egress before the bridge's post-create hook runs.
+			expect(fake.processCalls[0]?.command).toContain("resolves github.com");
+			expect(fake.processCalls[1]).toMatchObject({
 				name: BLAXEL_KEEPALIVE_PROCESS,
 				command: "sleep 2147483647",
 				keepAlive: true,
 				timeout: 0,
 				waitForCompletion: false,
 			});
-			expect(fake.processCalls[1]?.command).toContain("df -Pk");
+			expect(fake.processCalls[2]?.command).toContain("df -Pk");
 			const result = await session.exec("echo hi");
 			expect(result.exit).toEqual({ kind: "exited", code: 0 });
 			expect(result.stdout).toBe("ok");
@@ -199,6 +213,47 @@ describe("Blaxel lifecycle", () => {
 		} finally {
 			create.mockRestore();
 			remove.mockRestore();
+		}
+	});
+
+	test("re-creates when a placement has no egress and gives up after the attempt cap", async () => {
+		const dead = fakeInstance("benchmark-33333333-3333-4333-8333-333333333333", { noEgress: true });
+		const live = fakeInstance("benchmark-44444444-4444-4444-8444-444444444444");
+		const create = spyOn(SandboxInstance, "create")
+			.mockResolvedValueOnce(dead.instance)
+			.mockResolvedValueOnce(live.instance);
+		const remove = spyOn(SandboxInstance, "delete").mockResolvedValue({} as never);
+		try {
+			const session = await blaxelDriver.driver(context).create(request);
+			expect(session.sandboxRef).toEqual(sandboxRef("blaxel", live.instance.metadata.name));
+			expect(create).toHaveBeenCalledTimes(2);
+			// The retry carries a fresh benchmark-<uuid> name and re-labels the attempt to match.
+			const retry = create.mock.calls[1]?.[0] as { name: string; labels: Record<string, string> };
+			expect(retry.name).toMatch(/^benchmark-[0-9a-f-]{36}$/);
+			expect(retry.name).not.toBe((create.mock.calls[0]?.[0] as { name?: string }).name);
+			expect(retry.labels["sandbox-benchmarks-attempt"]).toBe(retry.name);
+			expect(remove).toHaveBeenCalledWith(dead.instance.metadata.name);
+			expect(remove).not.toHaveBeenCalledWith(live.instance.metadata.name);
+		} finally {
+			create.mockRestore();
+			remove.mockRestore();
+		}
+		const alwaysDead = fakeInstance("benchmark-55555555-5555-4555-8555-555555555555", {
+			noEgress: true,
+		});
+		const create2 = spyOn(SandboxInstance, "create").mockResolvedValue(alwaysDead.instance);
+		const remove2 = spyOn(SandboxInstance, "delete").mockResolvedValue({} as never);
+		try {
+			const error = await blaxelDriver
+				.driver(context)
+				.create(request)
+				.catch((caught: unknown) => caught);
+			expect(error).toMatchObject({ provider: "blaxel" });
+			expect(create2).toHaveBeenCalledTimes(3);
+			expect(remove2).toHaveBeenCalledTimes(3);
+		} finally {
+			create2.mockRestore();
+			remove2.mockRestore();
 		}
 	});
 

@@ -263,21 +263,27 @@ export async function createBlaxelSandboxWithEgress(
 			typeof instance.metadata?.name === "string" && instance.metadata.name.length > 0
 				? instance.metadata.name
 				: name;
-		const probe = await execBlaxelCommand(instance, BLAXEL_NETWORK_BOOTSTRAP).catch(
-			(caught: unknown) => ({
-				exitCode: undefined,
-				stdout: "",
-				stderr: caught instanceof Error ? caught.message : String(caught),
-			}),
-		);
+		// The arch line first: which pool each placement landed on is the evidence the fleet owner needs.
+		const probe = await execBlaxelCommand(
+			instance,
+			`echo "arch=$(uname -m)"; ${BLAXEL_NETWORK_BOOTSTRAP}`,
+		).catch((caught: unknown) => ({
+			exitCode: undefined,
+			stdout: "",
+			stderr: caught instanceof Error ? caught.message : String(caught),
+		}));
+		const lines = probe.stdout.trim().split("\n");
+		const arch = lines.find((line) => line.startsWith("arch="))?.slice(5) ?? "?";
+		const verdict =
+			[...lines].reverse().find((line) => line.startsWith("dns:")) ||
+			lines.at(-1) ||
+			probe.stderr.slice(0, 200);
 		if (probe.exitCode === 0) {
-			if (placement > 1)
-				console.error(`[blaxel create ${actual}] placement ${placement}: egress ok`);
+			console.error(`[blaxel create ${actual}] placement ${placement}: arch=${arch} ${verdict}`);
 			return instance;
 		}
-		const last = probe.stdout.trim().split("\n").pop() || probe.stderr.slice(0, 200);
 		console.error(
-			`[blaxel create ${actual}] placement ${placement}/${BLAXEL_PLACEMENT_ATTEMPTS}: no egress (${last}); ${placement < BLAXEL_PLACEMENT_ATTEMPTS ? "deleting and re-creating" : "giving up"}`,
+			`[blaxel create ${actual}] placement ${placement}/${BLAXEL_PLACEMENT_ATTEMPTS}: arch=${arch} no egress (${verdict}); ${placement < BLAXEL_PLACEMENT_ATTEMPTS ? "deleting and re-creating" : "giving up"}`,
 		);
 		try {
 			await SandboxInstance.delete(actual);

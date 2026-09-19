@@ -277,16 +277,27 @@ export async function prepareBlaxelSandbox(
 	request: CreateRequest,
 	options: DriverOperationOptions,
 ): Promise<ComputeSdkCreatedRequestVerification> {
-	options.signal?.throwIfAborted();
 	// Fork-local: the ComputeSDK bridge replaces whatever this callback throws with a generic
 	// "preparation and verification callback failed" (see providerCallbackFailure in
 	// packages/driver/src/computesdk.ts), so name the failing step and a redacted rendering of the
 	// error on stderr before it is lost. Secrets are redacted with the same helper the CLI uses.
+	// The name lookup is defensive and the first line precedes the abort check on purpose: run
+	// 35414884805 failed this callback with no line at all, which only an already-aborted signal or
+	// an instance without metadata can produce.
 	const secrets = diagnosticSecretsFromEnv(process.env);
+	const sandboxName = (): string => {
+		try {
+			return typeof native?.metadata?.name === "string" ? native.metadata.name : "?";
+		} catch {
+			return "?";
+		}
+	};
 	const note = (text: string) =>
-		console.error(
-			`[blaxel prepare ${native.metadata.name}] ${redactDiagnosticText(text, secrets)}`,
-		);
+		console.error(`[blaxel prepare ${sandboxName()}] ${redactDiagnosticText(text, secrets)}`);
+	note(
+		`begin aborted=${options.signal?.aborted ?? false}${options.signal?.aborted ? ` reason=${String(options.signal.reason).slice(0, 200)}` : ""} status=${String(native?.status ?? "?")} hasMetadata=${native?.metadata !== undefined} hasProcess=${native?.process !== undefined}`,
+	);
+	options.signal?.throwIfAborted();
 	const failed = (step: string, caught: unknown): never => {
 		let text = describeDriverFailure(caught, secrets);
 		if (text === "Unknown failure") {

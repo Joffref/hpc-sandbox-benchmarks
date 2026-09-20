@@ -169,7 +169,7 @@
   document.getElementById("subtitle").textContent =
     `Median of each metric, ARM relative to x86 on a log scale. ${rows.length} metrics: ARM faster on ${faster}, slower on ${slower}, within 2% on ${rows.length - faster - slower}.`;
   document.getElementById("note").innerHTML =
-    `ARM: ${esc(a.cpuModel)}, ${a.vcpus} vCPU, ${a.memoryGb} GiB, ${esc(a.os)}; ${(DATA.armRuns ?? []).length} dataset runs pooled (${(DATA.armRuns ?? []).join(", ")}), one sandbox per suite each, 2 PTS passes (real-world tasks 1 pass). ` +
+    `ARM: ${esc(a.cpuModel)}, ${a.vcpus} vCPU, ${a.memoryGb} GiB, ${esc(a.os)}; ${(DATA.armRuns ?? []).length === 1 ? "run" : `${(DATA.armRuns ?? []).length} runs pooled`} ${(DATA.armRuns ?? []).join(", ")}, one sandbox per suite each, 2 PTS passes (real-world tasks 1 pass). ` +
     `x86: ${esc(b.cpuModel)}, ${b.vcpus} vCPU, ${b.memoryGb} GiB, ${esc(b.os)}; run ${(DATA.x86Runs ?? []).join(", ")} (one sandbox per suite, 2 PTS passes; real-world 1 pass). ` +
     `Both on Blaxel, same 40 GB ephemeral volume. Every value is the p50 median of that side's samples; "faster" is the better-direction ratio (time metrics inverted). ` +
     `fio runs with Direct=No on both sides, so its numbers reflect the page cache, not the volume. ` +

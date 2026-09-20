@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Blaxel sandbox benchmarks: fleet report</title>
+<style>
+  .viz-root {
+    color-scheme: light;
+    --surface-1: #fcfcfb; --page: #f9f9f7;
+    --text-primary: #0b0b0b; --text-secondary: #52514e; --text-muted: #898781;
+    --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11,11,11,0.10); --mid: #f0efec;
+    --s1: #2a78d6; --s2: #eb6834; --good: #006300;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      color-scheme: dark;
+      --surface-1: #1a1a19; --page: #0d0d0d;
+      --text-primary: #ffffff; --text-secondary: #c3c2b7; --text-muted: #898781;
+      --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10); --mid: #383835;
+      --s1: #3987e5; --s2: #d95926; --good: #0ca30c;
+    }
+  }
+  :root[data-theme="dark"] .viz-root {
+    color-scheme: dark;
+    --surface-1: #1a1a19; --page: #0d0d0d;
+    --text-primary: #ffffff; --text-secondary: #c3c2b7; --text-muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10); --mid: #383835;
+    --s1: #3987e5; --s2: #d95926; --good: #0ca30c;
+  }
+  html, body { margin: 0; background: var(--page); }
+  body { font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--text-primary); }
+  .viz-root { background: var(--page); min-height: 100vh; padding: 32px 24px 56px; }
+  .wrap { max-width: 1040px; margin: 0 auto; display: grid; gap: 20px; }
+  .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 24px 28px; }
+  h1 { font-size: 22px; font-weight: 600; margin: 0 0 4px; letter-spacing: -0.01em; }
+  h2 { font-size: 16px; font-weight: 600; margin: 0 0 4px; }
+  .sub, .cap { color: var(--text-secondary); margin: 0 0 14px; }
+  .cap { font-size: 13px; margin: 8px 0 0; }
+  .toolbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .spacer { flex: 1; }
+  button { font: inherit; color: var(--text-primary); background: transparent; border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+  button:hover { background: var(--mid); }
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .tile { border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .tile .label { color: var(--text-secondary); font-size: 13px; }
+  .tile .value { font-size: 28px; font-weight: 600; line-height: 1.2; margin-top: 2px; }
+  .tile .delta { color: var(--text-muted); font-size: 12px; margin-top: 2px; }
+  .legend { display: flex; gap: 18px; align-items: center; color: var(--text-secondary); margin: 6px 0 10px; }
+  .legend span { display: inline-flex; align-items: center; gap: 8px; }
+  .sw { width: 14px; height: 10px; border-radius: 2px; display: inline-block; }
+  .sw.s1 { background: var(--s1); } .sw.s2 { background: var(--s2); }
+  .sw.base { width: 2px; height: 14px; background: var(--axis); border-radius: 0; }
+  svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .grid line { stroke: var(--grid); stroke-width: 1; }
+  .baseline { stroke: var(--axis); stroke-width: 1.5; }
+  .tick, .axislabel { fill: var(--text-muted); font-size: 12px; }
+  .group { fill: var(--text-primary); font-size: 13px; font-weight: 600; }
+  .metric { fill: var(--text-secondary); font-size: 12.5px; }
+  .vlabel { fill: var(--text-secondary); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+  .bar.s1 { fill: var(--s1); } .bar.s2 { fill: var(--s2); }
+  .hit { fill: transparent; }
+  .row:hover .metric, .row:focus .metric { fill: var(--text-primary); }
+  .row:hover .bar, .row:focus .bar { filter: brightness(0.9); }
+  .tooltip { position: absolute; pointer-events: none; background: var(--surface-1); color: var(--text-primary); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 12.5px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); max-width: 320px; opacity: 0; transition: opacity 80ms; z-index: 2; }
+  .tooltip b { font-weight: 600; } .tooltip .k { color: var(--text-secondary); }
+  .tooltip table { border-collapse: collapse; margin-top: 4px; } .tooltip td { padding: 1px 8px 1px 0; font-variant-numeric: tabular-nums; }
+  iframe { width: 100%; border: 1px solid var(--border); border-radius: 10px; background: var(--page); }
+  table.data { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.data th, table.data td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+  table.data th { color: var(--text-secondary); font-weight: 600; }
+  table.data td.num, table.data th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  table.data tr.g td { color: var(--text-primary); font-weight: 600; padding-top: 12px; border-bottom: none; }
+  .status { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .status .ok { color: var(--good); font-weight: 700; }
+  .status .part { color: var(--text-secondary); font-weight: 700; }
+  ul { margin: 6px 0 0; padding-left: 20px; } li { margin: 4px 0; }
+  .note { color: var(--text-muted); font-size: 12px; margin: 12px 0 0; line-height: 1.5; }
+  .hidden { display: none; }
+  @media (max-width: 760px) { .tiles { grid-template-columns: repeat(2, 1fr); } }
+</style>
+</head>
+<body>
+<div class="viz-root">
+<div class="wrap">
+
+  <div class="card">
+    <div class="toolbar">
+      <div>
+        <h1>Blaxel sandbox benchmarks: fleet report</h1>
+        <p class="sub" id="subtitle"></p>
+      </div>
+      <span class="spacer"></span>
+      <button type="button" id="toggle-theme">Dark mode</button>
+    </div>
+    <div class="tiles" id="tiles"></div>
+  </div>
+
+  <div class="card">
+    <h2>Three host types, relative to the AMD EPYC (Debian) baseline</h2>
+    <p class="sub">Headline metrics. Each bar is that host's median relative to the EPYC median on a log scale, better-direction so right of 1× is faster. Hover a row for the raw values; the table below carries everything.</p>
+    <div class="legend" aria-label="Legend">
+      <span><i class="sw s1"></i>ARM (Alpine)</span>
+      <span><i class="sw s2"></i>Intel Xeon (Alpine)</span>
+      <span><i class="sw base"></i>AMD EPYC (Debian) = 1×</span>
+    </div>
+    <div id="hosts-chart" style="position:relative"></div>
+    <div class="tooltip" id="tooltip" role="tooltip"></div>
+    <div class="toolbar" style="margin-top:12px"><button type="button" id="toggle-table" aria-controls="hosts-table" aria-expanded="false">Show all metrics as a table</button></div>
+    <div id="hosts-table" class="hidden"></div>
+    <p class="note" id="hosts-note"></p>
+  </div>
+
+  <div class="card">
+    <h2>ARM (Alpine) vs x86 (Debian), pooled</h2>
+    <p class="sub">Every metric both fleets share. ARM pools the ARMv8 Alpine runs; x86 is upstream's EPYC Debian run 34853816482. Interactive: hover, table view, dark mode.</p>
+    <iframe src="arm-vs-x86.html" title="ARM (Alpine) vs x86 (Debian) diverging chart" height="1800"></iframe>
+  </div>
+
+  <div class="card">
+    <h2>Same day, same Alpine image: ARM vs Intel Xeon</h2>
+    <p class="sub">Runs 35416607047 (ARMv8) and 35464215327 (Xeon), both Alpine 3.21, so the OS is held constant. The Xeon pool is the slowest host type in the fleet on CPU- and disk-bound work, which is why ARM leads almost everywhere here.</p>
+    <iframe src="arm-vs-x86-alpine.html" title="Same-day Alpine ARM vs Xeon diverging chart" height="1660"></iframe>
+  </div>
+
+  <div class="card">
+    <h2>Run timeline</h2>
+    <p class="sub">Every Blaxel run committed to the fork's dataset since 14 September, with the host the scheduler placed it on. Host type is read from the sandbox, not from the image, because the same image lands on different pools.</p>
+    <div id="timeline"></div>
+    <p class="note">Status: <b>complete</b> means every planned cell validated; <b>partial</b> means the dataset kept the verified cells and recorded the failed ones as gaps. Runs before 17 September predate the Alpine port and used the Debian image on the EPYC pool.</p>
+  </div>
+
+  <div class="card">
+    <h2>What changed to get here, and what is still open</h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+      <div>
+        <h2 style="font-size:14px;color:var(--text-secondary)">Fixed in the fork</h2>
+        <ul>
+          <li><b>Fork setup.</b> Account-journal branches provisioned; Blaxel moved to benchmark-scoped admission so a shared dev workspace no longer blocks allocation.</li>
+          <li><b>Alpine port.</b> apk package path, musl mise, apk Node 22, PTS from tarball, bash bootstrap, busybox-safe keepalive. Works on arm64 and x86_64.</li>
+          <li><b>Network resilience.</b> apk retries and mirror fallback; DNS64/NAT64 fallback when the sandbox resolvers fail; each placement is probed for egress and dead ones are re-created, up to three times.</li>
+          <li><b>fio.</b> Source tarball mirrored as a release asset and seeded into the PTS cache, since brick.kernel.dk is unreachable from the fleet.</li>
+          <li><b>Diagnostics.</b> Every post-create step logs its state and architecture, so a failed cell names its cause in the job log.</li>
+          <li><b>Plan.</b> realworld-openclaw is dropped for Blaxel at planning; its dependency ships no arm64-musl build.</li>
+        </ul>
+      </div>
+      <div>
+        <h2 style="font-size:14px;color:var(--text-secondary)">Open</h2>
+        <ul>
+          <li><b>Placement is scheduler luck.</b> The same image lands on ARM or Xeon depending on the hour. The SDK exposes region, subnet and egress gateway but no architecture knob; a way to pin the pool would make results comparable run to run.</li>
+          <li><b>ARM pool egress flaps.</b> It failed on 17 Sep and again on 19 Sep before being repaired; the retry masks brief outages but not sustained ones.</li>
+          <li><b>Xeon pool is slow.</b> Half the memory bandwidth and a fifth of the buffered disk throughput of EPYC; two runs agree. Worth knowing before quoting any "x86" number from it.</li>
+          <li><b>Long cells can lose their sandbox.</b> The Mastra cell on 19 Sep 19:23 stopped responding after 80 minutes with a data-plane 404.</li>
+          <li><b>Not measurable on Alpine.</b> realworld-openclaw (arm64-musl) and fast-cli (glibc-only Chrome).</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<script id="data" type="application/json">{"generated":"2026-09-20","runs":[{"runId":"34781421576","at":"2026-09-14T00:12:55.940Z","sha":"08dfc6eb","host":"epyc-debian","hostLabel":"AMD EPYC (Debian)","cpu":"AMD EPYC","os":"Debian GNU/Linux 12 (bookworm)","metrics":43,"suites":9,"gaps":4,"failedGaps":4,"complete":false,"suitesCovered":["cpu-node","disk","memory","network","pgbench","realworld-better-auth","realworld-mastra","realworld-openclaw","system"]},{"runId":"34804682438","at":"2026-09-14T05:26:28.695Z","sha":"eea984ce","host":"epyc-debian","hostLabel":"AMD EPYC (Debian)","cpu":"AMD EPYC","os":"Debian GNU/Linux 12 (bookworm)","metrics":46,"suites":9,"gaps":4,"failedGaps":4,"complete":false,"suitesCovered":["cpu-node","disk","memory","network","pgbench","realworld-better-auth","realworld-mastra","realworld-openclaw","system"]},{"runId":"34853816482","at":"2026-09-14T16:49:58.613Z","sha":"845a0f19","host":"epyc-debian","hostLabel":"AMD EPYC (Debian)","cpu":"AMD EPYC","os":"Debian GNU/Linux 12 (bookworm)","metrics":46,"suites":9,"gaps":4,"failedGaps":4,"complete":false,"suitesCovered":["cpu-node","disk","memory","network","pgbench","realworld-better-auth","realworld-mastra","realworld-openclaw","system"]},{"runId":"35008234357","at":"2026-09-15T21:49:09.784Z","sha":"6e68d808","host":"epyc-debian","hostLabel":"AMD EPYC (Debian)","cpu":"AMD EPYC","os":"Debian GNU/Linux 12 (bookworm)","metrics":46,"suites":9,"gaps":4,"failedGaps":4,"complete":false,"suitesCovered":["cpu-node","disk","memory","network","pgbench","realworld-better-auth","realworld-mastra","realworld-openclaw","system"]},{"runId":"35023569840","at":"2026-09-15T21:33:08.891Z","sha":"deeee5a4","host":"epyc-debian","hostLabel":"AMD EPYC (Debian)","cpu":"AMD EPYC","os":"Debian GNU/Linux 12 (bookworm)","metrics":4,"suites":2,"gaps":18,"failedGaps":18,"complete":false,"suitesCovered":["cpu-node","system"]},{"runId":"35247716410","at":"2026-09-17T17:53:23.148Z","sha":"f6874780","host":"arm-alpine","hostLabel":"ARM (Alpine)","cpu":"ARMv8","os":"Alpine Linux v3.21","metrics":32,"suites":8,"gaps":8,"failedGaps":3,"complete":false,"suitesCovered":["cpu-node","disk","memory","network","pgbench","realworld-better-auth","realworld-mastra","system"]},{"runId":"35254700103","at":"2026-09-17T19:20:47.646Z","sha":"5c162190","host":"epyc-debian","hostLabel":"AMD EPYC (Debian)","cpu":"AMD EPYC","os":"Debian GNU/Linux 12 (bookworm)","metrics":46,"suites":9,"gaps":6,"failedGaps":5,"complete":false,"suitesCovered":["cpu-node","disk","memory","network","pgbench","realworld-better-auth","realworld-mastra","realworld-openclaw","system"]},{"runId":"35300489795","at":"2026-09-18T04:09:47.085Z","sha":"d29ca86a","host":"arm-alpine","hostLabel":"ARM (Alpine)","cpu":"ARMv8","os":"Alpine Linux v3.21","metrics":41,"suites":8,"gaps":3,"failedGaps":2,"complete":false,"suitesCovered":["cpu-node","disk","memory","network","pgbench","realworld-better-auth","realworld-mastra","system"]},{"runId":"35312759151","at":"2026-09-18T07:21:21.173Z","sha":"0a361c33","host":"arm-alpine","hostLabel":"ARM (Alpine)","cpu":"ARMv8","os":"Alpine Linux v3.21","metrics":41,"suites":8,"gaps":3,"failedGaps":2,"complete":false,"suitesCovered":["cpu-node","disk","memory","network","pgbench","realworld-better-auth","realworld-mastra","system"]},{"runId":"35398728363","at":"2026-09-18T23:18:55.289Z","sha":"fb826b66","host":"xeon-alpine","hostLabel":"Intel Xeon (Alpine)","cpu":"Intel Xeon","os":"Alpine Linux v3.21","metrics":41,"suites":8,"gaps":0,"failedGaps":0,"complete":true,"suitesCovered":["cpu-node","disk","memory","network","pgbench","realworld-better-auth","realworld-mastra","system"]},{"runId":"35416607047","at":"2026-09-19T04:09:22.065Z","sha":"83aeb5a4","host":"arm-alpine","hostLabel":"ARM (Alpine)","cpu":"ARMv8","os":"Alpine Linux v3.21","metrics":41,"suites":8,"gaps":0,"failedGaps":0,"complete":true,"suitesCovered":["cpu-node","disk","memory","network","pgbench","realworld-better-auth","realworld-mastra","system"]},{"runId":"35464215327","at":"2026-09-19T21:55:08.613Z","sha":"ee47d218","host":"xeon-alpine","hostLabel":"Intel Xeon (Alpine)","cpu":"Intel Xeon","os":"Alpine Linux v3.21","metrics":36,"suites":7,"gaps":2,"failedGaps":2,"complete":false,"suitesCovered":["cpu-node","disk","memory","network","pgbench","realworld-better-auth","system"]}],"metrics":[{"id":"node_web_tooling_runs_per_s","dimension":"cpu","label":"Node.js web tooling","unit":"runs/s","direction":"HIB","headline":true,"arm":24.685000000000002,"xeon":10.825,"epyc":20.13,"nArm":8,"nXeon":4,"nEpyc":32,"armVsEpyc":1.226279185295579,"xeonVsEpyc":0.5377545951316443,"armVsXeon":2.2803695150115475},{"id":"fio_type_random_read_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_iops","dimension":"disk","label":"fio rand read 4KB, buffered (IOPS)","unit":"IOPS","direction":"HIB","headline":false,"arm":57000,"xeon":21450,"epyc":53400,"nArm":6,"nXeon":4,"nEpyc":30,"armVsEpyc":1.0674157303370786,"xeonVsEpyc":0.40168539325842695,"armVsXeon":2.6573426573426575},{"id":"fio_type_random_read_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_mb_per_s","dimension":"disk","label":"fio rand read 4KB, buffered (MB/s)","unit":"MB/s","direction":"HIB","headline":false,"arm":233.30816,"xeon":88.0279552,"epyc":218.628096,"nArm":6,"nXeon":4,"nEpyc":30,"armVsEpyc":1.0671462829736211,"xeonVsEpyc":0.4026378896882494,"armVsXeon":2.6503871351995234},{"id":"fio_type_random_write_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_iops","dimension":"disk","label":"fio rand write 4KB, buffered (IOPS)","unit":"IOPS","direction":"HIB","headline":false,"arm":293000,"xeon":72850,"epyc":295000,"nArm":6,"nXeon":4,"nEpyc":30,"armVsEpyc":0.9932203389830508,"xeonVsEpyc":0.24694915254237287,"armVsXeon":4.021962937542896},{"id":"fio_type_random_write_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_mb_per_s","dimension":"disk","label":"fio rand write 4KB, buffered (MB/s)","unit":"MB/s","direction":"HIB","headline":true,"arm":1199.570944,"xeon":298.31987200000003,"epyc":1210.056704,"nArm":6,"nXeon":4,"nEpyc":30,"armVsEpyc":0.9913344887348353,"xeonVsEpyc":0.24653379549393414,"armVsXeon":4.021089630931458},{"id":"fio_type_sequential_read_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_iops","dimension":"disk","label":"fio seq read 1MB, buffered (IOPS)","unit":"IOPS","direction":"HIB","headline":false,"arm":11450,"xeon":1670.5,"epyc":7843.5,"nArm":6,"nXeon":4,"nEpyc":30,"armVsEpyc":1.4598074839038695,"xeonVsEpyc":0.21297889972588768,"armVsXeon":6.854235258904519},{"id":"fio_type_sequential_read_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_mb_per_s","dimension":"disk","label":"fio seq read 1MB, buffered (MB/s)","unit":"MB/s","direction":"HIB","headline":false,"arm":12025.9084288,"xeon":1753.74336,"epyc":8226.078720000001,"nArm":6,"nXeon":4,"nEpyc":30,"armVsEpyc":1.461924792861695,"xeonVsEpyc":0.2131931166347992,"armVsXeon":6.8572795216741405},{"id":"fio_type_sequential_write_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_iops","dimension":"disk","label":"fio seq write 1MB, buffered (IOPS)","unit":"IOPS","direction":"HIB","headline":false,"arm":2014,"xeon":1616,"epyc":3240,"nArm":6,"nXeon":4,"nEpyc":30,"armVsEpyc":0.6216049382716049,"xeonVsEpyc":0.49876543209876545,"armVsXeon":1.2462871287128714},{"id":"fio_type_sequential_write_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_mb_per_s","dimension":"disk","label":"fio seq write 1MB, buffered (MB/s)","unit":"MB/s","direction":"HIB","headline":false,"arm":2113.404928,"xeon":1696.07168,"epyc":3399.483392,"nArm":6,"nXeon":4,"nEpyc":30,"armVsEpyc":0.6216841455891424,"xeonVsEpyc":0.4989204194941394,"armVsXeon":1.2460587326120556},{"id":"hardlink_bogo_ops_per_s","dimension":"disk","label":"Hardlink throughput","unit":"bogo ops/s","direction":"HIB","headline":false,"arm":13.02,"xeon":11.254999999999999,"epyc":20.26,"nArm":6,"nXeon":4,"nEpyc":30,"armVsEpyc":0.6426456071076011,"xeonVsEpyc":0.5555281342546889,"armVsXeon":1.1568191914704575},{"id":"stream_type_add","dimension":"memory","label":"STREAM Add","unit":"MB/s","direction":"HIB","headline":false,"arm":140233.5,"xeon":64860.1,"epyc":97416,"nArm":8,"nXeon":4,"nEpyc":30,"armVsEpyc":1.4395325203252032,"xeonVsEpyc":0.6658054118419972,"armVsXeon":2.162091948671063},{"id":"stream_type_copy","dimension":"memory","label":"STREAM Copy","unit":"MB/s","direction":"HIB","headline":false,"arm":139966.34999999998,"xeon":56597.350000000006,"epyc":101059.7,"nArm":8,"nXeon":4,"nEpyc":30,"armVsEpyc":1.3849867949340833,"xeonVsEpyc":0.5600387691631779,"armVsXeon":2.47301949649586},{"id":"stream_type_scale","dimension":"memory","label":"STREAM Scale","unit":"MB/s","direction":"HIB","headline":false,"arm":138921.3,"xeon":63418.45,"epyc":90278.45,"nArm":8,"nXeon":4,"nEpyc":30,"armVsEpyc":1.5388090956368878,"xeonVsEpyc":0.7024760615628647,"armVsXeon":2.1905502263142664},{"id":"stream_type_triad","dimension":"memory","label":"STREAM Triad","unit":"MB/s","direction":"HIB","headline":true,"arm":140225.05,"xeon":64800.05,"epyc":97086,"nArm":8,"nXeon":4,"nEpyc":30,"armVsEpyc":1.4443385246070493,"xeonVsEpyc":0.6674499927898977,"armVsXeon":2.1639651512614573},{"id":"iperf_server_address_localhost_server_port_5201_duration_10_seconds_test_tcp_parallel_1","dimension":"network","label":"iperf3 loopback TCP, 1 stream","unit":"Mbits/sec","direction":"HIB","headline":false,"arm":93002.5,"xeon":60855.5,"epyc":98479.5,"nArm":8,"nXeon":4,"nEpyc":30,"armVsEpyc":0.9443843642585513,"xeonVsEpyc":0.6179509441051183,"armVsXeon":1.5282513495082615},{"id":"iperf_server_address_localhost_server_port_5201_duration_10_seconds_test_tcp_parallel_10","dimension":"network","label":"iperf3 loopback TCP, 10 streams","unit":"Mbits/sec","direction":"HIB","headline":false,"arm":66231.5,"xeon":79048,"epyc":99377.5,"nArm":8,"nXeon":4,"nEpyc":30,"armVsEpyc":0.6664637367613393,"xeonVsEpyc":0.7954315614701517,"armVsXeon":0.8378643355935634},{"id":"iperf_server_address_localhost_server_port_5201_duration_10_seconds_test_udp_10000mbit_objective_parallel_1","dimension":"network","label":"iperf3 loopback UDP, 10G objective","unit":"Mbits/sec","direction":"HIB","headline":false,"arm":9999,"xeon":9999,"epyc":9999,"nArm":8,"nXeon":4,"nEpyc":30,"armVsEpyc":1,"xeonVsEpyc":1,"armVsXeon":1},{"id":"iperf_wan_direction_download","dimension":"network","label":"iperf3 WAN download","unit":"Mbits/sec","direction":"HIB","headline":true,"arm":3779.38,"xeon":1160.25,"epyc":1920.71,"nArm":8,"nXeon":4,"nEpyc":30,"armVsEpyc":1.9676994444762614,"xeonVsEpyc":0.6040734936559918,"armVsXeon":3.257384184443008},{"id":"iperf_wan_direction_upload","dimension":"network","label":"iperf3 WAN upload","unit":"Mbits/sec","direction":"HIB","headline":true,"arm":6447.9400000000005,"xeon":2271.975,"epyc":2451.935,"nArm":8,"nXeon":4,"nEpyc":30,"armVsEpyc":2.629735290698979,"xeonVsEpyc":0.9266049059212418,"armVsXeon":2.8380329889193328},{"id":"realworld_better_auth_task_build","dimension":"realworld","label":"Better-Auth: build","unit":"Seconds","direction":"LIB","headline":false,"arm":56.751000000000005,"xeon":74.267,"epyc":86.3325,"nArm":4,"nXeon":2,"nEpyc":60,"armVsEpyc":1.5212507268594384,"xeonVsEpyc":1.1624611200129265,"armVsXeon":1.308646543673239},{"id":"realworld_better_auth_task_cold_install","dimension":"realworld","label":"Better-Auth: cold install","unit":"Seconds","direction":"LIB","headline":false,"arm":13.956,"xeon":20.828,"epyc":12.912500000000001,"nArm":4,"nXeon":2,"nEpyc":60,"armVsEpyc":0.9252292920607625,"xeonVsEpyc":0.6199587094296141,"armVsXeon":1.4924047004872456},{"id":"realworld_better_auth_task_git_clone","dimension":"realworld","label":"Better-Auth: git clone","unit":"Seconds","direction":"LIB","headline":false,"arm":3.2,"xeon":3.464,"epyc":0.7855000000000001,"nArm":4,"nXeon":2,"nEpyc":60,"armVsEpyc":0.24546875,"xeonVsEpyc":0.22676096997690534,"armVsXeon":1.0825},{"id":"realworld_better_auth_task_lint_biome","dimension":"realworld","label":"Better-Auth: lint (Biome)","unit":"Seconds","direction":"LIB","headline":false,"arm":51.411500000000004,"xeon":69.74000000000001,"epyc":3.7765,"nArm":4,"nXeon":2,"nEpyc":60,"armVsEpyc":0.07345632786438831,"xeonVsEpyc":0.054151132778893024,"armVsXeon":1.3565058401330443},{"id":"realworld_better_auth_task_lint_deps_knip","dimension":"realworld","label":"Better-Auth: lint deps (Knip)","unit":"Seconds","direction":"LIB","headline":false,"arm":9.8525,"xeon":18.095,"epyc":11.712499999999999,"nArm":4,"nXeon":2,"nEpyc":60,"armVsEpyc":1.1887845724435422,"xeonVsEpyc":0.6472782536612324,"armVsXeon":1.836589698046181},{"id":"realworld_better_auth_task_lint_format","dimension":"realworld","label":"Better-Auth: lint format","unit":"Seconds","direction":"LIB","headline":false,"arm":3.311,"xeon":6.0305,"epyc":3.373,"nArm":4,"nXeon":2,"nEpyc":60,"armVsEpyc":1.0187254605859257,"xeonVsEpyc":0.5593234391841473,"armVsXeon":1.8213530655391121},{"id":"realworld_better_auth_task_lint_packages","dimension":"realworld","label":"Better-Auth: lint packages","unit":"Seconds","direction":"LIB","headline":false,"arm":3.1174999999999997,"xeon":3.8515,"epyc":3.508,"nArm":4,"nXeon":2,"nEpyc":60,"armVsEpyc":1.125260625501203,"xeonVsEpyc":0.9108139685836687,"armVsXeon":1.2354450681635927},{"id":"realworld_better_auth_task_lint_spell","dimension":"realworld","label":"Better-Auth: lint spell","unit":"Seconds","direction":"LIB","headline":false,"arm":7.553,"xeon":15.116,"epyc":9.07,"nArm":4,"nXeon":2,"nEpyc":60,"armVsEpyc":1.2008473454256587,"xeonVsEpyc":0.6000264620269913,"armVsXeon":2.0013239772275915},{"id":"realworld_better_auth_task_lint_types","dimension":"realworld","label":"Better-Auth: lint types","unit":"Seconds","direction":"LIB","headline":false,"arm":28.644,"xeon":30.914,"epyc":45.277,"nArm":4,"nXeon":2,"nEpyc":60,"armVsEpyc":1.5806800726155565,"xeonVsEpyc":1.4646115028789546,"armVsXeon":1.0792487082809665},{"id":"realworld_better_auth_task_typecheck","dimension":"realworld","label":"Better-Auth: typecheck","unit":"Seconds","direction":"LIB","headline":false,"arm":41.086,"xeon":58.176500000000004,"epyc":52.066,"nArm":4,"nXeon":2,"nEpyc":60,"armVsEpyc":1.2672443167989098,"xeonVsEpyc":0.8949661805024365,"armVsXeon":1.4159689431923284},{"id":"realworld_mastra_task_build_core","dimension":"realworld","label":"Mastra: build:core","unit":"Seconds","direction":"LIB","headline":false,"arm":72.741,"xeon":70.147,"epyc":77.078,"nArm":4,"nXeon":1,"nEpyc":60,"armVsEpyc":1.059622496253832,"xeonVsEpyc":1.098806791452236,"armVsXeon":0.9643392309701545},{"id":"realworld_mastra_task_cold_install","dimension":"realworld","label":"Mastra: cold install","unit":"Seconds","direction":"LIB","headline":true,"arm":41.864000000000004,"xeon":46.407,"epyc":40.8985,"nArm":4,"nXeon":1,"nEpyc":60,"armVsEpyc":0.9769372253009745,"xeonVsEpyc":0.881300234878359,"armVsXeon":1.108518058475062},{"id":"realworld_mastra_task_git_clone","dimension":"realworld","label":"Mastra: git clone","unit":"Seconds","direction":"LIB","headline":false,"arm":6.04,"xeon":6.499,"epyc":2.207,"nArm":4,"nXeon":1,"nEpyc":60,"armVsEpyc":0.36539735099337745,"xeonVsEpyc":0.33959070626250193,"armVsXeon":1.0759933774834436},{"id":"realworld_mastra_task_lint_format","dimension":"realworld","label":"Mastra: lint:format","unit":"Seconds","direction":"LIB","headline":false,"arm":87.365,"xeon":87.956,"epyc":94.279,"nArm":4,"nXeon":1,"nEpyc":60,"armVsEpyc":1.0791392434041092,"xeonVsEpyc":1.0718882168356905,"armVsXeon":1.0067647227150462},{"id":"realworld_mastra_task_test_core","dimension":"realworld","label":"Mastra: test:core","unit":"Seconds","direction":"LIB","headline":false,"arm":1054.9945,"xeon":1028.681,"epyc":941.361,"nArm":4,"nXeon":1,"nEpyc":47,"armVsEpyc":0.8922899598054777,"xeonVsEpyc":0.915114598208774,"armVsXeon":0.9750581638103327},{"id":"realworld_openclaw_task_cold_install","dimension":"realworld","label":"OpenClaw: cold install","unit":"Seconds","direction":"LIB","headline":false,"epyc":13.888,"nArm":0,"nXeon":0,"nEpyc":60,"armVsEpyc":null,"xeonVsEpyc":null,"armVsXeon":null},{"id":"realworld_openclaw_task_git_clone","dimension":"realworld","label":"OpenClaw: git clone","unit":"Seconds","direction":"LIB","headline":false,"epyc":2.7525,"nArm":0,"nXeon":0,"nEpyc":60,"armVsEpyc":null,"xeonVsEpyc":null,"armVsXeon":null},{"id":"realworld_openclaw_task_lint_extensions_all","dimension":"realworld","label":"OpenClaw: lint (all extensions)","unit":"Seconds","direction":"LIB","headline":false,"epyc":158.547,"nArm":0,"nXeon":0,"nEpyc":48,"armVsEpyc":null,"xeonVsEpyc":null,"armVsXeon":null},{"id":"realworld_openclaw_task_lint_oxlint","dimension":"realworld","label":"OpenClaw: lint (Oxlint)","unit":"Seconds","direction":"LIB","headline":false,"epyc":303.87850000000003,"nArm":0,"nXeon":0,"nEpyc":48,"armVsEpyc":null,"xeonVsEpyc":null,"armVsXeon":null},{"id":"realworld_openclaw_task_typecheck","dimension":"realworld","label":"OpenClaw: typecheck (tsgo)","unit":"Seconds","direction":"LIB","headline":false,"epyc":18.243,"nArm":0,"nXeon":0,"nEpyc":49,"armVsEpyc":null,"xeonVsEpyc":null,"armVsXeon":null},{"id":"git_seconds","dimension":"system","label":"Git common operations","unit":"Seconds","direction":"LIB","headline":true,"arm":60.884,"xeon":69.8785,"epyc":41.718,"nArm":8,"nXeon":4,"nEpyc":30,"armVsEpyc":0.6852046514683662,"xeonVsEpyc":0.5970076633013016,"armVsXeon":1.147731752184482},{"id":"pgbench_scaling_factor_100_clients_50_mode_read_only","dimension":"system","label":"pgbench RO (s100, 50c)","unit":"TPS","direction":"HIB","headline":false,"arm":136454.05846149998,"xeon":123404.04296600001,"epyc":332287.363412,"nArm":8,"nXeon":4,"nEpyc":30,"armVsEpyc":0.4106507604152008,"xeonVsEpyc":0.37137747791207,"armVsXeon":1.105750307541346},{"id":"pgbench_scaling_factor_100_clients_50_mode_read_only_average_latency","dimension":"system","label":"pgbench RO latency (s100, 50c)","unit":"ms","direction":"LIB","headline":false,"arm":0.3665,"xeon":0.40549999999999997,"epyc":0.1505,"nArm":8,"nXeon":4,"nEpyc":30,"armVsEpyc":0.4106412005457026,"xeonVsEpyc":0.3711467324290999,"armVsXeon":1.106412005457026},{"id":"pgbench_scaling_factor_100_clients_50_mode_read_write","dimension":"system","label":"pgbench RW (s100, 50c)","unit":"TPS","direction":"HIB","headline":false,"arm":14916.298085999999,"xeon":15472.46254,"epyc":24723.429381,"nArm":8,"nXeon":4,"nEpyc":30,"armVsEpyc":0.6033264178740187,"xeonVsEpyc":0.6258218591588518,"armVsXeon":0.96405456128511},{"id":"pgbench_scaling_factor_100_clients_50_mode_read_write_average_latency","dimension":"system","label":"pgbench RW latency (s100, 50c)","unit":"ms","direction":"LIB","headline":false,"arm":3.3525,"xeon":3.2325,"epyc":2.0225,"nArm":8,"nXeon":4,"nEpyc":30,"armVsEpyc":0.6032811334824757,"xeonVsEpyc":0.625676720804331,"armVsXeon":0.9642058165548099},{"id":"pybench_milliseconds","dimension":"system","label":"PyBench","unit":"Milliseconds","direction":"LIB","headline":false,"arm":668.5,"xeon":683.5,"epyc":485,"nArm":8,"nXeon":4,"nEpyc":30,"armVsEpyc":0.7255048616305161,"xeonVsEpyc":0.709583028529627,"armVsXeon":1.0224382946896036},{"id":"sqlite_speedtest_seconds","dimension":"system","label":"SQLite Speedtest","unit":"Seconds","direction":"LIB","headline":false,"arm":51.5035,"xeon":55.712,"epyc":37.941,"nArm":8,"nXeon":4,"nEpyc":30,"armVsEpyc":0.7366683817604629,"xeonVsEpyc":0.6810202469844917,"armVsXeon":1.0817128932985136}],"headline":["node_web_tooling_runs_per_s","stream_type_copy","fio_type_sequential_read_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_mb_per_s","fio_type_random_read_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_iops","hardlink_bogo_ops_per_s","iperf_wan_direction_download","iperf_server_address_localhost_server_port_5201_duration_10_seconds_test_tcp_parallel_1","pgbench_scaling_factor_100_clients_50_mode_read_only","pgbench_scaling_factor_100_clients_50_mode_read_write","pybench_milliseconds","sqlite_speedtest_seconds","git_seconds","realworld_better_auth_task_build","realworld_better_auth_task_typecheck","realworld_mastra_task_build_core","realworld_mastra_task_test_core"]}</script>
+<script>
+(() => {
+  const DATA = JSON.parse(document.getElementById("data").textContent);
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const fmtVal = v => v == null ? "–" : v >= 1000 ? Math.round(v).toLocaleString("en-US") : String(+v.toPrecision(3));
+  const fmtRel = r => r == null ? "–" : r >= 1 ? `${(+r.toFixed(2)).toString().replace(/\.?0+$/, "")}× faster` : `${(+(1 / r).toFixed(2)).toString().replace(/\.?0+$/, "")}× slower`;
+  const GROUP = { cpu: "CPU (Node)", memory: "Memory (STREAM)", disk: "Disk (fio, hardlink)", network: "Network (iperf3)", realworld: "Real-world pipelines", system: "System (pgbench, SQLite, git, PyBench)" };
+  const ORDER = ["cpu", "memory", "disk", "network", "realworld", "system"];
+
+  // ---- subtitle + tiles -----------------------------------------------------------
+  const runs = DATA.runs.slice().sort((a, b) => a.at.localeCompare(b.at));
+  const all3 = DATA.metrics.filter(m => m.arm != null && m.xeon != null && m.epyc != null);
+  const armRuns = runs.filter(r => r.host === "arm-alpine"), xeonRuns = runs.filter(r => r.host === "xeon-alpine"), epycRuns = runs.filter(r => r.host === "epyc-debian");
+  const greenArm = armRuns.filter(r => r.complete);
+  document.getElementById("subtitle").textContent =
+    `Fork Joffref/hpc-sandbox-benchmarks · ${runs.length} committed runs from ${runs[0].at.slice(0, 10)} to ${runs.at(-1).at.slice(0, 10)} · generated ${DATA.generated}`;
+  const tiles = [
+    { label: "Committed Blaxel runs", value: runs.length, delta: `${armRuns.length} ARM · ${xeonRuns.length} Xeon · ${epycRuns.length} EPYC` },
+    { label: "Metrics compared across all three hosts", value: all3.length, delta: `of ${DATA.metrics.length} catalogued` },
+    { label: "ARM vs EPYC, all shared metrics", value: `${all3.filter(m => m.armVsEpyc > 1.02).length}–${all3.filter(m => m.armVsEpyc < 0.98).length}`, delta: `faster – slower; ${all3.filter(m => m.armVsEpyc >= 0.98 && m.armVsEpyc <= 1.02).length} within 2%` },
+    { label: "Fully green ARM matrices", value: greenArm.length, delta: greenArm.length ? `latest ${greenArm.at(-1).at.slice(0, 10)}, run ${greenArm.at(-1).runId}` : "none yet" },
+  ];
+  document.getElementById("tiles").innerHTML = tiles.map(t => `<div class="tile"><div class="label">${esc(t.label)}</div><div class="value">${esc(t.value)}</div><div class="delta">${esc(t.delta)}</div></div>`).join("");
+
+  // ---- grouped host chart (headline metrics) ----------------------------------------
+  const head = DATA.headline.map(id => DATA.metrics.find(m => m.id === id)).filter(m => m && m.arm != null && m.xeon != null && m.epyc != null);
+  const W = 976, ML = 268, MR = 100, MT = 34, MB = 30, ROW = 34, BAR = 11, GAP = 2, GH = 30, GG = 12;
+  const plotW = W - ML - MR, lg = v => Math.log2(v);
+  const maxAbs = Math.max(...head.flatMap(m => [Math.abs(lg(m.armVsEpyc)), Math.abs(lg(m.xeonVsEpyc))]));
+  const dom = Math.max(1, Math.ceil(maxAbs * 2) / 2);
+  const x = v => ML + ((lg(v) + dom) / (2 * dom)) * plotW, x0 = x(1);
+  const fmtX = v => v >= 1 ? `${Math.round(v)}×` : `1/${Math.round(1 / v)}×`;
+  let y = MT; const placed = [];
+  for (const g of ORDER) { const list = head.filter(m => m.dimension === g); if (!list.length) continue; placed.push({ kind: "group", g, y }); y += GH; for (const m of list) { placed.push({ kind: "row", m, y }); y += ROW; } y += GG; }
+  const H = y + MB;
+  // Direct labels: the two most extreme ratios per series only; the rest ride in tooltip + table.
+  const extremes = new Set();
+  for (const key of ["armVsEpyc", "xeonVsEpyc"]) { const s = head.slice().sort((a, b) => Math.abs(lg(b[key])) - Math.abs(lg(a[key]))); for (const m of s.slice(0, 2)) extremes.add(`${key}:${m.id}`); }
+  const ticks = []; for (let t = -Math.floor(dom); t <= Math.floor(dom) + 1e-9; t += 1) ticks.push(t);
+  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-labelledby="hc-title hc-desc"><title id="hc-title">Host types relative to EPYC</title><desc id="hc-desc">Grouped bars per metric: ARM and Xeon medians relative to EPYC on a log scale.</desc>`;
+  svg += `<g class="grid">${ticks.map(t => { const tx = ML + ((t + dom) / (2 * dom)) * plotW; return `<line x1="${tx}" x2="${tx}" y1="${MT - 8}" y2="${H - MB}"/>`; }).join("")}</g>`;
+  svg += `<line class="baseline" x1="${x0}" x2="${x0}" y1="${MT - 12}" y2="${H - MB + 4}"/>`;
+  svg += ticks.map(t => { const tx = ML + ((t + dom) / (2 * dom)) * plotW; return `<text class="tick" x="${tx}" y="${MT - 14}" text-anchor="middle">${fmtX(2 ** t)}</text>`; }).join("");
+  svg += `<text class="axislabel" x="${ML}" y="${H - 8}">← slower than EPYC</text><text class="axislabel" x="${ML + plotW}" y="${H - 8}" text-anchor="end">faster than EPYC →</text>`;
+  const bar = (cls, ratio, by) => { const xr = x(ratio), w = Math.max(0, Math.abs(xr - x0)), rr = Math.min(4, w); if (w < 0.5) return `<path class="bar ${cls}" d="M${x0 - 0.5},${by} h1 v${BAR} h-1 z"/>`; const d = ratio >= 1 ? `M${x0},${by} h${w - rr} a${rr},${rr} 0 0 1 ${rr},${rr} v${BAR - 2 * rr} a${rr},${rr} 0 0 1 -${rr},${rr} h-${w - rr} z` : `M${x0},${by} h-${w - rr} a${rr},${rr} 0 0 0 -${rr},${rr} v${BAR - 2 * rr} a${rr},${rr} 0 0 0 ${rr},${rr} h${w - rr} z`; return `<path class="bar ${cls}" d="${d}"/>`; };
+  const vlabel = (ratio, by) => { const text = fmtRel(ratio), approx = text.length * 6.3, xr = x(ratio); let tx = ratio >= 1 ? xr + 7 : xr - 7, anchor = ratio >= 1 ? "start" : "end"; if (ratio < 1 && xr - 7 - approx < ML + 4) { tx = x0 + 7; anchor = "start"; } return `<text class="vlabel" x="${tx}" y="${by + BAR - 2}" text-anchor="${anchor}">${esc(text)}</text>`; };
+  for (const p of placed) {
+    if (p.kind === "group") { svg += `<text class="group" x="8" y="${p.y + 19}">${esc(GROUP[p.g])}</text>`; continue; }
+    const m = p.m, y1 = p.y + (ROW - (2 * BAR + GAP)) / 2, y2 = y1 + BAR + GAP;
+    svg += `<g class="row" tabindex="0" data-id="${esc(m.id)}" aria-label="${esc(m.label)}: ARM ${esc(fmtRel(m.armVsEpyc))}, Xeon ${esc(fmtRel(m.xeonVsEpyc))} than EPYC">`;
+    svg += `<text class="metric" x="${ML - 12}" y="${p.y + ROW / 2 + 4}" text-anchor="end">${esc(m.label)}</text>`;
+    svg += bar("s1", m.armVsEpyc, y1) + bar("s2", m.xeonVsEpyc, y2);
+    if (extremes.has(`armVsEpyc:${m.id}`)) svg += vlabel(m.armVsEpyc, y1);
+    if (extremes.has(`xeonVsEpyc:${m.id}`)) svg += vlabel(m.xeonVsEpyc, y2);
+    svg += `<rect class="hit" x="${ML - 260}" y="${p.y}" width="${plotW + 260 + MR}" height="${ROW}"/></g>`;
+  }
+  svg += `</svg>`;
+  const chart = document.getElementById("hosts-chart"); chart.innerHTML = svg;
+  document.getElementById("hosts-note").textContent =
+    `Medians of pooled samples per host type: ARM ${armRuns.length} runs, Xeon ${xeonRuns.length} runs, EPYC ${epycRuns.length} runs (fork and upstream, Debian image). All 4 vCPU / 8 GiB / 40 GB. fio runs buffered (Direct=No) on every host, so its numbers reflect the page cache. Node.js web tooling and the real-world pipelines depend on the Node runtime, which is apk Node 22 on Alpine and mise Node 22.23.1 on Debian.`;
+
+  // ---- tooltip -------------------------------------------------------------------------
+  const tip = document.getElementById("tooltip"), byId = new Map(DATA.metrics.map(m => [m.id, m]));
+  const show = (el, ev) => { const m = byId.get(el.dataset.id); if (!m) return;
+    tip.innerHTML = `<b>${esc(m.label)}</b><div class="k">${esc(GROUP[m.dimension])} · ${m.direction === "LIB" ? "lower is better" : "higher is better"}</div><table>` +
+      `<tr><td class="k">ARM</td><td>${fmtVal(m.arm)} ${esc(m.unit)}</td><td>${esc(fmtRel(m.armVsEpyc))}</td><td class="k">n=${m.nArm}</td></tr>` +
+      `<tr><td class="k">Xeon</td><td>${fmtVal(m.xeon)} ${esc(m.unit)}</td><td>${esc(fmtRel(m.xeonVsEpyc))}</td><td class="k">n=${m.nXeon}</td></tr>` +
+      `<tr><td class="k">EPYC</td><td>${fmtVal(m.epyc)} ${esc(m.unit)}</td><td>baseline</td><td class="k">n=${m.nEpyc}</td></tr></table>`;
+    tip.style.opacity = "1"; const rect = chart.getBoundingClientRect(); const px = ev ? ev.clientX - rect.left : rect.width / 2, py = ev ? ev.clientY - rect.top : 0;
+    tip.style.left = `${Math.min(px + 14, rect.width - tip.offsetWidth - 8)}px`; tip.style.top = `${Math.max(0, py - tip.offsetHeight - 12) + chart.offsetTop}px`; };
+  const hide = () => { tip.style.opacity = "0"; };
+  for (const el of chart.querySelectorAll(".row")) { el.addEventListener("mousemove", ev => show(el, ev)); el.addEventListener("mouseleave", hide); el.addEventListener("focus", () => show(el, null)); el.addEventListener("blur", hide); }
+
+  // ---- full table ------------------------------------------------------------------------
+  let html = `<table class="data"><thead><tr><th>Metric</th><th>Unit</th><th>Better</th><th class="num">ARM (Alpine)</th><th class="num">Xeon (Alpine)</th><th class="num">EPYC (Debian)</th><th class="num">ARM vs EPYC</th><th class="num">Xeon vs EPYC</th></tr></thead><tbody>`;
+  for (const g of ORDER) { const list = DATA.metrics.filter(m => m.dimension === g); if (!list.length) continue; html += `<tr class="g"><td colspan="8">${esc(GROUP[g])}</td></tr>`;
+    for (const m of list) html += `<tr><td>${esc(m.label)}</td><td>${esc(m.unit)}</td><td>${m.direction === "LIB" ? "lower" : "higher"}</td><td class="num">${fmtVal(m.arm)}</td><td class="num">${fmtVal(m.xeon)}</td><td class="num">${fmtVal(m.epyc)}</td><td class="num">${esc(fmtRel(m.armVsEpyc))}</td><td class="num">${esc(fmtRel(m.xeonVsEpyc))}</td></tr>`; }
+  html += `</tbody></table>`;
+  const tv = document.getElementById("hosts-table"); tv.innerHTML = html;
+  const tbtn = document.getElementById("toggle-table");
+  tbtn.addEventListener("click", () => { const open = tv.classList.toggle("hidden") === false; tbtn.textContent = open ? "Hide table" : "Show all metrics as a table"; tbtn.setAttribute("aria-expanded", String(open)); });
+
+  // ---- timeline ------------------------------------------------------------------------------
+  const HOSTNAME = { "arm-alpine": "ARM (Alpine)", "xeon-alpine": "Intel Xeon (Alpine)", "epyc-debian": "AMD EPYC (Debian)" };
+  let tl = `<table class="data"><thead><tr><th>Date (UTC)</th><th>Run</th><th>Host</th><th class="num">Suites</th><th class="num">Metrics</th><th class="num">Gaps</th><th>Status</th></tr></thead><tbody>`;
+  for (const r of runs.slice().reverse()) tl += `<tr><td>${esc(r.at.slice(0, 16).replace("T", " "))}</td><td><a href="https://github.com/Joffref/hpc-sandbox-benchmarks/actions/runs/${esc(r.runId)}" style="color:inherit">${esc(r.runId)}</a></td><td>${esc(HOSTNAME[r.host] ?? r.hostLabel)}</td><td class="num">${r.suites}</td><td class="num">${r.metrics}</td><td class="num">${r.gaps}</td><td><span class="status">${r.complete ? '<span class="ok">✓</span> complete' : '<span class="part">◐</span> partial'}</span></td></tr>`;
+  tl += `</tbody></table>`;
+  document.getElementById("timeline").innerHTML = tl;
+
+  // ---- theme ------------------------------------------------------------------------------------
+  const root = document.documentElement, thbtn = document.getElementById("toggle-theme");
+  const isDark = () => root.dataset.theme === "dark" || (!root.dataset.theme && matchMedia("(prefers-color-scheme: dark)").matches);
+  const paint = () => { thbtn.textContent = isDark() ? "Light mode" : "Dark mode"; for (const f of document.querySelectorAll("iframe")) { try { f.contentDocument.documentElement.dataset.theme = isDark() ? "dark" : "light"; } catch {} } };
+  thbtn.addEventListener("click", () => { root.dataset.theme = isDark() ? "light" : "dark"; paint(); });
+  for (const f of document.querySelectorAll("iframe")) f.addEventListener("load", paint);
+  paint();
+})();
+</script>
+</body>
+</html>

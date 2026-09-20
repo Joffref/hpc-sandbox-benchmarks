@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Blaxel sandbox, same day, same Alpine image: ARM vs x86</title>
+<style>
+  .viz-root {
+    color-scheme: light;
+    --surface-1: #fcfcfb; --page: #f9f9f7;
+    --text-primary: #0b0b0b; --text-secondary: #52514e; --text-muted: #898781;
+    --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11,11,11,0.10);
+    --faster: #2a78d6; --slower: #e34948; --mid: #f0efec;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      color-scheme: dark;
+      --surface-1: #1a1a19; --page: #0d0d0d;
+      --text-primary: #ffffff; --text-secondary: #c3c2b7; --text-muted: #898781;
+      --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
+      --faster: #3987e5; --slower: #e66767; --mid: #383835;
+    }
+  }
+  :root[data-theme="dark"] .viz-root {
+    color-scheme: dark;
+    --surface-1: #1a1a19; --page: #0d0d0d;
+    --text-primary: #ffffff; --text-secondary: #c3c2b7; --text-muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
+    --faster: #3987e5; --slower: #e66767; --mid: #383835;
+  }
+  html, body { margin: 0; background: var(--page); }
+  body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--text-primary); }
+  .viz-root { background: var(--page); min-height: 100vh; padding: 32px 24px 48px; }
+  .card { max-width: 1040px; margin: 0 auto; background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 28px 32px 24px; }
+  h1 { font-size: 20px; font-weight: 600; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .sub { color: var(--text-secondary); margin: 0 0 18px; }
+  .toolbar { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; margin: 0 0 12px; color: var(--text-secondary); }
+  .legend { display: flex; gap: 18px; align-items: center; }
+  .legend span { display: inline-flex; align-items: center; gap: 8px; }
+  .sw { width: 14px; height: 10px; border-radius: 2px; display: inline-block; }
+  .sw.faster { background: var(--faster); } .sw.slower { background: var(--slower); }
+  .spacer { flex: 1; }
+  button { font: inherit; color: var(--text-primary); background: transparent; border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+  button:hover { background: var(--mid); }
+  svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .grid line { stroke: var(--grid); stroke-width: 1; }
+  .baseline { stroke: var(--axis); stroke-width: 1; }
+  .tick { fill: var(--text-muted); font-size: 12px; }
+  .group { fill: var(--text-primary); font-size: 13px; font-weight: 600; }
+  .metric { fill: var(--text-secondary); font-size: 12.5px; }
+  .vlabel { fill: var(--text-secondary); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .bar.faster { fill: var(--faster); } .bar.slower { fill: var(--slower); }
+  .hit { fill: transparent; cursor: default; }
+  .row:hover .bar, .row:focus-within .bar, .row:focus .bar { filter: brightness(0.9); }
+  .row:hover .metric, .row:focus .metric { fill: var(--text-primary); }
+  .tooltip { position: absolute; pointer-events: none; background: var(--surface-1); color: var(--text-primary); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 12.5px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); max-width: 300px; opacity: 0; transition: opacity 80ms; }
+  .tooltip b { font-weight: 600; } .tooltip .k { color: var(--text-secondary); }
+  .tooltip table { border-collapse: collapse; margin-top: 4px; } .tooltip td { padding: 1px 8px 1px 0; font-variant-numeric: tabular-nums; }
+  .note { color: var(--text-muted); font-size: 12px; margin: 16px 0 0; line-height: 1.5; }
+  table.data { width: 100%; border-collapse: collapse; margin-top: 18px; font-size: 13px; }
+  table.data th, table.data td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--grid); }
+  table.data th { color: var(--text-secondary); font-weight: 600; }
+  table.data td.num, table.data th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.data tr.g td { color: var(--text-primary); font-weight: 600; padding-top: 12px; border-bottom: none; }
+  .hidden { display: none; }
+  .sr { position: absolute; left: -9999px; }
+</style>
+</head>
+<body>
+<div class="viz-root" data-palette="#2a78d6,#e34948" data-mode="light">
+  <div class="card">
+    <h1>Blaxel sandbox, same day, same Alpine image: ARM vs x86</h1>
+    <p class="sub" id="subtitle"></p>
+    <div class="toolbar">
+      <div class="legend" aria-label="Legend">
+        <span><i class="sw faster"></i>ARM faster</span>
+        <span><i class="sw slower"></i>ARM slower</span>
+      </div>
+      <span class="spacer"></span>
+      <button type="button" id="toggle-table" aria-controls="table-view" aria-expanded="false">Show table</button>
+      <button type="button" id="toggle-theme">Dark mode</button>
+    </div>
+    <div id="chart" style="position:relative"></div>
+    <div class="tooltip" id="tooltip" role="tooltip"></div>
+    <p class="note" id="note"></p>
+    <div id="table-view" class="hidden"></div>
+  </div>
+</div>
+
+<script id="data" type="application/json">{"rows":[{"id":"node_web_tooling_runs_per_s","dimension":"cpu","label":"Node.js web tooling","unit":"runs/s","direction":"HIB","arm":24.25,"x86":10.825,"nArm":2,"nX86":2,"ratio":2.240184757505774,"pct":124.01847575057738},{"id":"fio_type_sequential_read_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_mb_per_s","dimension":"disk","label":"fio seq read 1MB, buffered (MB/s)","unit":"MB/s","direction":"HIB","arm":12079.595519999999,"x86":1739.063296,"nArm":2,"nX86":2,"ratio":6.946035574314139,"pct":594.6035574314138},{"id":"fio_type_sequential_read_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_iops","dimension":"disk","label":"fio seq read 1MB, buffered (IOPS)","unit":"IOPS","direction":"HIB","arm":11450,"x86":1657,"nArm":2,"nX86":2,"ratio":6.910078455039227,"pct":591.0078455039227},{"id":"fio_type_random_write_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_mb_per_s","dimension":"disk","label":"fio rand write 4KB, buffered (MB/s)","unit":"MB/s","direction":"HIB","arm":1242.5625599999998,"x86":298.84416,"nArm":2,"nX86":2,"ratio":4.157894736842105,"pct":315.7894736842105},{"id":"fio_type_random_write_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_iops","dimension":"disk","label":"fio rand write 4KB, buffered (IOPS)","unit":"IOPS","direction":"HIB","arm":303500,"x86":73000,"nArm":2,"nX86":2,"ratio":4.157534246575342,"pct":315.75342465753425},{"id":"fio_type_random_read_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_iops","dimension":"disk","label":"fio rand read 4KB, buffered (IOPS)","unit":"IOPS","direction":"HIB","arm":57250,"x86":21000,"nArm":2,"nX86":2,"ratio":2.7261904761904763,"pct":172.61904761904762},{"id":"fio_type_random_read_engine_linux_aio_direct_no_block_size_4kb_job_count_1_disk_target_default_test_directory_mb_per_s","dimension":"disk","label":"fio rand read 4KB, buffered (MB/s)","unit":"MB/s","direction":"HIB","arm":234.356736,"x86":86.19294719999999,"nArm":2,"nX86":2,"ratio":2.7189781021897814,"pct":171.89781021897815},{"id":"fio_type_sequential_write_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_iops","dimension":"disk","label":"fio seq write 1MB, buffered (IOPS)","unit":"IOPS","direction":"HIB","arm":2065.5,"x86":1639.5,"nArm":2,"nX86":2,"ratio":1.2598353156450137,"pct":25.983531564501373},{"id":"fio_type_sequential_write_engine_linux_aio_direct_no_block_size_1mb_job_count_1_disk_target_default_test_directory_mb_per_s","dimension":"disk","label":"fio seq write 1MB, buffered (MB/s)","unit":"MB/s","direction":"HIB","arm":2167.4065920000003,"x86":1721.237504,"nArm":2,"nX86":2,"ratio":1.2592141334145601,"pct":25.921413341456013},{"id":"hardlink_bogo_ops_per_s","dimension":"disk","label":"Hardlink throughput","unit":"bogo ops/s","direction":"HIB","arm":13.02,"x86":11.11,"nArm":2,"nX86":2,"ratio":1.171917191719172,"pct":17.191719171917196},{"id":"stream_type_copy","dimension":"memory","label":"STREAM Copy","unit":"MB/s","direction":"HIB","arm":167833,"x86":55104.65,"nArm":2,"nX86":2,"ratio":3.0457139279534484,"pct":204.57139279534485},{"id":"stream_type_scale","dimension":"memory","label":"STREAM Scale","unit":"MB/s","direction":"HIB","arm":167797.05,"x86":61540.100000000006,"nArm":2,"nX86":2,"ratio":2.7266294659904675,"pct":172.66294659904676},{"id":"stream_type_triad","dimension":"memory","label":"STREAM Triad","unit":"MB/s","direction":"HIB","arm":159585.7,"x86":63612.6,"nArm":2,"nX86":2,"ratio":2.5087121104938332,"pct":150.87121104938333},{"id":"stream_type_add","dimension":"memory","label":"STREAM Add","unit":"MB/s","direction":"HIB","arm":159481.05,"x86":63825.65,"nArm":2,"nX86":2,"ratio":2.498698407301766,"pct":149.8698407301766},{"id":"iperf_wan_direction_download","dimension":"network","label":"iperf3 WAN download","unit":"Mbits/sec","direction":"HIB","arm":3680.75,"x86":1117.15,"nArm":2,"nX86":2,"ratio":3.2947679362663918,"pct":229.47679362663916},{"id":"iperf_wan_direction_upload","dimension":"network","label":"iperf3 WAN upload","unit":"Mbits/sec","direction":"HIB","arm":6906.6,"x86":2340.525,"nArm":2,"nX86":2,"ratio":2.950876405934566,"pct":195.0876405934566},{"id":"iperf_server_address_localhost_server_port_5201_duration_10_seconds_test_tcp_parallel_1","dimension":"network","label":"iperf3 loopback TCP, 1 stream","unit":"Mbits/sec","direction":"HIB","arm":93537.5,"x86":70432,"nArm":2,"nX86":2,"ratio":1.3280540095411177,"pct":32.805400954111775},{"id":"iperf_server_address_localhost_server_port_5201_duration_10_seconds_test_udp_10000mbit_objective_parallel_1","dimension":"network","label":"iperf3 loopback UDP, 10G objective","unit":"Mbits/sec","direction":"HIB","arm":9999,"x86":9999,"nArm":2,"nX86":2,"ratio":1,"pct":0},{"id":"iperf_server_address_localhost_server_port_5201_duration_10_seconds_test_tcp_parallel_10","dimension":"network","label":"iperf3 loopback TCP, 10 streams","unit":"Mbits/sec","direction":"HIB","arm":66970,"x86":73760.5,"nArm":2,"nX86":2,"ratio":0.9079385307854475,"pct":-9.20614692145525},{"id":"realworld_better_auth_task_lint_spell","dimension":"realworld","label":"Better-Auth: lint spell","unit":"Seconds","direction":"LIB","arm":7.584,"x86":23.556,"nArm":1,"nX86":1,"ratio":3.1060126582278484,"pct":210.60126582278485},{"id":"realworld_better_auth_task_lint_format","dimension":"realworld","label":"Better-Auth: lint format","unit":"Seconds","direction":"LIB","arm":3.298,"x86":8.935,"nArm":1,"nX86":1,"ratio":2.7092177077016375,"pct":170.92177077016376},{"id":"realworld_better_auth_task_lint_deps_knip","dimension":"realworld","label":"Better-Auth: lint deps (Knip)","unit":"Seconds","direction":"LIB","arm":9.879,"x86":26.224,"nArm":1,"nX86":1,"ratio":2.6545196882275537,"pct":165.45196882275536},{"id":"realworld_better_auth_task_cold_install","dimension":"realworld","label":"Better-Auth: cold install","unit":"Seconds","direction":"LIB","arm":14.16,"x86":27.567,"nArm":1,"nX86":1,"ratio":1.946822033898305,"pct":94.6822033898305},{"id":"realworld_better_auth_task_typecheck","dimension":"realworld","label":"Better-Auth: typecheck","unit":"Seconds","direction":"LIB","arm":41.415,"x86":78.159,"nArm":1,"nX86":1,"ratio":1.8872147772546182,"pct":88.72147772546182},{"id":"realworld_better_auth_task_build","dimension":"realworld","label":"Better-Auth: build","unit":"Seconds","direction":"LIB","arm":56.664,"x86":93.136,"nArm":1,"nX86":1,"ratio":1.643653819003247,"pct":64.3653819003247},{"id":"realworld_better_auth_task_lint_packages","dimension":"realworld","label":"Better-Auth: lint packages","unit":"Seconds","direction":"LIB","arm":3.125,"x86":4.722,"nArm":1,"nX86":1,"ratio":1.5110400000000002,"pct":51.10400000000001},{"id":"realworld_better_auth_task_lint_types","dimension":"realworld","label":"Better-Auth: lint types","unit":"Seconds","direction":"LIB","arm":28.628,"x86":36.903,"nArm":1,"nX86":1,"ratio":1.2890526757021097,"pct":28.905267570210967},{"id":"realworld_better_auth_task_lint_biome","dimension":"realworld","label":"Better-Auth: lint (Biome)","unit":"Seconds","direction":"LIB","arm":54.923,"x86":65.498,"nArm":1,"nX86":1,"ratio":1.1925422864737907,"pct":19.25422864737907},{"id":"realworld_better_auth_task_git_clone","dimension":"realworld","label":"Better-Auth: git clone","unit":"Seconds","direction":"LIB","arm":3.184,"x86":3.717,"nArm":1,"nX86":1,"ratio":1.167399497487437,"pct":16.73994974874371},{"id":"git_seconds","dimension":"system","label":"Git common operations","unit":"Seconds","direction":"LIB","arm":61.0005,"x86":81.9965,"nArm":2,"nX86":2,"ratio":1.3441939000499994,"pct":34.41939000499994},{"id":"sqlite_speedtest_seconds","dimension":"system","label":"SQLite Speedtest","unit":"Seconds","direction":"LIB","arm":51.42,"x86":67.4825,"nArm":2,"nX86":2,"ratio":1.3123784519642163,"pct":31.23784519642163},{"id":"pgbench_scaling_factor_100_clients_50_mode_read_only_average_latency","dimension":"system","label":"pgbench RO latency (s100, 50c)","unit":"ms","direction":"LIB","arm":0.3545,"x86":0.4125,"nArm":2,"nX86":2,"ratio":1.16361071932299,"pct":16.36107193229901},{"id":"pgbench_scaling_factor_100_clients_50_mode_read_only","dimension":"system","label":"pgbench RO (s100, 50c)","unit":"TPS","direction":"HIB","arm":141035.312585,"x86":121306.7625195,"nArm":2,"nX86":2,"ratio":1.1626335552589548,"pct":16.263355525895484},{"id":"pybench_milliseconds","dimension":"system","label":"PyBench","unit":"Milliseconds","direction":"LIB","arm":669,"x86":756,"nArm":2,"nX86":2,"ratio":1.1300448430493273,"pct":13.004484304932728},{"id":"pgbench_scaling_factor_100_clients_50_mode_read_write_average_latency","dimension":"system","label":"pgbench RW latency (s100, 50c)","unit":"ms","direction":"LIB","arm":3.384,"x86":3.341,"nArm":2,"nX86":2,"ratio":0.9872931442080379,"pct":-1.2706855791962068},{"id":"pgbench_scaling_factor_100_clients_50_mode_read_write","dimension":"system","label":"pgbench RW (s100, 50c)","unit":"TPS","direction":"HIB","arm":14778.4277575,"x86":14971.5285305,"nArm":2,"nX86":2,"ratio":0.9871021337195721,"pct":-1.2897866280427883}],"armSpec":{"cpuModel":"ARMv8","detectedIsolation":"unknown","diskGb":40.2,"hostMemoryGb":8,"hostVcpus":4,"kernel":"6.1.166","memoryGb":7.77,"os":"Alpine Linux v3.21","vcpus":4,"virtualization":"unknown","asnSource":"ipinfo","city":"Ashburn","country":"US","egressAsn":"AS14618","egressOrg":"AS14618 Amazon.com, Inc.","egressOrgName":"Amazon.com, Inc.","geoSource":"ipinfo","location":"39.0437,-77.4875","region":"Virginia","timezone":"America/New_York"},"x86Spec":{"cpuModel":"Intel Xeon","detectedIsolation":"unknown","diskGb":40.2,"hostMemoryGb":8,"hostVcpus":4,"kernel":"6.1.166","memoryGb":7.78,"os":"Alpine Linux v3.21","vcpus":4,"virtualization":"unknown","asnSource":"ipinfo","city":"Ashburn","country":"US","egressAsn":"AS14618","egressOrg":"AS14618 Amazon.com, Inc.","egressOrgName":"Amazon.com, Inc.","geoSource":"ipinfo","location":"39.0437,-77.4875","region":"Virginia","timezone":"America/New_York"},"armRuns":["35416607047"],"x86Runs":["35464215327"]}</script>
+<script>
+(() => {
+  const DATA = JSON.parse(document.getElementById("data").textContent);
+  const rows = DATA.rows;
+  const GROUP_LABEL = { cpu: "CPU (Node)", memory: "Memory (STREAM)", disk: "Disk (fio, hardlink)", network: "Network (iperf3)", realworld: "Real-world pipelines", system: "System (pgbench, SQLite, git, PyBench)" };
+  const groups = ["cpu", "memory", "disk", "network", "realworld", "system"].filter(g => rows.some(r => r.dimension === g));
+
+  // ---- layout ---------------------------------------------------------------
+  const W = 976, ML = 268, MR = 96, MT = 34, MB = 30;
+  const ROW = 26, BAR = 16, GROUP_HEAD = 30, GROUP_GAP = 14;
+  const plotW = W - ML - MR;
+  const lg = v => Math.log2(v);
+  const maxAbs = Math.max(...rows.map(r => Math.abs(lg(r.ratio))));
+  const dom = Math.ceil(maxAbs * 2) / 2;               // symmetric, in log2 units (e.g. 2 => 0.25x .. 4x)
+  const x = v => ML + ((lg(v) + dom) / (2 * dom)) * plotW;
+  const x0 = x(1);
+
+  let y = MT; const placed = [];
+  for (const g of groups) {
+    placed.push({ kind: "group", g, y });
+    y += GROUP_HEAD;
+    const list = rows.filter(r => r.dimension === g);
+    const ext = list.length > 2 ? new Set([list[0].id, list[list.length - 1].id]) : new Set(list.map(r => r.id));
+    for (const r of list) { placed.push({ kind: "row", r, y, label: ext.has(r.id) }); y += ROW; }
+    y += GROUP_GAP;
+  }
+  const H = y + MB;
+
+  // Axis ticks at whole log2 steps only, written as multipliers (1/4×, 1/2×, 1×, 2×, 4×) so the
+  // symmetric scale reads as symmetric; half steps drew too many crowded labels.
+  const fmtX = v => v >= 1 ? `${Math.round(v)}×` : `1/${Math.round(1 / v)}×`;
+  const fmtRel = ratio => ratio >= 1 ? `${(+ratio.toFixed(ratio >= 10 ? 0 : 2)).toString().replace(/\.?0+$/, "")}× faster` : `${(+(1 / ratio).toFixed(2)).toString().replace(/\.?0+$/, "")}× slower`;
+  const fmtVal = v => v >= 1000 ? Math.round(v).toLocaleString("en-US") : +v.toPrecision(3);
+
+  const ticks = []; for (let t = -Math.floor(dom); t <= Math.floor(dom) + 1e-9; t += 1) ticks.push(t);
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-labelledby="chart-title chart-desc">`;
+  svg += `<title id="chart-title">ARM relative to x86 per metric</title><desc id="chart-desc">Diverging bars on a log scale; bars right of 1× mean ARM was faster, left mean slower. Table view below carries every value.</desc>`;
+  svg += `<g class="grid">`;
+  for (const t of ticks) { const tx = ML + ((t + dom) / (2 * dom)) * plotW; svg += `<line x1="${tx}" x2="${tx}" y1="${MT - 8}" y2="${H - MB}"/>`; }
+  svg += `</g>`;
+  svg += `<line class="baseline" x1="${x0}" x2="${x0}" y1="${MT - 12}" y2="${H - MB + 4}"/>`;
+  for (const t of ticks) { const tx = ML + ((t + dom) / (2 * dom)) * plotW; svg += `<text class="tick" x="${tx}" y="${MT - 14}" text-anchor="middle">${fmtX(2 ** t)}</text>`; }
+  svg += `<text class="tick" x="${ML}" y="${H - 8}" text-anchor="start">← ARM slower</text><text class="tick" x="${ML + plotW}" y="${H - 8}" text-anchor="end">ARM faster →</text>`;
+
+  for (const p of placed) {
+    if (p.kind === "group") { svg += `<text class="group" x="8" y="${p.y + 19}">${esc(GROUP_LABEL[p.g])}</text>`; continue; }
+    const r = p.r, cls = r.ratio >= 1 ? "faster" : "slower";
+    const xr = x(r.ratio), width = Math.max(0, Math.abs(xr - x0));
+    const by = p.y + (ROW - BAR) / 2, rr = Math.min(4, width);
+    // 4px rounded data-end, square at the baseline; 2px surface gap comes from ROW - BAR air.
+    let path;
+    if (width < 0.5) path = `M${x0 - 0.5},${by} h1 v${BAR} h-1 z`;
+    else if (r.ratio >= 1) path = `M${x0},${by} h${width - rr} a${rr},${rr} 0 0 1 ${rr},${rr} v${BAR - 2 * rr} a${rr},${rr} 0 0 1 -${rr},${rr} h-${width - rr} z`;
+    else path = `M${x0},${by} h-${width - rr} a${rr},${rr} 0 0 0 -${rr},${rr} v${BAR - 2 * rr} a${rr},${rr} 0 0 0 ${rr},${rr} h${width - rr} z`;
+    svg += `<g class="row" tabindex="0" data-id="${esc(r.id)}" aria-label="${esc(r.label)}: ${esc(fmtRel(r.ratio))}">`;
+    svg += `<text class="metric" x="${ML - 12}" y="${p.y + 17}" text-anchor="end">${esc(r.label)}</text>`;
+    svg += `<path class="bar ${cls}" d="${path}"/>`;
+    if (p.label) {
+      // Value label rides at the bar's data-end. A "slower" bar that reaches the left margin has no
+      // room outside its end without colliding with the metric name, so its label moves to the
+      // empty side of the baseline instead of being clipped or overlapping.
+      const text = fmtRel(r.ratio), approxW = text.length * 6.6;
+      let tx = r.ratio >= 1 ? xr + 8 : xr - 8, anchor = r.ratio >= 1 ? "start" : "end";
+      if (r.ratio < 1 && xr - 8 - approxW < ML + 4) { tx = x0 + 8; anchor = "start"; }
+      svg += `<text class="vlabel" x="${tx}" y="${p.y + 17}" text-anchor="${anchor}">${esc(text)}</text>`;
+    }
+    svg += `<rect class="hit" x="${ML - 260}" y="${p.y}" width="${plotW + 260 + MR}" height="${ROW}"/>`;
+    svg += `</g>`;
+  }
+  svg += `</svg>`;
+  const chart = document.getElementById("chart");
+  chart.innerHTML = svg;
+
+  // ---- subtitle / note ---------------------------------------------------------
+  const a = DATA.armSpec, b = DATA.x86Spec;
+  const faster = rows.filter(r => r.ratio > 1.02).length, slower = rows.filter(r => r.ratio < 0.98).length;
+  document.getElementById("subtitle").textContent =
+    `Median of each metric, ARM relative to x86 on a log scale. ${rows.length} metrics: ARM faster on ${faster}, slower on ${slower}, within 2% on ${rows.length - faster - slower}.`;
+  document.getElementById("note").innerHTML =
+    `ARM: ${esc(a.cpuModel)}, ${a.vcpus} vCPU, ${a.memoryGb} GiB, ${esc(a.os)}; ${(DATA.armRuns ?? []).length} dataset runs pooled (${(DATA.armRuns ?? []).join(", ")}), one sandbox per suite each, 2 PTS passes (real-world tasks 1 pass). ` +
+    `x86: ${esc(b.cpuModel)}, ${b.vcpus} vCPU, ${b.memoryGb} GiB, ${esc(b.os)}; run ${(DATA.x86Runs ?? []).join(", ")} (one sandbox per suite, 2 PTS passes; real-world 1 pass). ` +
+    `Both on Blaxel, same 40 GB ephemeral volume. Every value is the p50 median of that side's samples; "faster" is the better-direction ratio (time metrics inverted). ` +
+    `fio runs with Direct=No on both sides, so its numbers reflect the page cache, not the volume. ` +
+    `Not shown: realworld-mastra (the x86 cell lost its sandbox mid-run), realworld-openclaw (no arm64-musl build of a dependency), fast-cli (glibc-only Chrome). ` +
+    `Treat the ARM side as indicative until more replicates land.`;
+
+  // ---- tooltip -------------------------------------------------------------------
+  const tip = document.getElementById("tooltip"); const byId = new Map(rows.map(r => [r.id, r]));
+  const show = (el, ev) => {
+    const r = byId.get(el.dataset.id); if (!r) return;
+    tip.innerHTML = `<b>${esc(r.label)}</b><div class="k">${esc(GROUP_LABEL[r.dimension])} · ${esc(fmtRel(r.ratio))}</div>` +
+      `<table><tr><td class="k">ARM</td><td>${fmtVal(r.arm)} ${esc(r.unit)}</td><td class="k">n=${r.nArm}</td></tr>` +
+      `<tr><td class="k">x86</td><td>${fmtVal(r.x86)} ${esc(r.unit)}</td><td class="k">n=${r.nX86}</td></tr></table>` +
+      `<div class="k">${r.direction === "LIB" ? "lower is better" : "higher is better"}</div>`;
+    tip.style.opacity = "1";
+    const rect = chart.getBoundingClientRect();
+    const px = ev ? ev.clientX - rect.left : rect.width / 2, py = ev ? ev.clientY - rect.top : 0;
+    const tw = tip.offsetWidth, th = tip.offsetHeight;
+    tip.style.left = `${Math.min(px + 14, rect.width - tw - 8)}px`;
+    tip.style.top = `${Math.max(0, py - th - 12)}px`;
+  };
+  const hide = () => { tip.style.opacity = "0"; };
+  for (const el of chart.querySelectorAll(".row")) {
+    el.addEventListener("mousemove", ev => show(el, ev));
+    el.addEventListener("mouseleave", hide);
+    el.addEventListener("focus", () => show(el, null));
+    el.addEventListener("blur", hide);
+  }
+
+  // ---- table view ----------------------------------------------------------------
+  const tv = document.getElementById("table-view");
+  let html = `<table class="data"><thead><tr><th>Metric</th><th>Unit</th><th>Better</th><th class="num">ARM</th><th class="num">x86</th><th class="num">ARM vs x86</th></tr></thead><tbody>`;
+  for (const g of groups) {
+    html += `<tr class="g"><td colspan="6">${esc(GROUP_LABEL[g])}</td></tr>`;
+    for (const r of rows.filter(r => r.dimension === g)) {
+      html += `<tr><td>${esc(r.label)}</td><td>${esc(r.unit)}</td><td>${r.direction === "LIB" ? "lower" : "higher"}</td><td class="num">${fmtVal(r.arm)}</td><td class="num">${fmtVal(r.x86)}</td><td class="num">${esc(fmtRel(r.ratio))}</td></tr>`;
+    }
+  }
+  html += `</tbody></table>`;
+  tv.innerHTML = html;
+  const tbtn = document.getElementById("toggle-table");
+  tbtn.addEventListener("click", () => { const open = tv.classList.toggle("hidden") === false; tbtn.textContent = open ? "Hide table" : "Show table"; tbtn.setAttribute("aria-expanded", String(open)); });
+
+  // ---- theme toggle ----------------------------------------------------------------
+  const root = document.documentElement, thbtn = document.getElementById("toggle-theme");
+  const isDark = () => root.dataset.theme === "dark" || (!root.dataset.theme && matchMedia("(prefers-color-scheme: dark)").matches);
+  const paint = () => { thbtn.textContent = isDark() ? "Light mode" : "Dark mode"; };
+  thbtn.addEventListener("click", () => { root.dataset.theme = isDark() ? "light" : "dark"; paint(); });
+  paint();
+})();
+</script>
+</body>
+</html>

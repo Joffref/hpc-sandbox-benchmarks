@@ -15,6 +15,7 @@ import { resolveDriverArtifact } from "./driver-run.ts";
 import {
 	batchIsComplete,
 	cellStartupDeadline,
+	isDuplicateAttemptNoopRerun,
 	executeExperimentBatch,
 } from "./execute-experiment.ts";
 import { readExperimentAttempt, writeImmutableJson } from "./experiment-artifacts.ts";
@@ -620,6 +621,22 @@ test("workflow reruns cannot silently measure a planned sample again", async () 
 	expect(
 		rerun.every((attempt) => attempt.outcome === "failed" && !attempt.measurementStarted),
 	).toBe(true);
+});
+
+test("duplicate-attempt reruns are classified as no-op reruns", async () => {
+	const f = await fixture("rerun-noop");
+	await executeExperimentBatch(f.options);
+	const rerun = await executeExperimentBatch({ ...f.options, workflowAttempt: 2 });
+	expect(isDuplicateAttemptNoopRerun(rerun)).toBe(true);
+	expect(isDuplicateAttemptNoopRerun([])).toBe(false);
+	expect(
+		isDuplicateAttemptNoopRerun([
+			{
+				...rerun[0]!,
+				outcome: "completed",
+			},
+		]),
+	).toBe(false);
 });
 
 test("a failed terminal upload does not discard its local immutable evidence or repeat allocation", async () => {
